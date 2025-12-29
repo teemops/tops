@@ -1,0 +1,375 @@
+## Template for IAM Role
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "IAM role for an account to be accessed by Teemops Parent AWS Account"
+Parameters:
+  # Parent AWS Account
+  ParentAWSAccountId:
+    Type: String
+    Description: "The AWS Account ID of the Teemops root account"
+    AllowedPattern: "[0-9]{12}"
+    MinLength: 12
+    MaxLength: 12
+    Default: "163057906376"
+  ExternalId:
+    Type: String
+    Description: "External STS ID DO NOT CHANGE"
+    AllowedPattern: "[a-zA-Z0-9]*"
+    MinLength: 10
+    MaxLength: 200
+  UniqueId:
+    Type: String
+    Description: "Unique GUID DO NOT CHANGE"
+    AllowedPattern: "[a-zA-Z0-9-]*"
+    MinLength: 10
+    MaxLength: 200
+  # RootAccountHash:
+  #   Type: String
+  #   Description: "Root Tops Account Hash DO NOT CHANGE. Used for SNS topic sending to root account."
+  #   AllowedPattern: "[a-zA-Z0-9-]*"
+  #   MinLength: 10
+  #   MaxLength: 200
+Resources:
+  TopsCustomNotifier:
+    Type: Custom::TeemopsPingSNS
+    Version: 1.0
+    Properties:
+      ServiceToken: !Join
+        - ""
+        - - "arn:aws:sns:"
+          - !Ref "AWS::Region"
+          - ":"
+          - !Ref ParentAWSAccountId
+          - ":teemops-sns"
+      TopsRoleArn: !GetAtt
+        - TeemOps
+        - Arn
+      TopsExternalId: !Ref ExternalId
+      TopsUniqueId: !Ref UniqueId
+      TopsType: "ops"
+      # TopsRootAccountHash: !Ref RootAccountHash
+  TopsCWEventRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - "events.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Policies:
+        - PolicyDocument:
+            Statement:
+              - Action:
+                  - "Events:PutEvents"
+                Effect: Allow
+                Resource:
+                  Fn::Join:
+                    - ""
+                    - - "arn:aws:events:*:"
+                      - !Ref ParentAWSAccountId
+                      - ":event-bus/default"
+          PolicyName: CWPutEventsTeemOpsPolicy
+  TeemOps:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action:
+              - "sts:AssumeRole"
+            Effect: Allow
+            Principal:
+              AWS: !Ref ParentAWSAccountId
+            Condition:
+              StringEquals:
+                "sts:ExternalId": !Ref ExternalId
+      Path: /
+      Policies:
+        - PolicyDocument:
+            Statement:
+              - Action:
+                  - "EC2:*"
+                Effect: Allow
+                Resource: "*"
+          PolicyName: EC2TeemOpsPolicy
+        - PolicyDocument:
+            Statement:
+              - Action:
+                  - "elasticloadbalancing:*"
+                Effect: Allow
+                Resource: "*"
+          PolicyName: ELBTeemOpsPolicy
+        - PolicyDocument:
+            Statement:
+              - Action:
+                  - "cloudwatch:*"
+                Effect: Allow
+                Resource: "*"
+          PolicyName: CWTeemOpsPolicy
+        - PolicyDocument:
+            Statement:
+              - Action:
+                  - "autoscaling:*"
+                Effect: Allow
+                Resource: "*"
+          PolicyName: EC2ASTeemOpsPolicy
+        - PolicyDocument:
+            Statement:
+              - Action:
+                  - "lambda:InvokeFunction"
+                  - "lambda:ListFunctions"
+                Effect: Allow
+                Resource: "*"
+          PolicyName: LambdaTeemOpsPolicy
+        - PolicyDocument:
+            Statement:
+              - Action:
+                  - "rds:*"
+                Effect: Allow
+                Resource: "*"
+          PolicyName: RDSTeemOpsPolicy
+        - PolicyDocument:
+            Statement:
+              - Action:
+                  - "sns:ConfirmSubscription"
+                  - "sns:ListSubscriptions"
+                  - "sns:ListTopics"
+                  - "sns:Publish"
+                  - "sns:Subscribe"
+                  - "sns:Unsubscribe"
+                Effect: Allow
+                Resource: "*"
+          PolicyName: SNSTeemOpsPolicy
+        - PolicyDocument:
+            Statement:
+              - Action:
+                  - "kms:CreateAlias"
+                  - "kms:CreateKey"
+                  - "kms:Encrypt"
+                  - "kms:Decrypt"
+                  - "kms:ListAliases"
+                  - "kms:ListKeys"
+                Effect: Allow
+                Resource: "*"
+          PolicyName: KMSTeemOpsPolicy
+        - PolicyDocument:
+            Statement:
+              - Action:
+                  - "logs:*"
+                Effect: Allow
+                Resource: "*"
+          PolicyName: LOGTeemOpsPolicy
+        - PolicyDocument:
+            Statement:
+              - Action:
+                  - "elasticache:*"
+                Effect: Allow
+                Resource: "*"
+          PolicyName: ELATeemOpsPolicy
+        - PolicyDocument:
+            Statement:
+              - Action:
+                  - "route53:AssociateVPCWithHostedZone"
+                  - "route53:ChangeResourceRecordSets"
+                  - "route53:ChangeTagsForResource"
+                  - "route53:CreateHealthCheck"
+                  - "route53:CreateHostedZone"
+                  - "route53:CreateReusableDelegationSet"
+                  - "route53:CreateTrafficPolicy"
+                  - "route53:CreateTrafficPolicyInstance"
+                  - "route53:CreateTrafficPolicyVersion"
+                  - "route53:DisableDomainAutoRenew"
+                  - "route53:DisassociateVPCFromHostedZone"
+                  - "route53:EnableDomainAutoRenew"
+                  - "route53:GetChange"
+                  - "route53:GetCheckerIpRanges"
+                  - "route53:GetGeoLocation"
+                  - "route53:GetHealthCheck"
+                  - "route53:GetHealthCheckCount"
+                  - "route53:GetHealthCheckLastFailureReason"
+                  - "route53:GetHealthCheckStatus"
+                  - "route53:GetHostedZone"
+                  - "route53:GetHostedZoneCount"
+                  - "route53:GetReusableDelegationSet"
+                  - "route53:GetTrafficPolicy"
+                  - "route53:GetTrafficPolicyInstance"
+                  - "route53:GetTrafficPolicyInstanceCount"
+                  - "route53:ListGeoLocations"
+                  - "route53:ListHealthChecks"
+                  - "route53:ListHostedZones"
+                  - "route53:ListHostedZonesByName"
+                  - "route53:ListResourceRecordSets"
+                  - "route53:ListReusableDelegationSets"
+                  - "route53:ListTagsForResource"
+                  - "route53:ListTagsForResources"
+                  - "route53:ListTrafficPolicies"
+                  - "route53:ListTrafficPolicyInstances"
+                  - "route53:ListTrafficPolicyInstancesByHostedZone"
+                  - "route53:ListTrafficPolicyInstancesByPolicy"
+                  - "route53:ListTrafficPolicyVersions"
+                  - "route53:UpdateHealthCheck"
+                  - "route53:UpdateHostedZoneComment"
+                  - "route53:UpdateTrafficPolicyComment"
+                  - "route53:UpdateTrafficPolicyInstance"
+                Effect: Allow
+                Resource: "*"
+          PolicyName: Route53TeemOpsPolicy
+        - PolicyDocument:
+            Statement:
+              - Action:
+                  - "acm:DescribeCertificate"
+                  - "acm:GetCertificate"
+                  - "acm:ListCertificates"
+                  - "acm:RequestCertificate"
+                  - "acm:ResendValidationEmail"
+                Effect: Allow
+                Resource: "*"
+          PolicyName: SSLTeemOpsPolicy
+        - PolicyDocument:
+            Statement:
+              - Action:
+                  - "cloudfront:CreateCloudFrontOriginAccessIdentity"
+                  - "cloudfront:CreateDistribution"
+                  - "cloudfront:CreateInvalidation"
+                  - "cloudfront:CreateStreamingDistribution"
+                  - "cloudfront:DeleteCloudFrontOriginAccessIdentity"
+                  - "cloudfront:GetCloudFrontOriginAccessIdentity"
+                  - "cloudfront:GetCloudFrontOriginAccessIdentityConfig"
+                  - "cloudfront:GetDistribution"
+                  - "cloudfront:GetDistributionConfig"
+                  - "cloudfront:GetInvalidation"
+                  - "cloudfront:GetStreamingDistribution"
+                  - "cloudfront:GetStreamingDistributionConfig"
+                  - "cloudfront:ListCloudFrontOriginAccessIdentities"
+                  - "cloudfront:ListDistributions"
+                  - "cloudfront:ListDistributionsByWebACLId"
+                  - "cloudfront:ListInvalidations"
+                  - "cloudfront:ListStreamingDistributions"
+                  - "cloudfront:UpdateCloudFrontOriginAccessIdentity"
+                  - "cloudfront:UpdateDistribution"
+                  - "cloudfront:UpdateStreamingDistribution"
+                Effect: Allow
+                Resource: "*"
+          PolicyName: CFTTeemOpsPolicy
+        - PolicyDocument:
+            Statement:
+              - Action:
+                  - "cloudformation:CancelUpdateStack"
+                  - "cloudformation:ContinueUpdateRollback"
+                  - "cloudformation:CreateStack"
+                  - "cloudformation:CreateStackInstances"
+                  - "cloudformation:DescribeAccountLimits"
+                  - "cloudformation:DescribeChangeSet"
+                  - "cloudformation:DescribeStackEvents"
+                  - "cloudformation:DescribeStackResource"
+                  - "cloudformation:DescribeStackResources"
+                  - "cloudformation:DescribeStacks"
+                  - "cloudformation:ExecuteChangeSet"
+                  - "cloudformation:GetStackPolicy"
+                  - "cloudformation:GetTemplate"
+                  - "cloudformation:GetTemplateSummary"
+                  - "cloudformation:ListChangeSets"
+                  - "cloudformation:ListStackResources"
+                  - "cloudformation:ListStacks"
+                  - "cloudformation:PreviewStackUpdate"
+                  - "cloudformation:SetStackPolicy"
+                  - "cloudformation:SignalResource"
+                  - "cloudformation:UpdateStack"
+                Effect: Allow
+                Resource: "*"
+          PolicyName: CFNTeemOpsPolicy
+        - PolicyDocument:
+            Statement:
+              - Action:
+                  - "cloudformation:DeleteStack"
+                Effect: Allow
+                Resource: "arn:aws:cloudformation:*:*:stack/teemops*/*"
+          PolicyName: CFNDeleteTeemOpsPolicy
+        - PolicyDocument:
+            Statement:
+              - Action:
+                  - "cloudformation:DeleteStackInstances"
+                Effect: Allow
+                Resource: "arn:aws:cloudformation:*:*:stackset/teemops*:*"
+          PolicyName: CFNStackDeleteTeemOpsPolicy
+        - PolicyDocument:
+            Statement:
+              - Action:
+                  - "iam:AddRoleToInstanceProfile"
+                  - "iam:AttachGroupPolicy"
+                  - "iam:AttachRolePolicy"
+                  - "iam:AttachUserPolicy"
+                  - "iam:CreateInstanceProfile"
+                  - "iam:CreatePolicy"
+                  - "iam:CreateRole"
+                  - "iam:GetInstanceProfile"
+                  - "iam:GetRole"
+                  - "iam:GetRolePolicy"
+                  - "iam:GetServerCertificate"
+                  - "iam:ListInstanceProfiles"
+                  - "iam:ListInstanceProfilesForRole"
+                  - "iam:ListRolePolicies"
+                  - "iam:ListRoles"
+                  - "iam:PassRole"
+                  - "iam:PutRolePolicy"
+                  - "iam:UpdateServerCertificate"
+                  - "iam:UpdateSigningCertificate"
+                  - "iam:UploadServerCertificate"
+                  - "iam:UploadSigningCertificate"
+                Effect: Allow
+                Resource: "*"
+          PolicyName: IAMRoleTeemOpsPolicy
+        - PolicyDocument:
+            Statement:
+              - Action:
+                  - "iam:CreateServiceLinkedRole"
+                Effect: Allow
+                Resource: "arn:aws:iam::*:role/aws-service-role/elasticloadbalancing.amazonaws.com/AWSServiceRoleForElasticLoadBalancing"
+          PolicyName: IAMRoleELBTeemOpsPolicy
+        - PolicyDocument:
+            Statement:
+              - Action:
+                  - "iam:CreateServiceLinkedRole"
+                Effect: Allow
+                Resource: "arn:aws:iam::*:role/aws-service-role/autoscaling.amazonaws.com/AWSServiceRoleForAutoScaling"
+          PolicyName: IAMRoleASGTeemOpsPolicy
+        - PolicyDocument:
+            Statement:
+              - Action:
+                  - "iam:DetachRolePolicy"
+                  - "iam:DeleteRole"
+                Effect: Allow
+                Resource: "arn:aws:iam::*:role/teemops*"
+          PolicyName: IAMRoleDetachEC2TeemOpsPolicy
+        - PolicyDocument:
+            Statement:
+              - Action:
+                  - "iam:RemoveRoleFromInstanceProfile"
+                  - "iam:DeleteInstanceProfile"
+                Effect: Allow
+                Resource: "arn:aws:iam::*:instance-profile/teemops*"
+          PolicyName: IAMInstanceProfileRemoveTeemopsPolicy
+        - PolicyDocument:
+            Statement:
+              - Action:
+                  - "events:*"
+                Effect: Allow
+                Resource: "*"
+          PolicyName: CloudWatchEventsTeemOpsPolicy
+Outputs:
+  ARN:
+    Description: ARN Required to complete your AWS Account Setup in TeemOps
+    Value: !GetAtt
+      - TeemOps
+      - Arn
+  Name:
+    Description: >-
+      Name of Role in your account which has been created to allow you to
+      Start/Stop/Remove EC2, RDS, CloudWatch from your account.
+    Value: !Ref TeemOps
+  CWRoleArn:
+    Description: IAM Role required for Cloudwatch events to be sent to root account default bus
+    Value: !GetAtt
+      - TopsCWEventRole
+      - Arn

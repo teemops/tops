@@ -1,0 +1,970 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cloud Security App - Wireframes</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 40px;
+        }
+        
+        h1 {
+            color: #1976d2;
+            margin-bottom: 10px;
+            border-bottom: 2px solid #1976d2;
+            padding-bottom: 10px;
+        }
+        
+        h2 {
+            color: #424242;
+            margin: 30px 0 15px 0;
+            font-size: 1.3em;
+        }
+        
+        .wireframe {
+            border: 2px solid #ccc;
+            border-radius: 4px;
+            padding: 20px;
+            margin: 20px 0;
+            background: #fafafa;
+            position: relative;
+        }
+        
+        /* Auth Pages */
+        .auth-page {
+            max-width: 400px;
+            margin: 40px auto;
+            padding: 40px;
+            border: 2px dashed #999;
+            border-radius: 8px;
+            background: white;
+        }
+        
+        .logo {
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: #1976d2;
+            margin-bottom: 30px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            margin: 15px 0;
+        }
+        
+        .checkbox-group input {
+            margin-right: 8px;
+        }
+        
+        .btn {
+            width: 100%;
+            padding: 12px;
+            background: #1976d2;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 10px 0;
+        }
+        
+        .btn-secondary {
+            background: #424242;
+        }
+        
+        .divider {
+            text-align: center;
+            margin: 20px 0;
+            color: #999;
+        }
+        
+        .oauth-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin: 15px 0;
+        }
+        
+        .oauth-btn {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background: white;
+            cursor: pointer;
+        }
+        
+        .link-text {
+            text-align: center;
+            margin-top: 15px;
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .link-text a {
+            color: #1976d2;
+            text-decoration: none;
+        }
+        
+        /* Main App Layout */
+        .app-layout {
+            display: grid;
+            grid-template-columns: 250px 1fr;
+            height: 800px;
+            border: 2px solid #ccc;
+        }
+        
+        .sidebar {
+            background: #263238;
+            color: white;
+            padding: 20px;
+        }
+        
+        .sidebar-item {
+            padding: 12px;
+            margin: 5px 0;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        
+        .sidebar-item:hover {
+            background: rgba(255,255,255,0.1);
+        }
+        
+        .sidebar-item.active {
+            background: #1976d2;
+        }
+        
+        .main-content {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .topbar {
+            background: white;
+            padding: 15px 20px;
+            border-bottom: 1px solid #ddd;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .topbar-right {
+            display: flex;
+            gap: 15px;
+        }
+        
+        .content-area {
+            padding: 20px;
+            flex: 1;
+            overflow-y: auto;
+        }
+        
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .page-title {
+            font-size: 24px;
+            color: #424242;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin: 20px 0;
+        }
+        
+        .stat-card {
+            background: #f5f5f5;
+            padding: 20px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+        
+        .stat-label {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 5px;
+        }
+        
+        .stat-value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #1976d2;
+        }
+        
+        .card {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        
+        .card-header {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #424242;
+        }
+        
+        .card-content {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .card-actions {
+            margin-top: 10px;
+            display: flex;
+            gap: 10px;
+        }
+        
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 12px;
+            background: #1976d2;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #e0e0e0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: #1976d2;
+            transition: width 0.3s;
+        }
+        
+        .step-indicator {
+            margin-bottom: 20px;
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .form-row {
+            margin-bottom: 15px;
+        }
+        
+        .findings-list {
+            margin-top: 20px;
+        }
+        
+        .finding-item {
+            padding: 15px;
+            border-left: 4px solid #f44336;
+            background: #fff3f3;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        
+        .finding-severity {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        
+        .severity-critical {
+            background: #f44336;
+            color: white;
+        }
+        
+        .severity-high {
+            background: #ff9800;
+            color: white;
+        }
+        
+        .severity-medium {
+            background: #ffc107;
+            color: #333;
+        }
+        
+        .chart-placeholder {
+            height: 200px;
+            background: #f5f5f5;
+            border: 2px dashed #ccc;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #999;
+            margin: 20px 0;
+        }
+        
+        .tabs {
+            display: flex;
+            border-bottom: 2px solid #ddd;
+            margin-bottom: 20px;
+        }
+        
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+        }
+        
+        .tab.active {
+            border-bottom-color: #1976d2;
+            color: #1976d2;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Cloud Security Application - Wireframes</h1>
+        <p>Interactive wireframes for all major pages and flows</p>
+    </div>
+
+    <!-- Login Page -->
+    <div class="container">
+        <h2>1. Login Page</h2>
+        <div class="wireframe">
+            <div class="auth-page">
+                <div class="logo">🔒 Cloud Security</div>
+                <h3 style="text-align: center; margin-bottom: 20px;">Sign In to Your Account</h3>
+                
+                <div class="form-group">
+                    <label>Email Address</label>
+                    <input type="email" placeholder="you@example.com">
+                </div>
+                
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" placeholder="••••••••">
+                </div>
+                
+                <div class="checkbox-group">
+                    <input type="checkbox" id="remember">
+                    <label for="remember">Remember me</label>
+                </div>
+                
+                <button class="btn">Sign In</button>
+                
+                <div class="divider">────────── OR ──────────</div>
+                
+                <div class="oauth-buttons">
+                    <button class="oauth-btn">Google</button>
+                    <button class="oauth-btn">Microsoft</button>
+                    <button class="oauth-btn">Apple</button>
+                </div>
+                
+                <div class="link-text">
+                    <a href="#">Forgot Password?</a><br><br>
+                    Don't have an account? <a href="#">Sign Up</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Registration Page -->
+    <div class="container">
+        <h2>2. Registration Page</h2>
+        <div class="wireframe">
+            <div class="auth-page">
+                <div class="logo">🔒 Cloud Security</div>
+                <h3 style="text-align: center; margin-bottom: 20px;">Create Your Account</h3>
+                
+                <div class="form-group">
+                    <label>Full Name</label>
+                    <input type="text" placeholder="John Doe">
+                </div>
+                
+                <div class="form-group">
+                    <label>Email Address</label>
+                    <input type="email" placeholder="you@example.com">
+                </div>
+                
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" placeholder="••••••••">
+                </div>
+                
+                <div class="form-group">
+                    <label>Confirm Password</label>
+                    <input type="password" placeholder="••••••••">
+                </div>
+                
+                <div class="checkbox-group">
+                    <input type="checkbox" id="terms">
+                    <label for="terms">I agree to Terms and Privacy Policy</label>
+                </div>
+                
+                <button class="btn">Create Account</button>
+                
+                <div class="divider">────────── OR ──────────</div>
+                
+                <div class="oauth-buttons">
+                    <button class="oauth-btn">Google</button>
+                    <button class="oauth-btn">Microsoft</button>
+                    <button class="oauth-btn">Apple</button>
+                </div>
+                
+                <div class="link-text">
+                    Already have an account? <a href="#">Sign In</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dashboard -->
+    <div class="container">
+        <h2>3. Dashboard</h2>
+        <div class="wireframe">
+            <div class="app-layout">
+                <div class="sidebar">
+                    <div class="sidebar-item active">🏠 Home</div>
+                    <div class="sidebar-item">☁️ AWS Accounts</div>
+                    <div class="sidebar-item">🔍 Scans</div>
+                    <div class="sidebar-item">📊 Reports</div>
+                    <div class="sidebar-item">📈 Insights</div>
+                    <div class="sidebar-item">⚙️ Settings</div>
+                </div>
+                <div class="main-content">
+                    <div class="topbar">
+                        <div>Cloud Security</div>
+                        <div style="display: flex; align-items: center; gap: 15px;">
+                            <select style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; background: white;">
+                                <option>My Organization</option>
+                                <option>Client A</option>
+                                <option>Client B</option>
+                                <option>+ Add Organization</option>
+                            </select>
+                            <span>🔔</span>
+                            <span>👤</span>
+                        </div>
+                    </div>
+                    <div class="content-area">
+                        <div class="page-header">
+                            <div class="page-title">Dashboard</div>
+                        </div>
+                        
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <div class="stat-label">Total Accounts</div>
+                                <div class="stat-value">5</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-label">Active Scans</div>
+                                <div class="stat-value">3</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-label">Critical Findings</div>
+                                <div class="stat-value">12</div>
+                            </div>
+                        </div>
+                        
+                        <h3 style="margin: 30px 0 15px 0;">Recent Scans</h3>
+                        <div class="card">
+                            <div class="card-header">Account: prod-aws | Status: Complete</div>
+                            <div class="card-content">Findings: 5 Critical, 12 High, 8 Medium</div>
+                            <div class="card-actions">
+                                <button class="btn-small">View Details</button>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header">Account: dev-aws | Status: Running</div>
+                            <div class="card-content">Progress: 65%</div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: 65%"></div>
+                            </div>
+                            <div class="card-actions">
+                                <button class="btn-small">View Progress</button>
+                            </div>
+                        </div>
+                        
+                        <div style="margin-top: 30px;">
+                            <button class="btn">New Scan</button>
+                            <button class="btn btn-secondary" style="margin-left: 10px;">Add AWS Account</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- AWS Accounts Page -->
+    <div class="container">
+        <h2>4. AWS Accounts Management</h2>
+        <div class="wireframe">
+            <div class="app-layout">
+                <div class="sidebar">
+                    <div class="sidebar-item">🏠 Home</div>
+                    <div class="sidebar-item active">☁️ AWS Accounts</div>
+                    <div class="sidebar-item">🔍 Scans</div>
+                    <div class="sidebar-item">📊 Reports</div>
+                    <div class="sidebar-item">📈 Insights</div>
+                    <div class="sidebar-item">⚙️ Settings</div>
+                </div>
+                <div class="main-content">
+                    <div class="topbar">
+                        <div>Cloud Security</div>
+                        <div style="display: flex; align-items: center; gap: 15px;">
+                            <select style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; background: white;">
+                                <option>My Organization</option>
+                                <option>Client A</option>
+                                <option>Client B</option>
+                                <option>+ Add Organization</option>
+                            </select>
+                            <span>🔔</span>
+                            <span>👤</span>
+                        </div>
+                    </div>
+                    <div class="content-area">
+                        <div class="page-header">
+                            <div class="page-title">AWS Accounts</div>
+                            <button class="btn">+ Add Account</button>
+                        </div>
+                        
+                        <div class="card">
+                            <div class="card-header">Account: prod-aws</div>
+                            <div class="card-content">
+                                Account ID: 123456789012<br>
+                                Status: Active | Last Scan: 2 hours ago
+                            </div>
+                            <div class="card-actions">
+                                <button class="btn-small">View</button>
+                                <button class="btn-small">Scan</button>
+                                <button class="btn-small" style="background: #f44336;">Remove</button>
+                            </div>
+                        </div>
+                        
+                        <div class="card">
+                            <div class="card-header">Account: dev-aws</div>
+                            <div class="card-content">
+                                Account ID: 987654321098<br>
+                                Status: Active | Last Scan: 1 day ago
+                            </div>
+                            <div class="card-actions">
+                                <button class="btn-small">View</button>
+                                <button class="btn-small">Scan</button>
+                                <button class="btn-small" style="background: #f44336;">Remove</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add AWS Account - Step 1 -->
+    <div class="container">
+        <h2>5. Add AWS Account - Step 1</h2>
+        <div class="wireframe">
+            <div class="app-layout">
+                <div class="sidebar">
+                    <div class="sidebar-item">🏠 Home</div>
+                    <div class="sidebar-item active">☁️ AWS Accounts</div>
+                    <div class="sidebar-item">🔍 Scans</div>
+                    <div class="sidebar-item">📊 Reports</div>
+                    <div class="sidebar-item">📈 Insights</div>
+                    <div class="sidebar-item">⚙️ Settings</div>
+                </div>
+                <div class="main-content">
+                    <div class="topbar">
+                        <div>Cloud Security</div>
+                        <div style="display: flex; align-items: center; gap: 15px;">
+                            <select style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; background: white;">
+                                <option>My Organization</option>
+                                <option>Client A</option>
+                                <option>Client B</option>
+                                <option>+ Add Organization</option>
+                            </select>
+                            <span>🔔</span>
+                            <span>👤</span>
+                        </div>
+                    </div>
+                    <div class="content-area">
+                        <div class="page-header">
+                            <div class="page-title">Add AWS Account</div>
+                        </div>
+                        
+                        <div class="step-indicator">Step 1 of 2: Create IAM Role</div>
+                        
+                        <div class="card" style="max-width: 600px;">
+                            <div class="card-header">Setup Instructions</div>
+                            <div class="card-content">
+                                <p>To securely access your AWS account, we need to create an IAM role using CloudFormation.</p>
+                                <ol style="margin: 15px 0; padding-left: 20px;">
+                                    <li>Click the button below</li>
+                                    <li>Complete the CloudFormation stack</li>
+                                    <li>Return here with the Role ARN</li>
+                                </ol>
+                            </div>
+                            <div class="card-actions">
+                                <button class="btn">Open AWS Console</button>
+                                <button class="btn btn-secondary">Cancel</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add AWS Account - Step 2 -->
+    <div class="container">
+        <h2>6. Add AWS Account - Step 2</h2>
+        <div class="wireframe">
+            <div class="app-layout">
+                <div class="sidebar">
+                    <div class="sidebar-item">🏠 Home</div>
+                    <div class="sidebar-item active">☁️ AWS Accounts</div>
+                    <div class="sidebar-item">🔍 Scans</div>
+                    <div class="sidebar-item">📊 Reports</div>
+                    <div class="sidebar-item">📈 Insights</div>
+                    <div class="sidebar-item">⚙️ Settings</div>
+                </div>
+                <div class="main-content">
+                    <div class="topbar">
+                        <div>Cloud Security</div>
+                        <div style="display: flex; align-items: center; gap: 15px;">
+                            <select style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; background: white;">
+                                <option>My Organization</option>
+                                <option>Client A</option>
+                                <option>Client B</option>
+                                <option>+ Add Organization</option>
+                            </select>
+                            <span>🔔</span>
+                            <span>👤</span>
+                        </div>
+                    </div>
+                    <div class="content-area">
+                        <div class="page-header">
+                            <div class="page-title">Add AWS Account</div>
+                        </div>
+                        
+                        <div class="step-indicator">Step 2 of 2: Enter Account Details</div>
+                        
+                        <div class="card" style="max-width: 600px;">
+                            <div class="form-row">
+                                <label>AWS Account ID</label>
+                                <input type="text" placeholder="123456789012" style="width: 100%; padding: 10px; margin-top: 5px;">
+                            </div>
+                            
+                            <div class="form-row">
+                                <label>IAM Role ARN</label>
+                                <input type="text" placeholder="arn:aws:iam::123456789012:role/..." style="width: 100%; padding: 10px; margin-top: 5px;">
+                            </div>
+                            
+                            <div class="form-row">
+                                <label>Account Name (optional)</label>
+                                <input type="text" placeholder="Production AWS" style="width: 100%; padding: 10px; margin-top: 5px;">
+                            </div>
+                            
+                            <div class="card-actions">
+                                <button class="btn">Add Account</button>
+                                <button class="btn btn-secondary">Back</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scans Page -->
+    <div class="container">
+        <h2>7. Scans List</h2>
+        <div class="wireframe">
+            <div class="app-layout">
+                <div class="sidebar">
+                    <div class="sidebar-item">🏠 Home</div>
+                    <div class="sidebar-item">☁️ AWS Accounts</div>
+                    <div class="sidebar-item active">🔍 Scans</div>
+                    <div class="sidebar-item">📊 Reports</div>
+                    <div class="sidebar-item">📈 Insights</div>
+                    <div class="sidebar-item">⚙️ Settings</div>
+                </div>
+                <div class="main-content">
+                    <div class="topbar">
+                        <div>Cloud Security</div>
+                        <div style="display: flex; align-items: center; gap: 15px;">
+                            <select style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; background: white;">
+                                <option>My Organization</option>
+                                <option>Client A</option>
+                                <option>Client B</option>
+                                <option>+ Add Organization</option>
+                            </select>
+                            <span>🔔</span>
+                            <span>👤</span>
+                        </div>
+                    </div>
+                    <div class="content-area">
+                        <div class="page-header">
+                            <div class="page-title">Scans</div>
+                            <button class="btn">+ New Scan</button>
+                        </div>
+                        
+                        <div style="margin-bottom: 20px;">
+                            <select style="padding: 8px; margin-right: 10px;">
+                                <option>All Accounts</option>
+                            </select>
+                            <select style="padding: 8px;">
+                                <option>All Status</option>
+                            </select>
+                        </div>
+                        
+                        <div class="card">
+                            <div class="card-header">Scan #1234 | prod-aws</div>
+                            <div class="card-content">
+                                Started: 2 hours ago | Status: Complete<br>
+                                Findings: 5 Critical, 12 High, 8 Medium
+                            </div>
+                            <div class="card-actions">
+                                <button class="btn-small">View Report</button>
+                                <button class="btn-small">Download</button>
+                            </div>
+                        </div>
+                        
+                        <div class="card">
+                            <div class="card-header">Scan #1233 | dev-aws</div>
+                            <div class="card-content">
+                                Started: 1 day ago | Status: Complete<br>
+                                Findings: 0 Critical, 3 High, 5 Medium
+                            </div>
+                            <div class="card-actions">
+                                <button class="btn-small">View Report</button>
+                                <button class="btn-small">Download</button>
+                            </div>
+                        </div>
+                        
+                        <div class="card">
+                            <div class="card-header">Scan #1232 | prod-aws</div>
+                            <div class="card-content">
+                                Started: 5 minutes ago | Status: Running<br>
+                                Progress: 65%
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: 65%"></div>
+                            </div>
+                            <div class="card-actions">
+                                <button class="btn-small">View Progress</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Report Detail Page -->
+    <div class="container">
+        <h2>8. Report Detail View</h2>
+        <div class="wireframe">
+            <div class="app-layout">
+                <div class="sidebar">
+                    <div class="sidebar-item">🏠 Home</div>
+                    <div class="sidebar-item">☁️ AWS Accounts</div>
+                    <div class="sidebar-item">🔍 Scans</div>
+                    <div class="sidebar-item active">📊 Reports</div>
+                    <div class="sidebar-item">📈 Insights</div>
+                    <div class="sidebar-item">⚙️ Settings</div>
+                </div>
+                <div class="main-content">
+                    <div class="topbar">
+                        <div>Cloud Security</div>
+                        <div style="display: flex; align-items: center; gap: 15px;">
+                            <select style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; background: white;">
+                                <option>My Organization</option>
+                                <option>Client A</option>
+                                <option>Client B</option>
+                                <option>+ Add Organization</option>
+                            </select>
+                            <span>🔔</span>
+                            <span>👤</span>
+                        </div>
+                    </div>
+                    <div class="content-area">
+                        <div class="page-header">
+                            <div class="page-title">Scan Report #1234 - prod-aws</div>
+                            <div>
+                                <button class="btn-small">Download PDF</button>
+                                <button class="btn-small">Download CSV</button>
+                                <button class="btn-small">Share</button>
+                            </div>
+                        </div>
+                        
+                        <div class="card">
+                            <div class="card-header">Executive Summary</div>
+                            <div class="card-content">
+                                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin: 15px 0;">
+                                    <div>
+                                        <div style="font-size: 24px; font-weight: bold; color: #1976d2;">25</div>
+                                        <div style="font-size: 12px; color: #666;">Total Findings</div>
+                                    </div>
+                                    <div>
+                                        <div style="font-size: 24px; font-weight: bold; color: #f44336;">5</div>
+                                        <div style="font-size: 12px; color: #666;">Critical</div>
+                                    </div>
+                                    <div>
+                                        <div style="font-size: 24px; font-weight: bold; color: #ff9800;">12</div>
+                                        <div style="font-size: 12px; color: #666;">High</div>
+                                    </div>
+                                    <div>
+                                        <div style="font-size: 24px; font-weight: bold; color: #4caf50;">72%</div>
+                                        <div style="font-size: 12px; color: #666;">Compliance Score</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <h3 style="margin: 20px 0 15px 0;">Critical Findings</h3>
+                        <div class="findings-list">
+                            <div class="finding-item">
+                                <span class="finding-severity severity-critical">CRITICAL</span>
+                                <strong>S3 Bucket Public Access</strong><br>
+                                <small>Bucket: my-public-bucket</small><br>
+                                <div style="margin-top: 10px;">
+                                    <button class="btn-small">View Details</button>
+                                    <button class="btn-small" style="background: #4caf50;">Remediate</button>
+                                </div>
+                            </div>
+                            <div class="finding-item">
+                                <span class="finding-severity severity-critical">CRITICAL</span>
+                                <strong>IAM Policy Allows * Actions</strong><br>
+                                <small>Policy: AdminPolicy</small><br>
+                                <div style="margin-top: 10px;">
+                                    <button class="btn-small">View Details</button>
+                                    <button class="btn-small" style="background: #4caf50;">Remediate</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Insights & Analytics -->
+    <div class="container">
+        <h2>9. Insights & Analytics Dashboard</h2>
+        <div class="wireframe">
+            <div class="app-layout">
+                <div class="sidebar">
+                    <div class="sidebar-item">🏠 Home</div>
+                    <div class="sidebar-item">☁️ AWS Accounts</div>
+                    <div class="sidebar-item">🔍 Scans</div>
+                    <div class="sidebar-item">📊 Reports</div>
+                    <div class="sidebar-item active">📈 Insights</div>
+                    <div class="sidebar-item">⚙️ Settings</div>
+                </div>
+                <div class="main-content">
+                    <div class="topbar">
+                        <div>Cloud Security</div>
+                        <div style="display: flex; align-items: center; gap: 15px;">
+                            <select style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; background: white;">
+                                <option>My Organization</option>
+                                <option>Client A</option>
+                                <option>Client B</option>
+                                <option>+ Add Organization</option>
+                            </select>
+                            <span>🔔</span>
+                            <span>👤</span>
+                        </div>
+                    </div>
+                    <div class="content-area">
+                        <div class="page-header">
+                            <div class="page-title">Insights & Analytics</div>
+                            <select style="padding: 8px;">
+                                <option>Last 30 Days</option>
+                            </select>
+                        </div>
+                        
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <div class="stat-label">Total Findings</div>
+                                <div class="stat-value">127</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-label">Avg Scan Time</div>
+                                <div class="stat-value">12 min</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-label">Compliance Score</div>
+                                <div class="stat-value">78%</div>
+                            </div>
+                        </div>
+                        
+                        <div class="card">
+                            <div class="card-header">Findings Trend</div>
+                            <div class="chart-placeholder">📊 Chart: Findings over time</div>
+                        </div>
+                        
+                        <div class="card">
+                            <div class="card-header">Findings by Service</div>
+                            <div class="chart-placeholder">📊 Pie Chart: S3: 35% | IAM: 40% | EC2: 15% | RDS: 10%</div>
+                        </div>
+                        
+                        <div class="card">
+                            <div class="card-header">Top Risk Areas</div>
+                            <div class="card-content">
+                                <ol style="margin: 15px 0; padding-left: 20px;">
+                                    <li>IAM Policy Misconfigurations</li>
+                                    <li>S3 Public Access</li>
+                                    <li>Unencrypted RDS Instances</li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>
+
