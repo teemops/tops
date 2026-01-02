@@ -1,0 +1,62 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e6]:
+    - generic [ref=e9]:
+      - heading "🔒 Cloud Security" [level=1] [ref=e10]
+      - heading "Sign In to Your Account" [level=2] [ref=e11]
+    - generic [ref=e13]:
+      - generic [ref=e14]:
+        - generic [ref=e15]: Email Address
+        - textbox "Email Address" [ref=e16]:
+          - /placeholder: you@example.com
+          - text: invalid@example.com
+      - generic [ref=e17]:
+        - generic [ref=e18]: Password
+        - generic [ref=e19]:
+          - textbox "••••••••" [ref=e20]: wrongpassword
+          - img [ref=e21]
+          - generic: Enter a password
+      - generic [ref=e23]:
+        - checkbox "Remember me" [ref=e25] [cursor=pointer]
+        - generic [ref=e27]: Remember me
+      - alert [ref=e28]:
+        - generic [ref=e31]: "Firebase: There is no user record corresponding to this identifier. The user may have been deleted. (auth/user-not-found)."
+      - button "Sign In" [ref=e32] [cursor=pointer]:
+        - generic [ref=e33]: Sign In
+      - generic [ref=e34]: ────────── OR ──────────
+      - generic [ref=e35]:
+        - button "Google" [ref=e36] [cursor=pointer]:
+          - generic [ref=e37]: 
+          - generic [ref=e38]: Google
+        - button "Microsoft" [ref=e39] [cursor=pointer]:
+          - generic [ref=e40]: 
+          - generic [ref=e41]: Microsoft
+      - generic [ref=e42]:
+        - link "Forgot Password?" [ref=e43] [cursor=pointer]:
+          - /url: /forgot-password
+        - generic [ref=e44]:
+          - text: Don't have an account?
+          - link "Sign Up" [ref=e45] [cursor=pointer]:
+            - /url: /register
+  - generic:
+    - img
+  - generic:
+    - generic:
+      - generic:
+        - button "Go to parent" [disabled]
+        - button "Open in editor"
+        - button "Close"
+  - generic:
+    - generic:
+      - generic:
+        - generic:
+          - button "Toggle Nuxt DevTools":
+            - img
+          - generic "Page load time":
+            - generic: "55"
+            - generic: ms
+          - button "Toggle Component Inspector":
+            - img
+```

@@ -9,9 +9,8 @@
       "runtimeArgs": ["run", "start:debug"],
       "console": "integratedTerminal",
       "restart": true,
-      "protocol": "inspector",
       "sourceMaps": true,
-      "cwd": "${workspaceFolder}/backend",
+      "cwd": "${workspaceFolder}",
       "skipFiles": ["<node_internals>/**"]
     },
     {
@@ -23,7 +22,7 @@
       "console": "integratedTerminal",
       "internalConsoleOptions": "neverOpen",
       "sourceMaps": true,
-      "cwd": "${workspaceFolder}/backend",
+      "cwd": "${workspaceFolder}",
       "skipFiles": ["<node_internals>/**"]
     }
   ]

@@ -26,16 +26,9 @@ export const useOrganizationStore = defineStore('organization', {
       this.loading = true;
       this.error = null;
       try {
-        const config = useRuntimeConfig();
-        const authStore = useAuthStore();
-        const token = await authStore.getIdToken();
+        const { apiCall } = useApi();
         
-        const response = await $fetch(`${config.public.apiBaseUrl}/organizations`, {
-          redirect: 'manual', // Prevent automatic redirect following
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+        const response = await apiCall('/organizations');
         
         this.organizations = response.organizations || [];
         
@@ -55,16 +48,10 @@ export const useOrganizationStore = defineStore('organization', {
       this.loading = true;
       this.error = null;
       try {
-        const config = useRuntimeConfig();
-        const authStore = useAuthStore();
-        const token = await authStore.getIdToken();
+        const { apiCall } = useApi();
         
-        const response = await $fetch(`${config.public.apiBaseUrl}/organizations`, {
+        const response = await apiCall('/organizations', {
           method: 'POST',
-          redirect: 'manual', // Prevent automatic redirect following
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
           body: { name },
         });
         

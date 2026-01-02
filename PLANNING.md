@@ -9,6 +9,22 @@ A cloud security scanning application with:
 - **Initial Support**: AWS
 - **Future Support**: Azure, GCP
 
+## Practices Alignment
+
+This project follows our [Practices](../docs/practices/) documents:
+- [Product Practices](../docs/practices/product.md) - Simplicity first, startup agility
+- [Security Practices](../docs/practices/security.md) - Security by design
+- [Code Quality Practices](../docs/practices/code-quality.md) - Simple, maintainable code
+- [Database Practices](../docs/practices/database.md) - Simple, normalized design
+- [Architecture Practices](../docs/practices/architecture.md) - Simple, scalable architecture
+- [Feature Development Practices](../docs/practices/feature-development.md) - Incremental development
+
+All new features should:
+1. Use the [User Story Template](../docs/templates/user-story-template.md)
+2. Follow the [Feature Development Process](../docs/processes/feature-development.md)
+3. Reference the [Practices Checklist](../docs/processes/practices-checklist.md) during development
+4. See [PROGRESS.md](../docs/PROGRESS.md) for current implementation status
+
 ---
 
 ## Architecture Overview

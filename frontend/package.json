@@ -8,20 +8,28 @@
     "dev": "nuxt dev",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
-    "postinstall": "nuxt prepare"
+    "postinstall": "nuxt prepare",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:no-server": "SKIP_SERVER=1 playwright test"
   },
   "dependencies": {
     "@pinia/nuxt": "^0.11.3",
     "@primevue/themes": "^4.5.4",
     "firebase": "^12.7.0",
     "nuxt": "^3.13.0",
+    "nuxt-vuefire": "^1.0.5",
     "pinia": "^3.0.4",
     "primeicons": "^7.0.0",
     "primevue": "^4.5.4",
     "vue": "^3.5.0",
-    "vue-router": "^4.4.0"
+    "vue-router": "^4.4.0",
+    "vuefire": "^3.2.2"
   },
   "devDependencies": {
-    "@nuxt/devtools": "latest"
+    "@nuxt/devtools": "latest",
+    "@playwright/test": "^1.57.0",
+    "@types/node": "^25.0.3"
   }
 }

@@ -26,15 +26,9 @@ export const useReportStore = defineStore('report', {
       this.loading = true;
       this.error = null;
       try {
-        const config = useRuntimeConfig();
-        const authStore = useAuthStore();
-        const token = await authStore.getIdToken();
+        const { apiCall } = useApi();
         
-        const response = await $fetch(`${config.public.apiBaseUrl}/organizations/${orgId}/reports`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+        const response = await apiCall(`/organizations/${orgId}/reports`);
         
         this.reports = response.reports || [];
       } catch (error: any) {
@@ -49,15 +43,9 @@ export const useReportStore = defineStore('report', {
       this.loading = true;
       this.error = null;
       try {
-        const config = useRuntimeConfig();
-        const authStore = useAuthStore();
-        const token = await authStore.getIdToken();
+        const { apiCall } = useApi();
         
-        const response = await $fetch(`${config.public.apiBaseUrl}/organizations/${orgId}/reports/${scanId}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+        const response = await apiCall(`/organizations/${orgId}/reports/${scanId}`);
         
         this.currentReport = response.report;
         return response.report;
@@ -72,7 +60,15 @@ export const useReportStore = defineStore('report', {
     async exportReport(orgId: string, scanId: string, format: 'json' | 'csv') {
       const config = useRuntimeConfig();
       const authStore = useAuthStore();
+      
+      if (!authStore.isAuthenticated) {
+        throw new Error('User is not authenticated');
+      }
+
       const token = await authStore.getIdToken();
+      if (!token) {
+        throw new Error('Failed to get authentication token');
+      }
       
       const url = `${config.public.apiBaseUrl}/organizations/${orgId}/reports/${scanId}/export/${format}`;
       

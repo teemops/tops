@@ -74,7 +74,7 @@
             label="Create Account"
             class="w-full mb-3"
             :loading="loading"
-            :disabled="!agreeToTerms || password !== confirmPassword"
+            :disabled="!isFormValid || loading"
           />
 
           <div class="auth-divider">
@@ -116,6 +116,15 @@ definePageMeta({
 });
 
 const authStore = useAuthStore();
+
+// Set auth instance from VueFire (client-side only)
+if (import.meta.client) {
+  const auth = useFirebaseAuth();
+  if (auth) {
+    authStore.setAuthInstance(auth);
+  }
+}
+
 const name = ref('');
 const email = ref('');
 const password = ref('');
@@ -124,9 +133,54 @@ const agreeToTerms = ref(false);
 const loading = ref(false);
 const error = ref<string | null>(null);
 
+// Computed property to check if form is valid (for button disable state)
+// Note: We allow HTML5 validation to work, but disable button for better UX
+// when passwords don't match or terms aren't agreed
+const isFormValid = computed(() => {
+  // Button should be disabled if:
+  // 1. Passwords don't match (and both are filled)
+  // 2. Terms aren't agreed
+  const passwordsMatch = password.value === confirmPassword.value;
+  const passwordsFilled = password.value !== '' && confirmPassword.value !== '';
+  
+  // If passwords are filled but don't match, disable button
+  if (passwordsFilled && !passwordsMatch) {
+    return false;
+  }
+  
+  // If terms aren't agreed, disable button (even if all fields are filled)
+  if (!agreeToTerms.value) {
+    return false;
+  }
+  
+  // If passwords are empty, allow HTML5 validation to handle it
+  // But if one password is filled and the other isn't, and they don't match, disable
+  if (password.value !== '' && confirmPassword.value === '') {
+    return false;
+  }
+  if (confirmPassword.value !== '' && password.value === '') {
+    return false;
+  }
+  
+  return true;
+});
+
 const handleRegister = async () => {
+  // Validate passwords match
   if (password.value !== confirmPassword.value) {
     error.value = 'Passwords do not match';
+    return;
+  }
+
+  // Validate required fields
+  if (!name.value.trim() || !email.value.trim() || !password.value) {
+    error.value = 'Please fill in all required fields';
+    return;
+  }
+
+  // Validate terms agreement
+  if (!agreeToTerms.value) {
+    error.value = 'Please agree to the terms and conditions';
     return;
   }
 

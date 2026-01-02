@@ -12,15 +12,9 @@ export const useUserStore = defineStore('user', {
       this.loading = true;
       this.error = null;
       try {
-        const config = useRuntimeConfig();
-        const authStore = useAuthStore();
-        const token = await authStore.getIdToken();
+        const { apiCall } = useApi();
         
-        const response = await $fetch(`${config.public.apiBaseUrl}/users/profile`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+        const response = await apiCall('/users/profile');
         
         this.profile = response.user;
       } catch (error: any) {
@@ -35,15 +29,10 @@ export const useUserStore = defineStore('user', {
       this.loading = true;
       this.error = null;
       try {
-        const config = useRuntimeConfig();
-        const authStore = useAuthStore();
-        const token = await authStore.getIdToken();
+        const { apiCall } = useApi();
         
-        const response = await $fetch(`${config.public.apiBaseUrl}/users/profile`, {
+        const response = await apiCall('/users/profile', {
           method: 'PUT',
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
           body: { name },
         });
         

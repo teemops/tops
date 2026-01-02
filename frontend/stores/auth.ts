@@ -6,14 +6,19 @@ import {
   GoogleAuthProvider,
   signOut as firebaseSignOut,
   onAuthStateChanged,
-  type User
+  type User,
+  type Auth
 } from 'firebase/auth';
+
+// Store the auth instance once obtained
+let authInstance: Auth | null = null;
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
     user: null as User | null,
     loading: true,
     error: null as string | null,
+    _initialized: false,
   }),
 
   getters: {
@@ -23,23 +28,63 @@ export const useAuthStore = defineStore('auth', {
   },
 
   actions: {
+    // Set the auth instance from a composable context
+    setAuthInstance(auth: Auth) {
+      authInstance = auth;
+    },
+
+    // Initialize auth state listener
     async initialize() {
-      const { $auth } = useNuxtApp();
-      
+      if (this._initialized) {
+        return;
+      }
+
+      // If we don't have auth instance yet, wait for it
+      if (!authInstance) {
+        // Wait up to 5 seconds for auth to be set
+        await new Promise<void>((resolve) => {
+          const checkInterval = setInterval(() => {
+            if (authInstance) {
+              clearInterval(checkInterval);
+              resolve();
+            }
+          }, 100);
+          
+          setTimeout(() => {
+            clearInterval(checkInterval);
+            resolve();
+          }, 5000);
+        });
+      }
+
+      if (!authInstance) {
+        console.error('Firebase auth not available after waiting');
+        this.loading = false;
+        return;
+      }
+
+      this._initialized = true;
+
+      // Listen for auth state changes
       return new Promise<void>((resolve) => {
-        onAuthStateChanged($auth, (user) => {
+        onAuthStateChanged(authInstance!, (user) => {
           this.user = user;
-          this.loading = false;
-          resolve();
+          if (this.loading) {
+            this.loading = false;
+            resolve();
+          }
         });
       });
     },
 
     async signIn(email: string, password: string) {
+      if (!authInstance) {
+        throw new Error('Firebase auth not available');
+      }
       try {
         this.error = null;
-        const { $auth } = useNuxtApp();
-        await signInWithEmailAndPassword($auth, email, password);
+        const result = await signInWithEmailAndPassword(authInstance, email, password);
+        this.user = result.user;
       } catch (error: any) {
         this.error = error.message;
         throw error;
@@ -47,16 +92,19 @@ export const useAuthStore = defineStore('auth', {
     },
 
     async signUp(email: string, password: string, name?: string) {
+      if (!authInstance) {
+        throw new Error('Firebase auth not available');
+      }
       try {
         this.error = null;
-        const { $auth } = useNuxtApp();
-        const userCredential = await createUserWithEmailAndPassword($auth, email, password);
+        const userCredential = await createUserWithEmailAndPassword(authInstance, email, password);
         
         if (name && userCredential.user) {
           // Update display name if provided
           // Note: This would require additional Firebase setup
         }
         
+        this.user = userCredential.user;
         return userCredential.user;
       } catch (error: any) {
         this.error = error.message;
@@ -65,11 +113,20 @@ export const useAuthStore = defineStore('auth', {
     },
 
     async signInWithGoogle() {
+      if (!authInstance) {
+        throw new Error('Firebase auth not available');
+      }
       try {
         this.error = null;
-        const { $auth } = useNuxtApp();
         const provider = new GoogleAuthProvider();
-        await signInWithPopup($auth, provider);
+        
+        // Sign in with popup
+        const result = await signInWithPopup(authInstance, provider);
+        
+        // Update store state immediately
+        this.user = result.user;
+        
+        return result.user;
       } catch (error: any) {
         this.error = error.message;
         throw error;
@@ -77,10 +134,12 @@ export const useAuthStore = defineStore('auth', {
     },
 
     async signOut() {
+      if (!authInstance) {
+        throw new Error('Firebase auth not available');
+      }
       try {
         this.error = null;
-        const { $auth } = useNuxtApp();
-        await firebaseSignOut($auth);
+        await firebaseSignOut(authInstance);
         this.user = null;
       } catch (error: any) {
         this.error = error.message;
@@ -94,4 +153,3 @@ export const useAuthStore = defineStore('auth', {
     },
   },
 });
-

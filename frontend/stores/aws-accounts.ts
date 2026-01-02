@@ -22,15 +22,9 @@ export const useAwsAccountStore = defineStore('awsAccount', {
       this.loading = true;
       this.error = null;
       try {
-        const config = useRuntimeConfig();
-        const authStore = useAuthStore();
-        const token = await authStore.getIdToken();
+        const { apiCall } = useApi();
         
-        const response = await $fetch(`${config.public.apiBaseUrl}/organizations/${orgId}/aws-accounts`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+        const response = await apiCall(`/organizations/${orgId}/aws-accounts`);
         
         this.accounts = response.accounts || [];
       } catch (error: any) {
@@ -45,15 +39,10 @@ export const useAwsAccountStore = defineStore('awsAccount', {
       this.loading = true;
       this.error = null;
       try {
-        const config = useRuntimeConfig();
-        const authStore = useAuthStore();
-        const token = await authStore.getIdToken();
+        const { apiCall } = useApi();
         
-        const response = await $fetch(`${config.public.apiBaseUrl}/organizations/${orgId}/aws-accounts/init`, {
+        const response = await apiCall(`/organizations/${orgId}/aws-accounts/init`, {
           method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
         });
         
         return response;

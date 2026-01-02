@@ -12,15 +12,9 @@ export const useInsightsStore = defineStore('insights', {
       this.loading = true;
       this.error = null;
       try {
-        const config = useRuntimeConfig();
-        const authStore = useAuthStore();
-        const token = await authStore.getIdToken();
+        const { apiCall } = useApi();
         
-        const response = await $fetch(`${config.public.apiBaseUrl}/organizations/${orgId}/insights?timeRange=${timeRange}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+        const response = await apiCall(`/organizations/${orgId}/insights?timeRange=${timeRange}`);
         
         this.insights = response.insights;
       } catch (error: any) {

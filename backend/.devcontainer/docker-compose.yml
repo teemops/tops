@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
+    volumes:
+      - ..:/workspace:cached
+      - node_modules:/workspace/node_modules
+    command: sleep infinity
+    ports:
+      - "3001:3001"
+    environment:
+      - DATABASE_URL=mysql://cloudsecurity:cloudsecurity@mysql:3306/cloudsecurity
+      - NODE_ENV=development
+      - PORT=3001
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - dev-network
+
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    volumes:
+      - mysql-data:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpassword
+      - MYSQL_DATABASE=cloudsecurity
+      - MYSQL_USER=cloudsecurity
+      - MYSQL_PASSWORD=cloudsecurity
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpassword"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: --default-authentication-plugin=mysql_native_password
+    networks:
+      - dev-network
+
+volumes:
+  node_modules:
+  mysql-data:
+
+networks:
+  dev-network:
+    driver: bridge
+

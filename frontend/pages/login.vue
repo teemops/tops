@@ -92,6 +92,15 @@ definePageMeta({
 });
 
 const authStore = useAuthStore();
+
+// Set auth instance from VueFire (client-side only)
+if (import.meta.client) {
+  const auth = useFirebaseAuth();
+  if (auth) {
+    authStore.setAuthInstance(auth);
+  }
+}
+
 const email = ref('');
 const password = ref('');
 const rememberMe = ref(false);
@@ -118,9 +127,19 @@ const handleGoogleSignIn = async () => {
   
   try {
     await authStore.signInWithGoogle();
+    
+    // VueFire handles auth state - just navigate after successful sign-in
     await navigateTo('/dashboard');
   } catch (err: any) {
-    error.value = err.message || 'Failed to sign in with Google';
+    // Handle popup closed by user
+    if (err.code === 'auth/popup-closed-by-user') {
+      error.value = 'Sign-in popup was closed. Please try again.';
+    } else if (err.code === 'auth/cancelled-popup-request') {
+      error.value = 'Another sign-in request is already in progress.';
+    } else {
+      error.value = err.message || 'Failed to sign in with Google';
+    }
+    console.error('Google sign-in error:', err);
   } finally {
     loading.value = false;
   }

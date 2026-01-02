@@ -1,17 +1,25 @@
 # Feature Specifications
 
+This document contains feature specifications using our [User Story Template](../docs/templates/user-story-template.md). All features follow our [Practices](../docs/practices/) and [Feature Development Process](../docs/processes/feature-development.md).
+
 ## Feature 1: Organization Management
 
-### Overview
-Users can create and manage multiple organizations to logically group AWS accounts, scans, and reports. Each organization is completely isolated from others.
+### User Story
+As a user, I want to create and manage multiple organizations so that I can logically separate different projects or clients, with each organization completely isolated from others.
 
-### User Stories
+### Expected Behavior
+When a user signs up, a default organization is automatically created. Users can create additional organizations, switch between them via a dropdown in the navigation, and manage organization settings. All AWS accounts, scans, and reports are scoped to the currently selected organization. Users can only see and manage organizations they own.
 
-**As a user, I want to:**
-- Create multiple organizations to separate different projects/clients
-- Switch between organizations easily
-- See which organization I'm currently viewing
-- Manage organization settings
+### User Acceptance Criteria
+- [ ] Given I am a new user, when I sign up, then a default organization is automatically created for me
+- [ ] Given I am logged in, when I click "Add Organization" and provide a name, then a new organization is created and available in the organization selector
+- [ ] Given I have multiple organizations, when I select a different organization from the dropdown, then the UI updates to show data for that organization
+- [ ] Given I am viewing an organization, when I look at the navigation, then I can see which organization is currently selected
+- [ ] Given I have an organization with no AWS accounts, when I try to delete it, then the organization is deleted successfully
+- [ ] Given I have an organization with AWS accounts, when I try to delete it, then I see an error preventing deletion
+- [ ] Given I have only one organization, when I try to delete it, then I see an error preventing deletion of the last organization
+- [ ] Given I own an organization, when I update its name, then the name is saved and reflected in the UI
+- [ ] Given I try to access another user's organization, then I receive an authorization error
 
 ### Data Model
 
@@ -135,16 +143,43 @@ Response: {
 
 ## Feature 2: AWS Account Management
 
-### Overview
-Securely connect customer AWS accounts using cross-account IAM roles via CloudFormation. The process is automated through SNS notifications from the CloudFormation stack.
+### User Story
+As a user, I want to securely connect my AWS accounts to my organization so that I can scan them for security issues. The connection process should be simple and secure, using cross-account IAM roles via CloudFormation.
 
-### User Stories
+### Expected Behavior
+When a user clicks "Add AWS Account", they receive a CloudFormation URL that opens in a new window. After completing the CloudFormation stack in their AWS Console, the account is automatically registered via SNS notification. The account appears in the list with a status (pending, active, or error). Users can see all accounts for their current organization, update account names, and remove accounts they no longer need. If the automated process fails, users can manually enter account details.
 
-**As a user, I want to:**
-- Add AWS accounts to my organization
-- See all AWS accounts for the current organization
-- Remove AWS accounts I no longer need
-- Know the status of my AWS account connections
+### User Acceptance Criteria
+- [ ] Given I am viewing an organization, when I click "Add AWS Account", then I receive a CloudFormation URL that opens in a new window
+- [ ] Given I have initiated account addition, when I complete the CloudFormation stack in AWS Console, then the account is automatically registered and status changes to "active"
+- [ ] Given I have initiated account addition, when the SNS notification is received, then the IAM Role ARN is stored encrypted and account status updates to "active"
+- [ ] Given I am viewing an organization, when I view the AWS accounts list, then I see all accounts for that organization with their status
+- [ ] Given I have an AWS account, when I update its name, then the name is saved and reflected in the list
+- [ ] Given I have an AWS account, when I delete it, then the account is removed from the organization
+- [ ] Given the automated registration fails, when I choose "Enter Manually", then I can provide AWS Account ID and IAM Role ARN to complete registration
+- [ ] Given I try to add a duplicate AWS Account ID to the same organization, then I see an error preventing the duplicate
+- [ ] Given I switch organizations, when I view AWS accounts, then I only see accounts for the current organization
+- [ ] Given an account is in "pending" status, when I view the account, then I see clear instructions on next steps
+
+### Success Metrics
+- **Task Success Rate**: >90% of users successfully add AWS accounts
+- **Time to Complete**: <5 minutes from initiation to active account (including CloudFormation)
+- **Error Rate**: <10% of accounts fail to register (with manual fallback available)
+- **User Satisfaction**: Account addition process is clear and straightforward
+
+### Related Practices
+- [Product Practices](../docs/practices/product.md) - Simplicity First, User Experience
+- [Security Practices](../docs/practices/security.md) - Data Protection (Encryption), Secrets Management, API Security
+- [Database Practices](../docs/practices/database.md) - Schema Design, Data Integrity
+- [Architecture Practices](../docs/practices/architecture.md) - Simplicity First, Standard Patterns
+
+### Technical Notes
+- IAM Role ARN must be encrypted at rest using AES-256
+- ExternalId and UniqueId are UUIDs used for security (AssumeRole and SNS matching)
+- CloudFormation template is stored in S3 and URL is configurable via environment variable
+- SNS webhook handler must verify message signatures
+- Manual fallback allows users to complete setup if automation fails
+- Account status polling in frontend checks for status updates
 
 ### Data Model
 
@@ -423,36 +458,40 @@ If SNS notification fails or times out:
 
 ### SNS Topic
 - Topic Name: `teemops-sns`
-- Region: Same as Lambda functions
-- Subscriber: Lambda function for processing notifications
+- Region: Same as backend API
+- Subscriber: NestJS webhook endpoint for processing notifications
 - Message Format: JSON with RoleArn, ExternalId, UniqueId, Type
 
-### Lambda Functions
-1. **Init Handler**: Generates UUIDs, creates pending record, returns CF URL
-2. **SNS Subscriber**: Processes notifications, updates account status
+### Backend Endpoints
+1. **Init Endpoint**: Generates UUIDs, creates pending record, returns CF URL
+2. **SNS Webhook**: Processes notifications, updates account status
 3. **Account Management**: CRUD operations for AWS accounts
 
 ---
 
-## Testing Scenarios
+## Implementation Status
 
 ### Organization Management
-- ✅ Create organization
-- ✅ List organizations
-- ✅ Switch organization
-- ✅ Update organization name
-- ✅ Delete organization (with/without accounts)
-- ✅ Prevent deletion of last organization
+- ✅ Backend: CRUD operations implemented
+- ✅ Frontend: UI and stores implemented
+- ✅ Database: Schema complete
+- ✅ Status: **Complete**
 
 ### AWS Account Management
-- ✅ Initiate account addition
-- ✅ Generate CloudFormation URL with correct parameters
-- ✅ Receive SNS notification and update account
-- ✅ Manual fallback flow
-- ✅ List accounts filtered by organization
-- ✅ Update account name
-- ✅ Delete account
-- ✅ Handle duplicate account ID
-- ✅ Handle invalid Role ARN
-- ✅ Handle timeout scenarios
+- ✅ Database: Schema complete
+- ✅ Frontend: UI structure and stores implemented
+- ⚠️ Backend: CloudFormation URL generation - **In Progress**
+- ⚠️ Backend: SNS webhook handler - **Not Started**
+- ⚠️ Backend: IAM Role ARN encryption - **Not Started**
+- ⚠️ Frontend: Status polling - **Not Started**
+- ⚠️ Frontend: Manual fallback UI - **Not Started**
+- ⚠️ Status: **Partial** - Core structure exists, integration needed
+
+---
+
+## Notes
+
+- All features follow our [Practices](../docs/practices/) documents
+- Features are developed incrementally following [Feature Development Process](../docs/processes/feature-development.md)
+- See [PROGRESS.md](../docs/PROGRESS.md) for detailed implementation status
 

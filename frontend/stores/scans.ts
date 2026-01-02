@@ -27,21 +27,15 @@ export const useScanStore = defineStore('scan', {
       this.loading = true;
       this.error = null;
       try {
-        const config = useRuntimeConfig();
-        const authStore = useAuthStore();
-        const token = await authStore.getIdToken();
+        const { apiCall } = useApi();
         
-        let url = `${config.public.apiBaseUrl}/organizations/${orgId}/scans`;
+        let endpoint = `/organizations/${orgId}/scans`;
         const params = new URLSearchParams();
         if (filters?.accountId) params.append('accountId', filters.accountId);
         if (filters?.status) params.append('status', filters.status);
-        if (params.toString()) url += `?${params.toString()}`;
+        if (params.toString()) endpoint += `?${params.toString()}`;
         
-        const response = await $fetch(url, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+        const response = await apiCall(endpoint);
         
         this.scans = response.scans || [];
       } catch (error: any) {
@@ -56,15 +50,10 @@ export const useScanStore = defineStore('scan', {
       this.loading = true;
       this.error = null;
       try {
-        const config = useRuntimeConfig();
-        const authStore = useAuthStore();
-        const token = await authStore.getIdToken();
+        const { apiCall } = useApi();
         
-        const response = await $fetch(`${config.public.apiBaseUrl}/organizations/${orgId}/scans`, {
+        const response = await apiCall(`/organizations/${orgId}/scans`, {
           method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
           body: {
             awsAccountId,
             scanType,
@@ -85,15 +74,9 @@ export const useScanStore = defineStore('scan', {
       this.loading = true;
       this.error = null;
       try {
-        const config = useRuntimeConfig();
-        const authStore = useAuthStore();
-        const token = await authStore.getIdToken();
+        const { apiCall } = useApi();
         
-        const response = await $fetch(`${config.public.apiBaseUrl}/organizations/${orgId}/scans/${scanId}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+        const response = await apiCall(`/organizations/${orgId}/scans/${scanId}`);
         
         this.currentScan = response.scan;
         return response;
