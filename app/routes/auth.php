@@ -22,6 +22,10 @@ Route::middleware('guest')->group(function () {
 
     Route::post('login', [AuthenticatedSessionController::class, 'store']);
 
+    // Firebase Auth OAuth verification
+    Route::post('auth/firebase/verify', [\App\Http\Controllers\Auth\FirebaseAuthController::class, 'verify'])
+        ->name('firebase.verify');
+
     Route::get('forgot-password', [PasswordResetLinkController::class, 'create'])
         ->name('password.request');
 

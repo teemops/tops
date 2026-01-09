@@ -146,6 +146,14 @@ FIREBASE_CLIENT_X509_CERT_URL=https://www.googleapis.com/robot/v1/metadata/x509/
 AWS_PARENT_ACCOUNT_ID=123456789012
 AWS_CLOUDFORMATION_TEMPLATE_URL=https://s3.amazonaws.com/your-bucket/teemops-cloudformation-template.json
 AWS_DEFAULT_REGION=us-east-1
+
+# Firebase Frontend Configuration (Required for OAuth - see FIREBASE_OAUTH_SETUP.md)
+VITE_FIREBASE_API_KEY=
+VITE_FIREBASE_AUTH_DOMAIN=
+VITE_FIREBASE_PROJECT_ID=
+VITE_FIREBASE_STORAGE_BUCKET=
+VITE_FIREBASE_MESSAGING_SENDER_ID=
+VITE_FIREBASE_APP_ID=
 ```
 
 ## Setup Steps
@@ -170,7 +178,11 @@ AWS_DEFAULT_REGION=us-east-1
 6. **Configure AWS:**
    - Set parent AWS account ID
    - Set CloudFormation template URL
-7. **Start queue worker** (for background scan processing):
+7. **Configure Firebase Frontend (Required for OAuth):**
+   - Get Firebase config from Firebase Console → Project Settings
+   - Add `VITE_FIREBASE_*` variables to `.env`
+   - See `FIREBASE_OAUTH_SETUP.md` for detailed instructions
+8. **Start queue worker** (for background scan processing):
    ```bash
    php artisan queue:work
    ```
