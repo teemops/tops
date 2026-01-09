@@ -33,31 +33,39 @@ const submit = () => {
 };
 
 const handleOAuth = async (provider: 'google' | 'github' | 'microsoft') => {
+    console.log('OAuth button clicked:', provider);
     oauthLoading.value = provider;
     oauthError.value = null;
 
     try {
+        console.log('Starting Firebase OAuth...');
         // Sign in with Firebase OAuth
-        await signInWithOAuth(provider);
+        const user = await signInWithOAuth(provider);
+        console.log('Firebase OAuth successful, user:', user.email);
         
         // Get the ID token
+        console.log('Getting ID token...');
         const token = await getIdToken();
         
         if (!token) {
             throw new Error('Failed to get authentication token');
         }
+        console.log('ID token obtained, sending to backend...');
 
         // Send token to backend to create Laravel session
         router.post(route('firebase.verify'), { token }, {
             onSuccess: () => {
+                console.log('Backend verification successful');
                 // Redirect handled by backend
             },
             onError: (errors) => {
-                oauthError.value = errors.firebase || 'Authentication failed';
+                console.error('Backend verification failed:', errors);
+                oauthError.value = errors.firebase || errors.message || 'Authentication failed';
                 oauthLoading.value = null;
             },
         });
     } catch (error: any) {
+        console.error('OAuth error:', error);
         oauthError.value = error.message || 'Authentication failed. Please try again.';
         oauthLoading.value = null;
     }

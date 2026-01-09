@@ -8,6 +8,7 @@
     "require": {
         "php": "^8.2",
         "aws/aws-sdk-php": "^3.369",
+        "doctrine/dbal": "^4.4",
         "inertiajs/inertia-laravel": "^2.0",
         "kreait/firebase-php": "^8.0",
         "laravel/framework": "^12.0",

@@ -26,7 +26,7 @@ Before setting up, ensure you have:
 
 ### Step 1: Install PHP and Composer
 
-Follow the instructions in `SETUP.md` to install PHP 8.2+ and Composer.
+Follow the instructions in [Setup Guide](../docs/laravel-app/setup.md) to install PHP 8.2+ and Composer.
 
 ### Step 2: Run Setup Script
 
@@ -96,12 +96,18 @@ The UI designs are in `../design/ui/` and are compatible with:
 - shadcn-vue components
 - Tailwind CSS v4
 
+## Documentation
+
+For detailed documentation, see:
+- [Documentation Index](../docs/README.md) - Complete documentation index
+- [Laravel App Docs](../docs/laravel-app/README.md) - Laravel-specific documentation
+- [Quick Reference](./DOCS.md) - Quick links to all docs
+
 ## Next Steps
 
 After initial setup:
 1. Review UI designs in `../design/ui/html/`
-2. Implement authentication pages
-3. Set up organization management
-4. Implement AWS account management
-5. Build scanning functionality
+2. Configure environment variables (see [ENV_SETUP.md](../docs/laravel-app/ENV_SETUP.md))
+3. Set up Firebase OAuth (see [FIREBASE_OAUTH_SETUP.md](../docs/laravel-app/FIREBASE_OAUTH_SETUP.md))
+4. Review feature specifications (see [features-spec.md](../docs/features/features-spec.md))
 

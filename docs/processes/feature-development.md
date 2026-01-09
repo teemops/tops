@@ -64,7 +64,8 @@ The feature development process follows these phases:
 - Design user experience (wireframes, flows)
 - Consider edge cases but don't over-engineer
 - Design data model (if needed)
-- Design API endpoints (if needed)
+- Design API endpoints (if needed - only for external APIs)
+- Design Inertia pages and components (for Laravel monolith)
 - Get feedback on design before implementation
 
 ### Practices Reference
@@ -75,7 +76,8 @@ The feature development process follows these phases:
 ### Checklist
 - [ ] User experience is designed
 - [ ] Data model is simple and normalized
-- [ ] API design follows RESTful conventions (if applicable)
+- [ ] API design follows RESTful conventions (if external API needed)
+- [ ] Inertia pages/components designed (for Laravel monolith)
 - [ ] Edge cases are considered but not over-engineered
 - [ ] Design feedback is gathered
 - [ ] Design aligns with simplicity principles
@@ -106,8 +108,9 @@ The feature development process follows these phases:
 - [ ] Input validation implemented
 - [ ] Error handling is clear
 - [ ] No premature optimization
-- [ ] Unit tests for business logic
-- [ ] Integration tests for API endpoints (if applicable)
+- [ ] Unit tests for business logic (Laravel services, models)
+- [ ] Integration tests for API endpoints (if external API)
+- [ ] Feature tests for Inertia pages (Laravel)
 
 ### Code Review Checklist
 Use [Practices Checklist](../processes/practices-checklist.md) during review:

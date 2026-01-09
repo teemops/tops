@@ -37,7 +37,7 @@
 - Edge cases in business rules
 
 ### 2. What NOT to Test
-- Framework code (NestJS, Nuxt, Prisma)
+- Framework code (Laravel, Vue, Inertia.js)
 - Simple getters/setters
 - Trivial functions with no logic
 - Third-party library code
@@ -53,47 +53,51 @@
 
 ### 4. Tools and Frameworks
 
-#### Backend (NestJS)
-- **Jest**: Default testing framework (already configured)
-- **@nestjs/testing**: NestJS testing utilities
-- **ts-jest**: TypeScript support for Jest
+#### Backend (Laravel)
+- **PHPUnit**: Default testing framework (built into Laravel)
+- **Laravel Testing Utilities**: TestCase, factories, assertions
+- **Database Factories**: For generating test data
 
-#### Frontend (Nuxt/Vue)
-- **Vitest**: Fast unit test framework (Vite-based)
-- **@vue/test-utils**: Vue component testing utilities
-- **@nuxt/test-utils**: Nuxt-specific testing helpers
+#### Frontend (Vue)
+- **Vitest**: Fast unit test framework (Vite-based, optional)
+- **@vue/test-utils**: Vue component testing utilities (optional)
+- **Laravel Feature Tests**: Test Inertia pages (recommended)
 
 ### 5. Example Unit Test Structure
 
-```typescript
-// Backend example
-describe('OrganizationsService', () => {
-  describe('createOrganization', () => {
-    it('should create organization with valid name', async () => {
-      // Arrange
-      const userId = 'user-123';
-      const name = 'My Organization';
-      
-      // Act
-      const result = await service.createOrganization(userId, name);
-      
-      // Assert
-      expect(result.name).toBe(name);
-      expect(result.userId).toBe(userId);
-    });
+```php
+// Laravel service example
+class OrganizationServiceTest extends TestCase
+{
+    public function test_creates_organization_with_valid_name(): void
+    {
+        // Arrange
+        $user = User::factory()->create();
+        $name = 'My Organization';
+        
+        $service = new OrganizationService();
+        
+        // Act
+        $result = $service->create($user->id, $name);
+        
+        // Assert
+        $this->assertEquals($name, $result->name);
+        $this->assertEquals($user->id, $result->user_id);
+    }
 
-    it('should throw error when name is empty', async () => {
-      // Arrange
-      const userId = 'user-123';
-      const name = '';
-      
-      // Act & Assert
-      await expect(
-        service.createOrganization(userId, name)
-      ).rejects.toThrow('Organization name is required');
-    });
-  });
-});
+    public function test_throws_exception_when_name_is_empty(): void
+    {
+        // Arrange
+        $user = User::factory()->create();
+        $name = '';
+        
+        $service = new OrganizationService();
+        
+        // Act & Assert
+        $this->expectException(ValidationException::class);
+        $service->create($user->id, $name);
+    }
+}
 ```
 
 ## Integration / Endpoint Testing
@@ -116,22 +120,40 @@ describe('OrganizationsService', () => {
 
 ### 3. Tools and Frameworks
 
-#### Backend (NestJS)
-- **Jest**: Test framework
-- **Supertest**: HTTP assertion library for API testing
-- **@nestjs/testing**: NestJS testing module
-- **Prisma**: Use test database for integration tests
+#### Backend (Laravel)
+- **PHPUnit**: Test framework
+- **Laravel HTTP Testing**: Built-in HTTP test methods
+- **Laravel Feature Tests**: Full request/response testing
+- **Database Transactions**: Automatic rollback in tests
 
 ### 4. Example Integration Test Structure
 
-```typescript
-// Backend API endpoint test
-describe('OrganizationsController (e2e)', () => {
-  let app: INestApplication;
-  let authToken: string;
+```php
+// Laravel feature test example
+class OrganizationsControllerTest extends TestCase
+{
+    use RefreshDatabase;
 
-  beforeAll(async () => {
-    // Setup test app and database
+    public function test_user_can_create_organization(): void
+    {
+        // Arrange
+        $user = User::factory()->create();
+        
+        // Act
+        $response = $this->actingAs($user)
+            ->post('/api/organizations', [
+                'name' => 'My Organization',
+            ]);
+
+        // Assert
+        $response->assertStatus(201);
+        $this->assertDatabaseHas('organizations', [
+            'name' => 'My Organization',
+            'user_id' => $user->id,
+        ]);
+    }
+}
+```
     const moduleFixture = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
@@ -474,21 +496,22 @@ frontend/
 
 ## Tools Summary
 
-### Backend Testing
-- **Jest**: Unit and integration testing
-- **Supertest**: API endpoint testing
-- **@nestjs/testing**: NestJS testing utilities
+### Backend Testing (Laravel)
+- **PHPUnit**: Unit and integration testing (built into Laravel)
+- **Laravel HTTP Testing**: API endpoint testing
+- **Laravel Testing Utilities**: TestCase, factories, assertions
+- **Database Factories**: Generate test data
 
-### Frontend Testing
-- **Vitest**: Unit testing (fast, Vite-based)
-- **@vue/test-utils**: Vue component testing
-- **Playwright**: End-to-end UI testing (recommended)
-- **Cypress**: Alternative E2E testing (if preferred)
+### Frontend Testing (Vue)
+- **Vitest**: Unit testing (fast, Vite-based, optional)
+- **@vue/test-utils**: Vue component testing (optional)
+- **Laravel Feature Tests**: Test Inertia pages (recommended)
+- **Playwright**: End-to-end UI testing (when needed)
 
 ### Test Utilities
-- **Test Containers**: For database testing (optional)
-- **MSW (Mock Service Worker)**: API mocking in frontend tests
-- **Faker**: Generate test data
+- **Laravel Database Factories**: Generate test data
+- **RefreshDatabase Trait**: Automatic database cleanup
+- **MSW (Mock Service Worker)**: API mocking in frontend tests (if needed)
 
 ## Quality Checklist
 

@@ -94,8 +94,8 @@ Quick reference checklist to ensure development aligns with our practices. Use t
 
 ### Query Design
 - [ ] Queries are simple and clear
-- [ ] Parameterized queries used (no SQL injection)
-- [ ] N+1 query problems avoided
+- [ ] Eloquent ORM used (automatically parameterized)
+- [ ] N+1 query problems avoided (eager loading)
 - [ ] Transactions used for atomic operations
 
 ### Optimization
@@ -105,10 +105,11 @@ Quick reference checklist to ensure development aligns with our practices. Use t
 - [ ] Not building for hypothetical scale
 
 ### Migration Management
-- [ ] Schema changes in version-controlled migrations
+- [ ] Schema changes in Laravel migrations
 - [ ] Migrations are reversible when possible
 - [ ] Migrations tested before production
 - [ ] Data migrations separate from schema migrations
+- [ ] Migrations use Eloquent models when possible
 
 ## Testing Practices
 
@@ -126,10 +127,11 @@ Quick reference checklist to ensure development aligns with our practices. Use t
 - [ ] Tests are reliable (not flaky)
 
 ### Integration Testing
-- [ ] API endpoints have integration tests
+- [ ] API endpoints have integration tests (Laravel feature tests)
 - [ ] Database interactions are tested
 - [ ] Authentication/authorization tested
 - [ ] Multi-tenant isolation tested
+- [ ] Inertia page rendering tested
 
 ### E2E Testing
 - [ ] Critical user flows have E2E tests (if needed)
@@ -159,7 +161,8 @@ Quick reference checklist to ensure development aligns with our practices. Use t
 - [ ] Technologies team knows well
 - [ ] Battle-tested solutions preferred
 - [ ] Minimal technology diversity
-- [ ] Standard stack used
+- [ ] Standard stack used (Laravel + Vue)
+- [ ] Monolith architecture maintained (no premature splitting)
 
 ### Optimization
 - [ ] Measured before optimizing

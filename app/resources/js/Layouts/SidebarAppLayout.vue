@@ -3,6 +3,7 @@ import { ref } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import Dropdown from '@/Components/Dropdown.vue';
 import DropdownLink from '@/Components/DropdownLink.vue';
+import NotificationContainer from '@/Components/NotificationContainer.vue';
 
 const showingNavigationDropdown = ref(false);
 
@@ -35,6 +36,20 @@ const logout = () => {
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
                         </svg>
                         Dashboard
+                    </Link>
+                    <Link
+                        :href="route('organizations.index')"
+                        :class="[
+                            route().current('organizations.*')
+                                ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
+                                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700',
+                            'group flex items-center px-3 py-2 text-sm font-medium rounded-md'
+                        ]"
+                    >
+                        <svg class="mr-3 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                        </svg>
+                        Organizations
                     </Link>
                     <Link
                         href="#"
@@ -129,6 +144,9 @@ const logout = () => {
                 </div>
             </main>
         </div>
+
+        <!-- Notifications -->
+        <NotificationContainer />
     </div>
 </template>
 

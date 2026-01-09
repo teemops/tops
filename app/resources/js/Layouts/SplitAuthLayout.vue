@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
+import NotificationContainer from '@/Components/NotificationContainer.vue';
 </script>
 
 <template>
@@ -79,6 +80,9 @@ import { Link } from '@inertiajs/vue3';
                 </div>
             </div>
         </div>
+
+        <!-- Notifications -->
+        <NotificationContainer />
     </div>
 </template>
 

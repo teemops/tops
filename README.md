@@ -1,115 +1,114 @@
-# Cloud Security Application
+# Teemops - Cloud Security Scanning Application
 
-A cloud security scanning application built with Nuxt 3 frontend and AWS Lambda backend.
+A cloud security scanning application built with Laravel 11 and Vue 3, providing AWS security scanning and compliance monitoring.
 
 ## Project Structure
 
 ```
-tops/
-├── frontend/          # Nuxt 3 application
-├── backend/           # Lambda functions with Serverless Framework
-├── shared/            # Shared types and utilities
-└── references/        # Reference files (CloudFormation templates, etc.)
+saas/
+├── app/                 # Laravel application (monolith with Vue frontend)
+│   ├── app/            # Laravel application code
+│   ├── resources/js/   # Vue 3 frontend (Inertia.js)
+│   ├── routes/         # Laravel routes
+│   └── database/       # Migrations and seeders
+├── docs/               # All project documentation
+│   ├── laravel-app/    # Laravel-specific docs
+│   ├── features/       # Feature specifications
+│   └── practices/      # Development practices
+├── design/             # UI designs and mockups
+└── references/         # Reference files (CloudFormation templates, etc.)
 ```
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js 18+
-- Docker and Docker Compose (for local MySQL)
-- MySQL database (local via Docker or AWS RDS)
-- Firebase project
-- AWS account with Serverless Framework configured
-- Serverless Framework CLI: `npm install -g serverless`
+- **PHP 8.2+** (8.3 recommended)
+- **Composer** (PHP dependency manager)
+- **Node.js 18+** and npm
+- **MySQL** database (local or AWS RDS)
+- **Firebase project** (for authentication)
+- **AWS account** (for scanning functionality)
 
-### Initial Setup
+### Quick Start
 
-1. **Set up environment variables**:
+1. **Navigate to app directory**:
    ```bash
-   # Run the setup script (generates .env with encryption key)
-   ./setup-env.sh
-   
-   # Then edit .env with your actual Firebase and AWS credentials
-   nano .env
+   cd app
    ```
 
-2. **Start MySQL using Docker Compose**:
+2. **Follow setup instructions**:
+   See [app/README.md](./app/README.md) for detailed setup instructions.
+
+3. **Or use the setup script**:
    ```bash
-   # Start MySQL container
-   docker-compose up -d
-   
-   # Check status
-   docker-compose ps
+   cd app
+   ./setup-laravel.sh
    ```
 
-   The MySQL data will be stored in `./mysql-data` directory.
+### Development
 
-### Backend Setup
-
+**Terminal 1 (Laravel)**:
 ```bash
-cd backend
-npm install
-npx prisma generate
-npx prisma migrate dev
-npm run dev  # Start serverless offline
+cd app
+php artisan serve
 ```
 
-### Frontend Setup
-
+**Terminal 2 (Vite)**:
 ```bash
-cd frontend
-npm install
+cd app
 npm run dev
 ```
 
-## Environment Variables
+Visit: http://localhost:8000
 
-### Backend (.env)
+## Technology Stack
 
-```env
-DATABASE_URL="mysql://user:password@localhost:3306/cloudsecurity"
-FIREBASE_PROJECT_ID=your-project-id
-FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
-FIREBASE_CLIENT_EMAIL=firebase-adminsdk-xxxxx@your-project.iam.gserviceaccount.com
-AWS_REGION=us-east-1
-AWS_PARENT_ACCOUNT_ID=123456789012
-ENCRYPTION_KEY=your-32-character-encryption-key
-CLOUDFORMATION_TEMPLATE_URL=https://s3.amazonaws.com/storage.auditaws.com/iam.role.child.account.cfn.yaml
-```
-
-### Frontend (.env)
-
-```env
-NUXT_PUBLIC_FIREBASE_API_KEY=your-api-key
-NUXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
-NUXT_PUBLIC_FIREBASE_PROJECT_ID=your-project-id
-NUXT_PUBLIC_API_BASE_URL=http://localhost:3000/dev
-```
-
-## Development
-
-### Backend
-
-```bash
-cd backend
-npm run dev          # Start serverless offline
-npm run build        # Build TypeScript
-npm run deploy:dev   # Deploy to AWS dev stage
-```
-
-### Frontend
-
-```bash
-cd frontend
-npm run dev          # Start Nuxt dev server
-npm run build        # Build for production
-```
+- **Backend**: Laravel 11 (PHP 8.2+)
+- **Frontend**: Vue 3 + TypeScript + Inertia.js
+- **Styling**: Tailwind CSS v4
+- **Components**: shadcn-vue
+- **Database**: MySQL
+- **Authentication**: Firebase Auth
+- **Queue**: Laravel Queues
 
 ## Documentation
 
-- [PLANNING.md](./PLANNING.md) - Project planning and architecture
-- [FEATURES_SPEC.md](./FEATURES_SPEC.md) - Feature specifications
-- [ONBOARDING_FLOW.md](./ONBOARDING_FLOW.md) - AWS account onboarding flow
-- [WIREFRAMES.md](./WIREFRAMES.md) - Application wireframes
+### Getting Started
+- [Quick Start Guide](./docs/quick-start.md) - Get up and running quickly
+- [Laravel App Setup](./docs/laravel-app/setup.md) - Detailed setup instructions
+- [Environment Setup](./docs/laravel-app/ENV_SETUP.md) - Environment variables
 
+### Architecture & Planning
+- [Architecture](./docs/architecture.md) - System architecture and design decisions
+- [Planning](./docs/planning.md) - Project planning and roadmap
+
+### Features
+- [Feature Specifications](./docs/features/features-spec.md) - All features and user stories
+- [AWS Account Onboarding](./docs/features/onboarding-flow.md) - Onboarding process
+- [API Documentation](./docs/laravel-app/API_DOCUMENTATION.md) - API endpoints
+
+### Development
+- [Feature Development Process](./docs/processes/feature-development.md) - How to develop features
+- [Practices Checklist](./docs/processes/practices-checklist.md) - Development practices
+- [User Story Template](./docs/templates/user-story-template.md) - Template for user stories
+
+### Full Documentation Index
+See [docs/README.md](./docs/README.md) for complete documentation index.
+
+## Key Features
+
+- **Multi-tenant Organizations**: Isolated data per organization
+- **AWS Account Management**: Secure cross-account IAM role setup
+- **Security Scanning**: Custom checks for S3, IAM, EC2, RDS
+- **OAuth Authentication**: Google, GitHub, Microsoft support
+- **Email Verification**: Required for email/password users
+- **Background Jobs**: Asynchronous scan processing
+
+## License
+
+[Add your license here]
+
+## Support
+
+For issues and questions, see the documentation or create an issue in the repository.

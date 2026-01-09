@@ -9,6 +9,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Inertia\Inertia;
 use Kreait\Firebase\Auth as FirebaseAuth;
 use Kreait\Firebase\Factory;
 
@@ -51,6 +52,10 @@ class FirebaseAuthController extends Controller
             $uid = $verifiedToken->claims()->get('sub');
             $email = $verifiedToken->claims()->get('email');
             $name = $verifiedToken->claims()->get('name');
+            
+            // Check if email is verified in Firebase
+            // OAuth providers (Google, GitHub, Microsoft) always verify emails, so default to true
+            $emailVerified = $verifiedToken->claims()->get('email_verified', true);
 
             // Find or create user
             $user = User::firstOrCreate(
@@ -58,15 +63,36 @@ class FirebaseAuthController extends Controller
                 [
                     'email' => $email,
                     'name' => $name ?? 'User',
-                    'email_verified_at' => now(),
+                    'email_verified_at' => $emailVerified ? now() : null,
                 ]
             );
 
-            // Update user info if changed
+            // Update user info if changed or if email verification status changed
+            $updates = [];
+            
             if ($user->name !== ($name ?? 'User')) {
-                $user->update([
-                    'name' => $name ?? $user->name,
-                ]);
+                $updates['name'] = $name ?? $user->name;
+            }
+            
+            // If Firebase says email is verified but user isn't verified in our system, verify them
+            if ($emailVerified && !$user->hasVerifiedEmail()) {
+                $updates['email_verified_at'] = now();
+            }
+            
+            // If email changed, update it
+            if ($user->email !== $email) {
+                $updates['email'] = $email;
+                // If email changed and is verified, set verified_at
+                if ($emailVerified) {
+                    $updates['email_verified_at'] = now();
+                } else {
+                    // Email changed but not verified, clear verification
+                    $updates['email_verified_at'] = null;
+                }
+            }
+            
+            if (!empty($updates)) {
+                $user->update($updates);
             }
 
             // Create default organization if user is new
@@ -83,12 +109,26 @@ class FirebaseAuthController extends Controller
 
             $request->session()->regenerate();
 
-            return redirect()->intended(route('dashboard', absolute: false));
+            // Show welcome message for new OAuth users
+            $message = $user->wasRecentlyCreated 
+                ? 'Welcome! Your account has been created and verified.'
+                : 'Welcome back!';
+
+            return redirect()->intended(route('dashboard', absolute: false))
+                ->with('success', $message);
         } catch (\Exception $e) {
             Log::error('Firebase token verification failed', [
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
                 'token_preview' => substr($token, 0, 20) . '...',
             ]);
+
+            // For Inertia requests, return back with errors
+            if ($request->header('X-Inertia')) {
+                return back()->withErrors([
+                    'firebase' => 'Authentication failed: ' . $e->getMessage(),
+                ]);
+            }
 
             return redirect()->route('login')
                 ->withErrors(['firebase' => 'Authentication failed. Please try again.']);

@@ -46,6 +46,9 @@ class RegisteredUserController extends Controller
 
         Auth::login($user);
 
-        return redirect(route('dashboard', absolute: false));
+        // Redirect to email verification page instead of dashboard
+        // The Registered event will automatically send the verification email
+        return redirect(route('verification.notice', absolute: false))
+            ->with('info', 'Registration successful! Please check your email to verify your account.');
     }
 }
