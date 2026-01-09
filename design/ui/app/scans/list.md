@@ -1,0 +1,140 @@
+# Scans List Page Design
+
+## Layout: Sidebar App Layout
+
+List of all security scans with filters and status indicators.
+
+## Visual Mockup
+
+```html
+<main class="flex-1">
+  <div class="py-6">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
+      <!-- Page Header -->
+      <div class="mb-8 flex items-center justify-between">
+        <div>
+          <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Scans</h1>
+          <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">View and manage your security scans</p>
+        </div>
+        <button class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
+          <svg class="-ml-1 mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+          </svg>
+          New Scan
+        </button>
+      </div>
+
+      <!-- Filters -->
+      <div class="mb-6 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Account</label>
+            <select class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white text-sm">
+              <option>All accounts</option>
+              <option>Production AWS</option>
+              <option>Staging AWS</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Status</label>
+            <select class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white text-sm">
+              <option>All statuses</option>
+              <option>Running</option>
+              <option>Completed</option>
+              <option>Failed</option>
+            </select>
+          </div>
+          <div class="flex items-end">
+            <button class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+              Clear filters
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Scans Table -->
+      <div class="bg-white dark:bg-gray-800 shadow rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+          <thead class="bg-gray-50 dark:bg-gray-700">
+            <tr>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Account</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Findings</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Started</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+            <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+              <td class="px-6 py-4 whitespace-nowrap">
+                <div class="text-sm font-medium text-gray-900 dark:text-white">Production AWS</div>
+                <div class="text-sm text-gray-500 dark:text-gray-400 font-mono">123456789012</div>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                  Completed
+                </span>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                <div class="flex items-center space-x-2">
+                  <span class="text-red-600 dark:text-red-400 font-medium">2</span>
+                  <span class="text-gray-400">•</span>
+                  <span class="text-orange-600 dark:text-orange-400 font-medium">5</span>
+                  <span class="text-gray-400">•</span>
+                  <span class="text-amber-600 dark:text-amber-400 font-medium">8</span>
+                  <span class="text-gray-400">•</span>
+                  <span class="text-blue-600 dark:text-blue-400 font-medium">8</span>
+                </div>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">2 hours ago</td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                <a href="/scans/1" class="text-blue-600 hover:text-blue-500 dark:text-blue-400">View</a>
+              </td>
+            </tr>
+            <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+              <td class="px-6 py-4 whitespace-nowrap">
+                <div class="text-sm font-medium text-gray-900 dark:text-white">Staging AWS</div>
+                <div class="text-sm text-gray-500 dark:text-gray-400 font-mono">987654321098</div>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
+                  <svg class="animate-spin -ml-1 mr-1.5 h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Running
+                </span>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">—</td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">5 minutes ago</td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                <a href="/scans/2" class="text-blue-600 hover:text-blue-500 dark:text-blue-400">View</a>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</main>
+```
+
+## Component Breakdown
+
+### shadcn-vue Components Used
+- `Table` - Scans table
+- `Badge` - Status badges
+- `Select` - Filter dropdowns
+- `Button` - New scan button
+
+## Implementation Notes
+
+1. **Filters**: Apply filters via query parameters
+2. **Status Updates**: Poll running scans for status updates
+3. **Findings Count**: Show breakdown by severity
+4. **Pagination**: Add if many scans
+
+## Laravel Starter Kit Integration
+
+- Page: `resources/js/Pages/Scans/Index.vue`
+

@@ -65,6 +65,23 @@ export const useOrganizationStore = defineStore('organization', {
       }
     },
 
+    async getCurrentOrganization() {
+      this.loading = true;
+      this.error = null;
+      try {
+        const { apiCall } = useApi();
+        
+        const response = await apiCall('/organizations/current');
+        
+        this.currentOrganization = response.organization;
+      } catch (error: any) {
+        this.error = error.message || 'Failed to get current organization';
+        throw error;
+      } finally {
+        this.loading = false;
+      }
+    },
+
     setCurrentOrganization(org: Organization) {
       this.currentOrganization = org;
     },

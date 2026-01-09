@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Add Step2 - Teemops</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900">
+  <div class="fixed top-4 left-4 z-50"><a href="../../index.html" class="inline-flex items-center px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">← Back to Index</a></div>
+  <div class="min-h-screen py-12 px-4">
+    <div class="max-w-7xl mx-auto">
+      <div class="mb-4">
+        <a href="../index.html" class="text-blue-600 hover:text-blue-500 dark:text-blue-400">← Back to Index</a>
+      </div>
+      <main class="flex-1">
+  <div class="py-6">
+    <div class="max-w-3xl mx-auto px-4 sm:px-6 md:px-8">
+      <!-- Progress Indicator -->
+      <div class="mb-8">
+        <div class="flex items-center">
+          <div class="flex items-center">
+            <div class="flex-shrink-0 w-10 h-10 rounded-full bg-green-600 flex items-center justify-center">
+              <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+              </svg>
+            </div>
+            <div class="ml-4">
+              <p class="text-sm font-medium text-gray-900 dark:text-white">CloudFormation Setup</p>
+            </div>
+          </div>
+          <div class="flex-auto border-t-2 border-blue-600 mx-4"></div>
+          <div class="flex items-center">
+            <div class="flex-shrink-0 w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center">
+              <span class="text-white text-sm font-medium">2</span>
+            </div>
+            <div class="ml-4">
+              <p class="text-sm font-medium text-gray-900 dark:text-white">Account Details</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Form Card -->
+      <div class="bg-white dark:bg-gray-800 shadow rounded-lg border border-gray-200 dark:border-gray-700">
+        <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+          <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Enter Account Details</h1>
+          <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">Manually enter your AWS account information</p>
+        </div>
+        <form class="px-6 py-6 space-y-6">
+          <!-- Account Name -->
+          <div>
+            <label for="name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Account name <span class="text-gray-500">(optional)</span>
+            </label>
+            <input
+              type="text"
+              id="name"
+              name="name"
+              class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+              placeholder="Production AWS"
+            />
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">A friendly name to identify this account</p>
+          </div>
+
+          <!-- AWS Account ID -->
+          <div>
+            <label for="aws_account_id" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              AWS Account ID <span class="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              id="aws_account_id"
+              name="aws_account_id"
+              required
+              pattern="[0-9]{12}"
+              maxlength="12"
+              class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white font-mono"
+              placeholder="123456789012"
+            />
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">12-digit AWS account ID</p>
+          </div>
+
+          <!-- IAM Role ARN -->
+          <div>
+            <label for="iam_role_arn" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              IAM Role ARN <span class="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              id="iam_role_arn"
+              name="iam_role_arn"
+              required
+              class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white font-mono text-sm"
+              placeholder="arn:aws:iam::123456789012:role/TeemOps"
+            />
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">The IAM role ARN from your CloudFormation stack outputs</p>
+          </div>
+
+          <!-- Help Text -->
+          <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+            <div class="flex">
+              <div class="flex-shrink-0">
+                <svg class="h-5 w-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+                </svg>
+              </div>
+              <div class="ml-3">
+                <p class="text-sm text-blue-700 dark:text-blue-300">
+                  You can find the IAM Role ARN in your CloudFormation stack outputs. If you haven't created the stack yet, 
+                  <a href="/aws-accounts/add" class="font-medium underline">go back to step 1</a>.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Actions -->
+          <div class="flex items-center justify-end space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <a href="/aws-accounts/add" class="text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">
+              ← Back
+            </a>
+            <button
+              type="submit"
+              class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              Connect Account
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</main>
+    </div>
+  </div>
+</body>
+</html>

@@ -59,6 +59,18 @@
         <Button label="Create" @click="createOrganization" :loading="creating" />
       </template>
     </Dialog>
+
+    <!-- Edit Organization Dialog -->
+    <Dialog v-model:visible="showEditDialog" modal header="Edit Organization" :style="{ width: '400px' }">
+      <div class="p-field">
+        <label for="editOrgName">Organization Name</label>
+        <InputText id="editOrgName" v-model="editOrgName" placeholder="Organization Name" class="w-full" />
+      </div>
+      <template #footer>
+        <Button label="Cancel" text @click="showEditDialog = false" />
+        <Button label="Update" @click="updateOrganization" :loading="creating" />
+      </template>
+    </Dialog>
   </div>
 </template>
 
@@ -91,15 +103,39 @@ const createOrganization = async () => {
   }
 };
 
-const editOrganization = (org: any) => {
-  // TODO: Implement edit
-  console.log('Edit organization:', org);
+const showEditDialog = ref(false);
+const editingOrg = ref<Organization | null>(null);
+const editOrgName = ref('');
+
+const editOrganization = (org: Organization) => {
+  editingOrg.value = org;
+  editOrgName.value = org.name;
+  showEditDialog.value = true;
 };
 
-const deleteOrganization = async (org: any) => {
-  if (confirm(`Are you sure you want to delete "${org.name}"?`)) {
-    // TODO: Implement delete
-    console.log('Delete organization:', org);
+const updateOrganization = async () => {
+  if (!editingOrg.value || !editOrgName.value.trim()) return;
+  
+  creating.value = true;
+  try {
+    await organizationStore.updateOrganization(editingOrg.value.orgId, editOrgName.value);
+    showEditDialog.value = false;
+    editingOrg.value = null;
+    editOrgName.value = '';
+  } catch (error) {
+    console.error('Failed to update organization:', error);
+  } finally {
+    creating.value = false;
+  }
+};
+
+const deleteOrganization = async (org: Organization) => {
+  if (confirm(`Are you sure you want to delete "${org.name}"? This action cannot be undone.`)) {
+    try {
+      await organizationStore.deleteOrganization(org.orgId);
+    } catch (error) {
+      console.error('Failed to delete organization:', error);
+    }
   }
 };
 </script>
