@@ -6,8 +6,10 @@ This directory contains Playwright end-to-end tests for the Laravel + Vue applic
 
 1. **Install Playwright browsers:**
    ```bash
-   npx playwright install --with-deps chromium
+   npx playwright install chromium
    ```
+   
+   **Note:** If you see a warning about "OS not officially supported" (e.g., ubuntu24.04-x64), this is **safe to ignore**. Playwright will download a fallback build that works perfectly fine.
 
 2. **Ensure Laravel app is running:**
    ```bash
@@ -114,9 +116,9 @@ Playwright can run in CI environments. The configuration includes:
 - Or set `PLAYWRIGHT_TEST_BASE_URL` to your server URL
 
 ### Tests fail with authentication errors
-- Ensure test user exists in database
-- Check that email verification is not blocking login
-- Use seeders to create test users
+- Seed test user: `php artisan db:seed --class=TestUserSeeder`
+- Test user email: `test@auditaws.cloud`, password: `password`
+- Check that email verification is not blocking login (test user is pre-verified)
 
 ### Selectors not found
 - Use Playwright's codegen to find selectors: `npx playwright codegen`

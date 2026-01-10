@@ -34,12 +34,20 @@ class VerifyFirebaseToken
 
     /**
      * Handle an incoming request.
+     * Supports both Firebase token authentication and session-based authentication.
      */
     public function handle(Request $request, Closure $next): Response
     {
         $token = $request->bearerToken() ?? $request->header('Authorization');
 
+        // If no Firebase token, check for session-based authentication
         if (!$token) {
+            // Check if user is authenticated via session (for web requests)
+            if (auth()->check()) {
+                // User is authenticated via session, proceed
+                return $next($request);
+            }
+
             return response()->json(['error' => 'Unauthorized - No token provided'], 401);
         }
 

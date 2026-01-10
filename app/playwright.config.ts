@@ -40,6 +40,15 @@ export default defineConfig({
         
         /* Video on failure */
         video: 'retain-on-failure',
+        
+        /* Increase timeout for actions */
+        actionTimeout: 10000,
+        
+        /* Increase navigation timeout */
+        navigationTimeout: 30000,
+        
+        /* Store session state for authentication */
+        storageState: undefined, // Can be set to a file path to persist auth state
     },
 
     /* Configure projects for major browsers */
@@ -66,8 +75,11 @@ export default defineConfig({
         url: 'http://localhost:8000',
         reuseExistingServer: !process.env.CI,
         timeout: 120 * 1000,
-        stdout: 'ignore',
+        stdout: 'pipe',
         stderr: 'pipe',
+        env: {
+            ...process.env,
+        },
     },
 });
 

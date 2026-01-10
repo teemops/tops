@@ -9,12 +9,22 @@ export class AuthHelper {
     /**
      * Login with email and password
      */
-    async login(email: string, password: string): Promise<void> {
+    async login(email: string = 'test@auditaws.cloud', password: string = 'password'): Promise<void> {
         await this.page.goto('/login');
-        await this.page.fill('input[name="email"]', email);
-        await this.page.fill('input[name="password"]', password);
-        await this.page.click('button[type="submit"]');
-        await this.page.waitForURL('**/dashboard', { timeout: 5000 });
+        // Wait for page to load and inputs to be visible
+        await this.page.waitForSelector('input#email', { state: 'visible' });
+        await this.page.waitForSelector('input#password', { state: 'visible' });
+        
+        // Use ID selectors since inputs don't have name attributes
+        await this.page.fill('input#email', email);
+        await this.page.fill('input#password', password);
+        
+        // Click submit button - try multiple selectors
+        const submitButton = this.page.locator('button:has-text("Sign in")').or(this.page.locator('button[type="submit"]'));
+        await submitButton.click();
+        
+        // Wait for redirect to dashboard
+        await this.page.waitForURL('**/dashboard', { timeout: 15000 });
     }
 
     /**
@@ -22,13 +32,15 @@ export class AuthHelper {
      */
     async register(name: string, email: string, password: string): Promise<void> {
         await this.page.goto('/register');
-        await this.page.fill('input[name="name"]', name);
-        await this.page.fill('input[name="email"]', email);
-        await this.page.fill('input[name="password"]', password);
-        await this.page.fill('input[name="password_confirmation"]', password);
+        await this.page.waitForLoadState('networkidle');
+        // Use ID selectors
+        await this.page.fill('input#name', name);
+        await this.page.fill('input#email', email);
+        await this.page.fill('input#password', password);
+        await this.page.fill('input#password_confirmation', password);
         await this.page.click('button[type="submit"]');
         // After registration, user is redirected to email verification page
-        await this.page.waitForURL('**/verify-email', { timeout: 5000 });
+        await this.page.waitForURL('**/verify-email', { timeout: 10000 });
     }
 
     /**

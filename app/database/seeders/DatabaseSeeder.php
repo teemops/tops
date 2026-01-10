@@ -17,9 +17,9 @@ class DatabaseSeeder extends Seeder
     {
         // User::factory(10)->create();
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
+        // Seed test user for Playwright E2E tests (only in development/testing)
+        if (app()->environment(['local', 'testing'])) {
+            $this->call(TestUserSeeder::class);
+        }
     }
 }

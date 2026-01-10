@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
+// API routes support both Firebase token auth (for external clients) and session auth (for web app)
 Route::middleware(['api', 'firebase.auth', 'organization.context'])->group(function () {
     // Organizations
     Route::get('/organizations', [OrganizationsController::class, 'index']);

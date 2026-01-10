@@ -23,9 +23,12 @@ cd /home/ben/dev/saas/app
 npx playwright install chromium
 ```
 
-**Note:** If you get a sudo password prompt, you can:
-- Run with sudo: `sudo npx playwright install chromium`
-- Or install system dependencies manually (see Playwright docs)
+**Note:** 
+- If you see a warning about "OS not officially supported" (e.g., ubuntu24.04-x64), this is **safe to ignore**. Playwright will download a fallback build that works fine.
+- If you get a sudo password prompt for system dependencies, you can:
+  - Run with sudo: `sudo npx playwright install chromium`
+  - Or install system dependencies manually (see Playwright docs)
+  - Or skip system dependencies if you only need browser binaries: `npx playwright install chromium --with-deps=false`
 
 ### 2. Run Tests
 
@@ -120,14 +123,17 @@ Helpers provide reusable functions:
 
 ## 🔧 Test Data
 
-**Important:** Tests currently use hardcoded credentials:
-- Email: `test@example.com`
+**Test User:**
+- Email: `test@auditaws.cloud`
 - Password: `password`
+- Created via: `TestUserSeeder`
 
-**Next Steps:**
-1. Create test user seeder
-2. Use factories for test data
-3. Clean up test data after tests
+**Seed Test User:**
+```bash
+php artisan db:seed --class=TestUserSeeder
+```
+
+See `SEED_TEST_USER.md` for details.
 
 ## 📚 Documentation
 
@@ -140,7 +146,7 @@ See `tests/e2e/README.md` for detailed documentation on:
 ## 🎯 Next Steps
 
 1. **Install browsers**: `npx playwright install chromium`
-2. **Create test user**: Add seeder for test@example.com
+2. **Seed test user**: `php artisan db:seed --class=TestUserSeeder`
 3. **Run tests**: `npm run test:e2e`
 4. **Add more tests** as features are implemented
 
@@ -151,14 +157,15 @@ See `tests/e2e/README.md` for detailed documentation on:
 
 ### "Browser not found"
 - Run: `npx playwright install chromium`
+- If you see "OS not officially supported" warning, it's safe to ignore - the fallback build works fine
 
 ### "Connection refused"
 - Ensure Laravel server is running: `php artisan serve`
 - Or set `PLAYWRIGHT_TEST_BASE_URL` environment variable
 
 ### Tests fail with authentication errors
-- Create test user in database
-- Or update test credentials in helpers
+- Seed test user: `php artisan db:seed --class=TestUserSeeder`
+- Verify user exists: Check database or run seeder again
 
 ## 📊 Test Results
 
