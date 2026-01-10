@@ -46,7 +46,10 @@ return [
 
     'aws' => [
         'parent_account_id' => env('AWS_PARENT_ACCOUNT_ID'),
-        'cloudformation_template_url' => env('AWS_CLOUDFORMATION_TEMPLATE_URL'),
+        'cloudformation_template_url' => env('TOPS_CFN_TEMPLATE_URL'),
+        'sqs_name' => env('TOPS_SQS_NAME'),
+        'sqs_arn' => env('TOPS_SQS_ARN'),
+        'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
     'google' => [

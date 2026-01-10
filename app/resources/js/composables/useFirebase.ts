@@ -5,6 +5,7 @@ import {
     GoogleAuthProvider, 
     GithubAuthProvider,
     OAuthProvider,
+    onAuthStateChanged,
     type Auth,
     type User
 } from 'firebase/auth';
@@ -52,6 +53,34 @@ try {
 
 // Export auth instance (may be null if not configured)
 export { auth };
+
+// Helper to wait for auth state to initialize
+export function waitForAuthState(): Promise<User | null> {
+    return new Promise((resolve) => {
+        if (!auth) {
+            resolve(null);
+            return;
+        }
+        
+        // If user is already available, return immediately
+        if (auth.currentUser) {
+            resolve(auth.currentUser);
+            return;
+        }
+        
+        // Otherwise wait for auth state change
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+            unsubscribe();
+            resolve(user);
+        });
+        
+        // Timeout after 2 seconds to avoid hanging
+        setTimeout(() => {
+            unsubscribe();
+            resolve(null);
+        }, 2000);
+    });
+}
 
 // OAuth Providers - created lazily when needed
 let googleProvider: GoogleAuthProvider | null = null;

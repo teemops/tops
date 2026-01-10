@@ -1,11 +1,28 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import Dropdown from '@/Components/Dropdown.vue';
 import DropdownLink from '@/Components/DropdownLink.vue';
 import NotificationContainer from '@/Components/NotificationContainer.vue';
+import OrganizationSelector from '@/Components/OrganizationSelector.vue';
+import { useOrganizations } from '@/composables/useOrganizations';
 
 const showingNavigationDropdown = ref(false);
+const { fetchOrganizations, initCurrentOrganization } = useOrganizations();
+
+onMounted(async () => {
+    // Initialize organization context on app load
+    try {
+        await fetchOrganizations();
+        initCurrentOrganization();
+    } catch (error) {
+        // Don't block page rendering if organization fetch fails
+        console.error('Failed to initialize organizations:', error);
+    }
+    
+    // If no organizations exist after loading, the OrganizationSelector will handle prompting
+    // to create one via its watcher
+});
 
 const logout = () => {
     router.post(route('logout'));
@@ -52,8 +69,13 @@ const logout = () => {
                         Organizations
                     </Link>
                     <Link
-                        href="#"
-                        class="text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 group flex items-center px-3 py-2 text-sm font-medium rounded-md"
+                        :href="route('aws-accounts.index')"
+                        :class="[
+                            route().current('aws-accounts.*')
+                                ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
+                                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700',
+                            'group flex items-center px-3 py-2 text-sm font-medium rounded-md'
+                        ]"
                     >
                         <svg class="mr-3 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
@@ -98,9 +120,7 @@ const logout = () => {
                 <div class="flex-1 px-4 flex justify-between items-center">
                     <div class="flex-1 flex">
                         <div class="flex items-center">
-                            <select class="block w-48 pl-3 pr-10 py-2 text-base border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
-                                <option>My Organization</option>
-                            </select>
+                            <OrganizationSelector />
                         </div>
                     </div>
                     <div class="ml-4 flex items-center md:ml-6 space-x-4">

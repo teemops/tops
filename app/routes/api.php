@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\OrganizationsController;
 use App\Http\Controllers\Api\AwsAccountsController;
 use App\Http\Controllers\Api\ScansController;
+use App\Http\Controllers\Test\E2ETestController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -45,3 +46,15 @@ Route::middleware(['api', 'firebase.auth', 'organization.context'])->group(funct
 // SNS callback (no auth required, uses signature verification)
 Route::post('/aws-accounts/sns-callback', [AwsAccountsController::class, 'snsCallback']);
 
+// E2E Test Helper Routes (ONLY available in testing/local environments)
+// These routes are automatically disabled in production
+if (app()->environment(['testing', 'local'])) {
+    Route::prefix('test')->group(function () {
+        // Verify email for authenticated user (requires session auth)
+        Route::post('/verify-email', [E2ETestController::class, 'verifyEmail'])
+            ->middleware(['web', 'auth']); // Use web middleware for session auth
+        
+        // Verify email by email address (for test users, no auth required in testing)
+        Route::post('/verify-email-by-address', [E2ETestController::class, 'verifyEmailByAddress']);
+    });
+}

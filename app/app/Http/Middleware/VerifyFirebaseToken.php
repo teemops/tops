@@ -43,10 +43,18 @@ class VerifyFirebaseToken
         // If no Firebase token, check for session-based authentication
         if (!$token) {
             // Check if user is authenticated via session (for web requests)
+            // This handles cases where the user logged in via web and has a Laravel session
             if (auth()->check()) {
                 // User is authenticated via session, proceed
                 return $next($request);
             }
+
+            // Log for debugging
+            Log::debug('API request without token or session', [
+                'url' => $request->url(),
+                'has_session' => $request->hasSession(),
+                'session_id' => $request->session()?->getId(),
+            ]);
 
             return response()->json(['error' => 'Unauthorized - No token provided'], 401);
         }
