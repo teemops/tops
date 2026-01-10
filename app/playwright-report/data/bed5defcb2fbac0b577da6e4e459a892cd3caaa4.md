@@ -1,0 +1,56 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - generic [ref=e5]:
+      - link "Teemops" [ref=e7] [cursor=pointer]:
+        - /url: http://localhost:8000/dashboard
+        - generic [ref=e8]: Teemops
+      - navigation [ref=e9]:
+        - link "Dashboard" [ref=e10] [cursor=pointer]:
+          - /url: http://localhost:8000/dashboard
+          - img [ref=e11]
+          - text: Dashboard
+        - link "Organizations" [ref=e13] [cursor=pointer]:
+          - /url: http://localhost:8000/organizations
+          - img [ref=e14]
+          - text: Organizations
+        - link "AWS Accounts" [ref=e16] [cursor=pointer]:
+          - /url: ""
+          - img [ref=e17]
+          - text: AWS Accounts
+        - link "Scans" [ref=e19] [cursor=pointer]:
+          - /url: ""
+          - img [ref=e20]
+          - text: Scans
+        - link "Reports" [ref=e22] [cursor=pointer]:
+          - /url: ""
+          - img [ref=e23]
+          - text: Reports
+        - link "Insights" [ref=e25] [cursor=pointer]:
+          - /url: ""
+          - img [ref=e26]
+          - text: Insights
+  - generic [ref=e28]:
+    - banner [ref=e29]:
+      - generic [ref=e30]:
+        - combobox [ref=e33]:
+          - option "My Organization" [selected]
+        - generic [ref=e34]:
+          - button [ref=e35] [cursor=pointer]:
+            - img [ref=e36]
+          - button "Open user menu JD" [ref=e41] [cursor=pointer]:
+            - generic [ref=e42]: Open user menu
+            - generic [ref=e44]: JD
+    - main [ref=e45]:
+      - generic [ref=e49]:
+        - generic [ref=e50]:
+          - generic [ref=e51]:
+            - heading "Organizations" [level=1] [ref=e52]
+            - paragraph [ref=e53]: Manage your organizations and switch between them
+          - button "Add Organization" [ref=e54] [cursor=pointer]:
+            - img [ref=e55]
+            - text: Add Organization
+        - paragraph [ref=e58]: Failed to load organizations
+```

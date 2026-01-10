@@ -1,0 +1,141 @@
+# AWS Accounts List Page Design
+
+## Layout: Sidebar App Layout
+
+The AWS accounts list page shows all AWS accounts for the current organization.
+
+## Visual Mockup
+
+```html
+<!-- Uses same sidebar and top bar as dashboard -->
+
+<main class="flex-1">
+  <div class="py-6">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
+      <!-- Page Header -->
+      <div class="mb-8 flex items-center justify-between">
+        <div>
+          <h1 class="text-3xl font-bold text-gray-900 dark:text-white">AWS Accounts</h1>
+          <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">Manage your connected AWS accounts</p>
+        </div>
+        <a href="/aws-accounts/add" class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+          <svg class="-ml-1 mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+          </svg>
+          Add AWS Account
+        </a>
+      </div>
+
+      <!-- AWS Accounts List -->
+      <div class="bg-white dark:bg-gray-800 shadow rounded-lg border border-gray-200 dark:border-gray-700">
+        <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+          <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Connected Accounts</h2>
+        </div>
+        <div class="divide-y divide-gray-200 dark:divide-gray-700">
+          <!-- Account Item -->
+          <div class="px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center flex-1">
+                <div class="flex-shrink-0">
+                  <div class="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                    <svg class="h-6 w-6 text-blue-600 dark:text-blue-400" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm0 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/>
+                    </svg>
+                  </div>
+                </div>
+                <div class="ml-4 flex-1">
+                  <div class="flex items-center">
+                    <h3 class="text-sm font-medium text-gray-900 dark:text-white">Production AWS</h3>
+                    <span class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                      <span class="w-1.5 h-1.5 mr-1.5 rounded-full bg-green-500"></span>
+                      Active
+                    </span>
+                  </div>
+                  <p class="mt-1 text-sm text-gray-500 dark:text-gray-400 font-mono">123456789012</p>
+                  <p class="mt-1 text-xs text-gray-500 dark:text-gray-500">Last scan: 2 hours ago</p>
+                </div>
+              </div>
+              <div class="ml-4 flex items-center space-x-2">
+                <button class="text-sm font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400">
+                  Scan
+                </button>
+                <button class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                  <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Account Item (Pending) -->
+          <div class="px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center flex-1">
+                <div class="flex-shrink-0">
+                  <div class="h-10 w-10 rounded-full bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center">
+                    <svg class="h-6 w-6 text-yellow-600 dark:text-yellow-400" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm0 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/>
+                    </svg>
+                  </div>
+                </div>
+                <div class="ml-4 flex-1">
+                  <div class="flex items-center">
+                    <h3 class="text-sm font-medium text-gray-900 dark:text-white">Staging AWS</h3>
+                    <span class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">
+                      <span class="w-1.5 h-1.5 mr-1.5 rounded-full bg-yellow-500"></span>
+                      Pending
+                    </span>
+                  </div>
+                  <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Waiting for CloudFormation setup</p>
+                  <p class="mt-1 text-xs text-blue-600 dark:text-blue-400">Click to complete setup</p>
+                </div>
+              </div>
+              <div class="ml-4 flex items-center space-x-2">
+                <button class="text-sm font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400">
+                  Complete Setup
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Empty State -->
+      <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-12 text-center hidden">
+        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+        </svg>
+        <h3 class="mt-4 text-sm font-medium text-gray-900 dark:text-white">No AWS accounts</h3>
+        <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">Get started by adding your first AWS account.</p>
+        <div class="mt-6">
+          <a href="/aws-accounts/add" class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
+            Add AWS Account
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+```
+
+## Component Breakdown
+
+### shadcn-vue Components Used
+- `Card` - Account list container
+- `Badge` - Status indicators
+- `Button` - Actions
+- `DropdownMenu` - Account actions menu
+
+## Implementation Notes
+
+1. **Status Display**: Clear visual indicators for pending/active/error
+2. **Empty State**: Show when no accounts exist
+3. **Actions**: Scan, edit, delete per account
+4. **Account ID**: Display in monospace font
+5. **Last Scan**: Show timestamp or "Never"
+
+## Laravel Starter Kit Integration
+
+- Page: `resources/js/Pages/AwsAccounts/Index.vue`
+
