@@ -34,6 +34,7 @@ Route::middleware(['api', 'firebase.auth', 'organization.context'])->group(funct
     Route::get('/aws-accounts/{accountId}', [AwsAccountsController::class, 'show']);
     Route::put('/aws-accounts/{accountId}', [AwsAccountsController::class, 'update']);
     Route::delete('/aws-accounts/{accountId}', [AwsAccountsController::class, 'destroy']);
+    Route::get('/aws-accounts/{accountId}/cloudformation-url', [AwsAccountsController::class, 'getCloudFormationUrl']);
 
     // Scans
     Route::get('/organizations/{orgId}/scans', [ScansController::class, 'index']);

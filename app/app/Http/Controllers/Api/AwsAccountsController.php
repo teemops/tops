@@ -186,16 +186,54 @@ class AwsAccountsController extends Controller
             })
             ->findOrFail($accountId);
 
-        // Cannot delete if has scans
-        if ($account->scans()->count() > 0) {
-            return response()->json([
-                'error' => 'Cannot delete AWS account with scan history. Please contact support.'
-            ], 422);
+        // Validate AWS account ID if provided (for confirmation)
+        $validated = $request->validate([
+            'aws_account_id' => ['sometimes', 'string', 'size:12'],
+        ]);
+
+        // If AWS account ID is provided, verify it matches
+        if (isset($validated['aws_account_id']) && $account->aws_account_id) {
+            if ($validated['aws_account_id'] !== $account->aws_account_id) {
+                return response()->json([
+                    'error' => 'AWS account ID does not match.'
+                ], 422);
+            }
         }
 
+        // Allow deletion even with scans - scans remain viewable, linked to soft-deleted account
         $account->delete();
 
         return response()->json(['success' => true]);
+    }
+
+    /**
+     * Get CloudFormation Console URL for account deletion
+     */
+    public function getCloudFormationUrl(Request $request, string $accountId): JsonResponse
+    {
+        $user = auth()->user();
+        
+        $account = AwsAccount::with('organization')
+            ->whereHas('organization', function ($query) use ($user) {
+                $query->where('user_id', $user->id);
+            })
+            ->findOrFail($accountId);
+
+        // Get region from config or default to us-east-1
+        $region = config('services.aws.region', config('services.ses.region', 'us-east-1'));
+        
+        // Build CloudFormation stacks URL
+        // Note: AWS Console doesn't support direct filtering by stack name in URL
+        // User will need to search for "tops-vendor-audit" in the console
+        $cloudFormationUrl = sprintf(
+            'https://console.aws.amazon.com/cloudformation/home?region=%s#/stacks',
+            urlencode($region)
+        );
+
+        return response()->json([
+            'cloudFormationUrl' => $cloudFormationUrl,
+            'stackName' => 'tops-vendor-audit',
+        ]);
     }
 
     /**
