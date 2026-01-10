@@ -52,6 +52,10 @@ class AwsAccount extends Model
      */
     public function setIamRoleArnAttribute($value)
     {
+        if ($value === null) {
+            $this->attributes['iam_role_arn'] = null;
+            return;
+        }
         $this->attributes['iam_role_arn'] = Crypt::encryptString($value);
     }
 
