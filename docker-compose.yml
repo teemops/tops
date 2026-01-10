@@ -6,10 +6,10 @@ services:
     container_name: cloud-security-mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-cloudsecurity}
-      MYSQL_USER: ${MYSQL_USER:-cloudsecurity}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-cloudsecurity}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-mysql}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-teemops}
+      MYSQL_USER: ${MYSQL_USER:-teem}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-b43c8ef4c93eb502}
     ports:
       - "${MYSQL_PORT:-3306}:3306"
     volumes:
@@ -20,4 +20,17 @@ services:
       timeout: 5s
       retries: 5
     command: --default-authentication-plugin=mysql_native_password
-
+  maildev:
+    image: maildev/maildev
+    container_name: maildev
+    ports:
+      - 8090:1080
+      - 1025:1025
+    restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "1m"
+    environment:
+      MAILDEV_SMTP_PORT: 1025
+      MAILDEV_WEB_PORT: 1080
