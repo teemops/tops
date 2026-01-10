@@ -11,10 +11,11 @@ This directory contains Playwright end-to-end tests for the Laravel + Vue applic
    
    **Note:** If you see a warning about "OS not officially supported" (e.g., ubuntu24.04-x64), this is **safe to ignore**. Playwright will download a fallback build that works perfectly fine.
 
-2. **Ensure Laravel app is running:**
-   ```bash
-   php artisan serve
-   ```
+2. **Servers are automatically started by Playwright:**
+   - Laravel server (`php artisan serve`) on port 8000
+   - Vite dev server (`npm run dev`) on port 5173
+   - Both are required for the Laravel + Vue application
+   - If servers are already running, Playwright will reuse them
 
 3. **Ensure database is set up:**
    ```bash
@@ -100,7 +101,7 @@ Playwright configuration is in `playwright.config.ts` at the root of the app dir
 Key settings:
 - **Base URL**: `http://localhost:8000` (configurable via `PLAYWRIGHT_TEST_BASE_URL`)
 - **Browsers**: Chromium by default (can add Firefox, WebKit)
-- **Web Server**: Automatically starts Laravel server if not running
+- **Web Servers**: Automatically starts both Laravel (port 8000) and Vite (port 5173) servers if not running
 
 ## CI/CD Integration
 
@@ -112,8 +113,9 @@ Playwright can run in CI environments. The configuration includes:
 ## Troubleshooting
 
 ### Tests fail with "page.goto: net::ERR_CONNECTION_REFUSED"
-- Ensure Laravel server is running: `php artisan serve`
-- Or set `PLAYWRIGHT_TEST_BASE_URL` to your server URL
+- Playwright automatically starts both Laravel and Vite servers
+- Ensure ports 8000 and 5173 are available
+- Or set `PLAYWRIGHT_TEST_BASE_URL` to your server URL if using existing servers
 
 ### Tests fail with authentication errors
 - Seed test user: `php artisan db:seed --class=TestUserSeeder`
@@ -124,6 +126,18 @@ Playwright can run in CI environments. The configuration includes:
 - Use Playwright's codegen to find selectors: `npx playwright codegen`
 - Check browser console for errors
 - Verify page has loaded: `await page.waitForLoadState('networkidle')`
+
+### "libnspr4.so: cannot open shared object file" or browser launch errors
+- Install missing system dependencies:
+  ```bash
+  # On Ubuntu/Debian:
+  sudo apt-get update
+  sudo apt-get install -y libnspr4 libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libasound2t64
+  ```
+  Or use Playwright's installer:
+  ```bash
+  sudo npx playwright install-deps chromium
+  ```
 
 ## Test Data
 

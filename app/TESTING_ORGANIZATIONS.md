@@ -2,24 +2,23 @@
 
 ## Prerequisites
 
-1. **Start Laravel development server:**
-   ```bash
-   cd /home/ben/dev/saas/app
-   php artisan serve
-   ```
+1. **Servers are automatically started by Playwright:**
+   - Laravel server (`php artisan serve`) on port 8000
+   - Vite dev server (`npm run dev`) on port 5173
+   - Both are required for the Laravel + Vue application
+   - If servers are already running, Playwright will reuse them
 
-2. **Start Vite dev server (in another terminal):**
-   ```bash
-   cd /home/ben/dev/saas/app
-   npm run dev
-   ```
-
-3. **Ensure database is migrated:**
+2. **Ensure database is migrated:**
    ```bash
    php artisan migrate
    ```
 
-4. **Ensure you're logged in** (visit `http://localhost:8000/login`)
+3. **Seed test user for automated tests:**
+   ```bash
+   php artisan db:seed --class=TestUserSeeder
+   ```
+   - Email: `test@auditaws.cloud`
+   - Password: `password`
 
 ## Test Checklist
 

@@ -26,11 +26,15 @@ class AwsAccountsController extends Controller
             ->where('user_id', $user->id)
             ->firstOrFail();
 
+        // Derive UniqueId from organization's orgId (does not change once org is created)
+        $uniqueId = $organization->org_id;
+
         // Create pending AWS account record
         $account = AwsAccount::create([
             'organization_id' => $organization->id,
             'name' => 'Pending AWS Account', // Will be updated when CloudFormation completes
             'status' => 'pending',
+            'unique_id' => $uniqueId, // Derived from orgId, same for all accounts in this org
         ]);
 
         // Build CloudFormation URL
@@ -38,7 +42,7 @@ class AwsAccountsController extends Controller
         $templateUrl = config('services.aws.cloudformation_template_url');
         
         $cloudFormationUrl = sprintf(
-            'https://console.aws.amazon.com/cloudformation/home?#/stacks/quickcreate?templateUrl=%s&param_ParentAWSAccountId=%s&param_ExternalId=%s&param_UniqueId=%s',
+            'https://console.aws.amazon.com/cloudformation/home?#/stacks/quickcreate?templateUrl=%s&stackName=tops-vendor-audit&param_ParentAWSAccountId=%s&param_ExternalId=%s&param_UniqueId=%s',
             urlencode($templateUrl),
             urlencode($parentAccountId),
             urlencode($account->external_id),
@@ -120,12 +124,16 @@ class AwsAccountsController extends Controller
 
         $validated = $request->validated();
 
+        // Derive UniqueId from organization's orgId
+        $uniqueId = $organization->org_id;
+
         $account = AwsAccount::create([
             'organization_id' => $organization->id,
             'name' => $validated['name'],
             'aws_account_id' => $validated['aws_account_id'],
             'iam_role_arn' => $validated['iam_role_arn'],
-            'status' => 'active',
+            'unique_id' => $uniqueId, // Derived from orgId
+            'status' => 'completed',
         ]);
 
         return response()->json([
@@ -191,8 +199,12 @@ class AwsAccountsController extends Controller
     }
 
     /**
-     * Handle SNS callback from CloudFormation
-     * This endpoint receives notifications when CloudFormation stack completes
+     * Handle SNS callback from CloudFormation (Legacy/Backup)
+     * NOTE: Primary flow should use SQS Queue polling via ProcessSqsMessages command
+     * This endpoint can remain as a fallback but SQS polling is the preferred method
+     * 
+     * Flow: CloudFormation → SNS → SQS Queue → Laravel SQS Polling Service
+     * Environment variables: TOPS_SQS_NAME, TOPS_SQS_ARN
      */
     public function snsCallback(Request $request): JsonResponse
     {
@@ -255,7 +267,7 @@ class AwsAccountsController extends Controller
                 'name' => $account->name === 'Pending AWS Account' 
                     ? "AWS Account {$awsAccountId}" 
                     : $account->name,
-                'status' => 'active',
+                'status' => 'completed',
             ]);
 
             Log::info('AWS account activated via SNS callback', [

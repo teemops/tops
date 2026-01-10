@@ -20,13 +20,14 @@ class OrganizationsController extends Controller
         $user = auth()->user();
         
         $organizations = $user->organizations()
-            ->select('id', 'name', 'is_default', 'created_at')
+            ->select('id', 'org_id', 'name', 'is_default', 'created_at')
             ->orderBy('is_default', 'desc')
             ->orderBy('created_at', 'asc')
             ->get()
             ->map(function ($org) {
                 return [
                     'id' => $org->id,
+                    'org_id' => $org->org_id,
                     'name' => $org->name,
                     'is_default' => $org->is_default,
                     'aws_accounts_count' => $org->awsAccounts()->count(),

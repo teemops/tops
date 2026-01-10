@@ -36,6 +36,11 @@ Route::middleware('auth')->group(function () {
     Route::get('/organizations/{orgId}/settings', function (string $orgId) {
         return Inertia::render('Organizations/Settings', ['orgId' => $orgId]);
     })->name('organizations.settings');
+    
+    // AWS Accounts
+    Route::get('/aws-accounts', function () {
+        return Inertia::render('AwsAccounts/Index');
+    })->name('aws-accounts.index');
 });
 
 require __DIR__.'/auth.php';
