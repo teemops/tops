@@ -45,66 +45,6 @@ fi
 
 echo "✅ All required PHP extensions are installed"
 
-# Create Laravel project
-echo "📦 Creating Laravel project..."
-if [ -f "composer.json" ] && [ -f "artisan" ]; then
-    echo "✅ Laravel project already exists, skipping creation..."
-else
-    echo "Creating new Laravel project in temporary location..."
-    
-    # Create Laravel in temp directory (composer requires empty directory)
-    TEMP_DIR=$(mktemp -d)
-    echo "📦 Installing Laravel to temporary directory..."
-    composer create-project laravel/laravel "$TEMP_DIR" --prefer-dist --no-interaction
-    
-    # Move all Laravel files to current directory
-    echo "📦 Moving Laravel files to current directory..."
-    cd "$TEMP_DIR"
-    # Move all files and directories, preserving existing files
-    for item in * .[!.]*; do
-        if [ -e "$item" ] && [ "$item" != "." ] && [ "$item" != ".." ]; then
-            # Skip if file already exists (preserve our setup files)
-            if [ ! -e "/home/ben/dev/saas/app/$item" ]; then
-                mv "$item" /home/ben/dev/saas/app/
-            fi
-        fi
-    done
-    cd /home/ben/dev/saas/app
-    rm -rf "$TEMP_DIR"
-    
-    echo "✅ Laravel project created"
-fi
-
-# Check if starter kit is already installed
-if [ -d "resources/js" ] && [ -f "package.json" ]; then
-    echo "📦 Checking if Starter Kit is already installed..."
-    if grep -q "vue" package.json 2>/dev/null || [ -d "resources/js/Pages" ]; then
-        echo "✅ Starter Kit appears to be installed, skipping..."
-    else
-        # Install Laravel Starter Kit Vue (official)
-        echo "📦 Installing Laravel Starter Kit Vue..."
-        if php artisan install vue 2>/dev/null; then
-            echo "✅ Official Laravel Starter Kit Vue installed"
-        else
-            echo "⚠️  Official starter kit command not available, using Breeze instead..."
-            composer require laravel/breeze --dev
-            php artisan breeze:install vue --typescript --dark
-            echo "✅ Laravel Breeze with Vue installed"
-        fi
-    fi
-else
-    # Install Laravel Starter Kit Vue (official)
-    echo "📦 Installing Laravel Starter Kit Vue..."
-    if php artisan install vue 2>/dev/null; then
-        echo "✅ Official Laravel Starter Kit Vue installed"
-    else
-        echo "⚠️  Official starter kit command not available, using Breeze instead..."
-        composer require laravel/breeze --dev
-        php artisan breeze:install vue --typescript --dark
-        echo "✅ Laravel Breeze with Vue installed"
-    fi
-fi
-
 # Install dependencies
 echo "📦 Installing PHP dependencies..."
 composer install
