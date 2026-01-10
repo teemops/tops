@@ -30,19 +30,20 @@ class AwsAccount extends Model
     ];
 
     /**
-     * Generate UUIDs on creation
+     * Generate ExternalId on creation
+     * UniqueId is derived from organization.orgId (set in controller)
      */
     protected static function boot()
     {
         parent::boot();
 
         static::creating(function ($account) {
+            // Generate ExternalId for each account (unique per account)
             if (empty($account->external_id)) {
                 $account->external_id = \Illuminate\Support\Str::uuid()->toString();
             }
-            if (empty($account->unique_id)) {
-                $account->unique_id = \Illuminate\Support\Str::uuid()->toString();
-            }
+            // UniqueId should be set from organization.orgId in the controller
+            // It does not change once an organization is created
         });
     }
 

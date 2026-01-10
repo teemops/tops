@@ -158,15 +158,38 @@ Response: {
 ## Feature 2: AWS Account Management
 
 ### User Story
-As a user, I want to securely connect my AWS accounts to my organization so that I can scan them for security issues. The connection process should be simple and secure, using cross-account IAM roles via CloudFormation.
+As a User, I want to Add an AWS Account to my current Organization so that I can connect it to the cloud security app.
 
 ### Expected Behavior
-When a user clicks "Add AWS Account", they receive a CloudFormation URL that opens in a new window. After completing the CloudFormation stack in their AWS Console, the account is automatically registered via SNS notification. The account appears in the list with a status (pending, active, or error). Users can see all accounts for their current organization, update account names, and remove accounts they no longer need. If the automated process fails, users can manually enter account details.
+
+**ExternalId Generation**: ExternalId is generated for each new AWS Account creation request. The UniqueId is derived from the OrgId. This does not change once an organization is created.
+
+**Temporary Record Creation**: This generates a temporary AWS Account record in the database as "pending" status.
+
+**CloudFormation URL**: When a new AWS account is added, a new window / tab is opened in the browser to redirect the user to the cloudformation url.
+
+**CloudFormation Parameters**: The Cloudformation URL has 3 parameters: ExternalId, UniqueId, ParentAWSAccountId.
+
+**CloudFormation URL Format**: 
+```
+https://console.aws.amazon.com/cloudformation/home?#/stacks/quickcreate?templateUrl={TOPS_CFN_TEMPLATE_URL}&stackName=tops-vendor-audit&param_ParentAWSAccountId={awsAccountId}&param_ExternalId={externalId}&param_UniqueId={uniqueId}
+```
+
+**CloudFormation Execution**: The Cloudformation will be created by the user within their AWS account.
+
+**SNS to SQS Flow**: Once the Cloudformation template has been created it will send an SNS back to the parent AWS account. This SNS then sends to an SQS Queue. The SQS Queue can be polled by the Laravel backend. (Environment Variables: `TOPS_SQS_NAME` and `TOPS_SQS_ARN`)
+
+**Database Update**: Database record for new AWS account will be updated. (This process will be handled by the Laravel backend Service that can be polling the SQS Queue for changes).
+
+**Status Update**: AWS Account record in table will be updated with status "completed".
+
+**Additional Behavior**: Users can see all accounts for their current organization, update account names, and remove accounts they no longer need. If the automated process fails, users can manually enter account details.
 
 ### User Acceptance Criteria
 - [ ] Given I am viewing an organization, when I click "Add AWS Account", then I receive a CloudFormation URL that opens in a new window
-- [ ] Given I have initiated account addition, when I complete the CloudFormation stack in AWS Console, then the account is automatically registered and status changes to "active"
-- [ ] Given I have initiated account addition, when the SNS notification is received, then the IAM Role ARN is stored encrypted and account status updates to "active"
+- [ ] Given I initiate account addition, when the system generates the request, then ExternalId is generated and UniqueId is derived from the organization's OrgId
+- [ ] Given I have initiated account addition, when I complete the CloudFormation stack in AWS Console, then the account is automatically registered via SNS→SQS flow and status changes to "completed"
+- [ ] Given I have initiated account addition, when the SQS message is processed by Laravel backend, then the IAM Role ARN is stored encrypted and account status updates to "completed"
 - [ ] Given I am viewing an organization, when I view the AWS accounts list, then I see all accounts for that organization with their status
 - [ ] Given I have an AWS account, when I update its name, then the name is saved and reflected in the list
 - [ ] Given I have an AWS account, when I delete it, then the account is removed from the organization
@@ -174,6 +197,7 @@ When a user clicks "Add AWS Account", they receive a CloudFormation URL that ope
 - [ ] Given I try to add a duplicate AWS Account ID to the same organization, then I see an error preventing the duplicate
 - [ ] Given I switch organizations, when I view AWS accounts, then I only see accounts for the current organization
 - [ ] Given an account is in "pending" status, when I view the account, then I see clear instructions on next steps
+- [ ] Given an organization is created, when I add AWS accounts to it, then all accounts use the same UniqueId (derived from OrgId)
 
 ### Success Metrics
 - **Task Success Rate**: >90% of users successfully add AWS accounts
@@ -189,11 +213,16 @@ When a user clicks "Add AWS Account", they receive a CloudFormation URL that ope
 
 ### Technical Notes
 - IAM Role ARN must be encrypted at rest using AES-256
-- ExternalId and UniqueId are UUIDs used for security (AssumeRole and SNS matching)
-- CloudFormation template is stored in S3 and URL is configurable via environment variable
-- SNS webhook handler must verify message signatures
+- ExternalId is generated as UUID for each AWS Account creation request
+- UniqueId is derived from the organization's OrgId and does not change once an organization is created
+- CloudFormation template URL is configurable via `TOPS_CFN_TEMPLATE_URL` environment variable
+- CloudFormation URL includes `stackName=tops-vendor-audit` parameter
+- SNS notification goes to parent AWS account, which forwards to SQS Queue
+- SQS Queue name and ARN configured via `TOPS_SQS_NAME` and `TOPS_SQS_ARN` environment variables
+- Laravel backend polls SQS Queue for new messages (instead of direct webhook)
 - Manual fallback allows users to complete setup if automation fails
 - Account status polling in frontend checks for status updates
+- Status values: `pending`, `completed`, `error` (note: "completed" instead of "active")
 
 ### Data Model
 
@@ -203,10 +232,10 @@ interface AwsAccount {
   name: string;            // User-defined name
   awsAccountId: string;    // 12-digit AWS account ID
   iamRoleArn: string;      // Encrypted IAM Role ARN
-  externalId: string;      // UUID, for AssumeRole security
-  uniqueId: string;        // UUID, for matching SNS notifications
+  externalId: string;      // UUID, generated per account for AssumeRole security
+  uniqueId: string;        // Derived from organization.orgId, same for all accounts in org
   organizationId: string;   // Links to organization.orgId
-  status: 'pending' | 'active' | 'error';
+  status: 'pending' | 'completed' | 'error';
   createdAt: Date;
   updatedAt: Date;
   lastScanAt?: Date;
@@ -222,14 +251,14 @@ interface AwsAccount {
 
 2. **Status Flow**:
    - `pending`: CloudFormation URL generated, waiting for completion
-   - `active`: SNS notification received, account ready for scanning
+   - `completed`: SQS message processed, account ready for scanning
    - `error`: CloudFormation failed or notification timeout
 
 3. **Security**:
    - IAM Role ARN encrypted at rest (AES-256)
-   - ExternalId ensures only parent account can assume role
-   - UniqueId prevents account hijacking
-   - Each account has unique ExternalId and UniqueId
+   - ExternalId ensures only parent account can assume role (generated per account)
+   - UniqueId derived from OrgId, same for all accounts in an organization
+   - UniqueId prevents account hijacking and links accounts to organization
 
 4. **Organization Isolation**:
    - AWS accounts are scoped to organizations
@@ -245,10 +274,10 @@ Vue Frontend:
   - Gets current organization.orgId from state
   - Calls POST /api/organizations/{orgId}/aws-accounts/init
 Laravel Backend:
-  - Generates UniqueId (UUID)
-  - Generates ExternalId (UUID)
+  - Derives UniqueId from organization.orgId (does not change)
+  - Generates ExternalId (UUID) for this account
   - Creates pending record in MySQL database
-  - Constructs CloudFormation URL
+  - Constructs CloudFormation URL with stackName parameter
   - Returns URL to frontend
 ```
 
@@ -258,7 +287,8 @@ Vue Frontend:
   - Opens CloudFormation URL in new window
   - URL format:
     https://console.aws.amazon.com/cloudformation/home?#/stacks/quickcreate?
-    templateUrl={S3_TEMPLATE_URL}&
+    templateUrl={TOPS_CFN_TEMPLATE_URL}&
+    stackName=tops-vendor-audit&
     param_ParentAWSAccountId={PARENT_ACCOUNT_ID}&
     param_ExternalId={EXTERNAL_ID}&
     param_UniqueId={UNIQUE_ID}
@@ -279,18 +309,22 @@ CloudFormation CustomNotifier:
     {
       TopsRoleArn: "arn:aws:iam::123456789012:role/TeemOps",
       TopsExternalId: "uuid-external-id",
-      TopsUniqueId: "uuid-unique-id",
+      TopsUniqueId: "org-uuid-derived-from-orgid",
       TopsType: "org-uuid-here" // Optional: can encode OrgId
     }
 
-Laravel SNS Webhook Handler:
-  - Receives SNS notification at POST /api/aws-accounts/sns-callback
-  - Verifies SNS message signature
-  - Extracts RoleArn, ExternalId, UniqueId
-  - Queries MySQL database for account with matching UniqueId
+AWS SNS → SQS:
+  - SNS forwards message to SQS Queue
+  - Queue name: {TOPS_SQS_NAME}
+  - Queue ARN: {TOPS_SQS_ARN}
+
+Laravel SQS Polling Service:
+  - Polls SQS Queue for new messages (background job/command)
+  - Extracts RoleArn, ExternalId, UniqueId from message
+  - Queries MySQL database for account with matching UniqueId and ExternalId
   - Encrypts and stores IAM Role ARN using Laravel encryption
-  - Updates status to "active"
-  - Optionally extracts OrgId from TopsType or notification metadata
+  - Updates status to "completed"
+  - Deletes message from SQS queue after processing
 ```
 
 #### Step 4: Frontend Polling
@@ -298,7 +332,7 @@ Laravel SNS Webhook Handler:
 Vue Frontend:
   - Polls GET /api/aws-accounts/{accountId} for status
   - Shows "Pending" while status is pending
-  - Shows "Active" when status becomes active
+  - Shows "Completed" when status becomes completed
   - Shows error message if status becomes error
 ```
 
@@ -365,24 +399,24 @@ Response: {
 }
 ```
 
-#### SNS Callback (Internal)
+#### SQS Queue Polling (Internal)
 ```
-POST /api/aws-accounts/sns-callback
-Headers: {
-  'x-amz-sns-message-type': 'Notification'
-}
-Body: {
-  // SNS message payload
-  Message: {
-    TopsRoleArn: "arn:aws:iam::...",
-    TopsExternalId: "uuid",
-    TopsUniqueId: "uuid",
-    TopsType: "org-uuid"
+Laravel Command/Job:
+  - Polls SQS Queue: {TOPS_SQS_NAME}
+  - Processes messages from queue
+  - Extracts account information from SNS message
+  - Updates database record
+  - Deletes message from queue after successful processing
+
+SQS Message Format (from SNS):
+{
+  "Type": "Notification",
+  "Message": {
+    "TopsRoleArn": "arn:aws:iam::123456789012:role/TeemOps",
+    "TopsExternalId": "uuid-external-id",
+    "TopsUniqueId": "org-uuid-derived-from-orgid",
+    "TopsType": "org-uuid-here"
   }
-}
-Response: {
-  success: true,
-  accountId: "uuid"
 }
 ```
 
@@ -704,16 +738,39 @@ Flash Message: success - "Successfully logged in via [Provider]!"
 - Outputs: IAM Role ARN
 - Custom Resource: SNS notification sender
 
-### SNS Topic
-- Topic Name: `teemops-sns`
-- Region: Same as Laravel API
-- Subscriber: Laravel webhook endpoint for processing notifications
+### SNS Topic → SQS Queue
+- SNS Topic Name: `teemops-sns` (in parent AWS account)
+- SQS Queue Name: Configured via `TOPS_SQS_NAME` environment variable
+- SQS Queue ARN: Configured via `TOPS_SQS_ARN` environment variable
+- Flow: CloudFormation → SNS → SQS → Laravel polling service
 - Message Format: JSON with RoleArn, ExternalId, UniqueId, Type
 
 ### Laravel API Endpoints
-1. **Init Endpoint**: Generates UUIDs, creates pending record, returns CF URL
-2. **SNS Webhook**: Processes notifications, updates account status
+1. **Init Endpoint**: Derives UniqueId from orgId, generates ExternalId, creates pending record, returns CF URL
+2. **SQS Polling Service**: Background command (`php artisan aws:process-sqs`) that polls SQS queue, processes messages, updates account status to "completed"
 3. **Account Management**: CRUD operations for AWS accounts
+
+### SQS Polling Command
+The Laravel application includes a command to poll the SQS queue for AWS account registration messages:
+
+```bash
+# Run once (process messages and exit)
+php artisan aws:process-sqs --once
+
+# Run continuously (long-running process)
+php artisan aws:process-sqs
+```
+
+**Recommended Setup**: Run as a supervisor/systemd service or schedule via Laravel scheduler:
+```php
+// In app/Console/Kernel.php
+$schedule->command('aws:process-sqs --once')->everyMinute();
+```
+
+**Environment Variables Required**:
+- `TOPS_SQS_NAME`: Name of the SQS queue
+- `TOPS_SQS_ARN`: ARN of the SQS queue
+- `AWS_DEFAULT_REGION`: AWS region (defaults to us-east-1)
 
 ---
 
@@ -726,14 +783,16 @@ Flash Message: success - "Successfully logged in via [Provider]!"
 - ✅ Status: **Complete**
 
 ### AWS Account Management
-- ✅ MySQL Database: Schema complete
+- ✅ MySQL Database: Schema complete (status enum: pending, completed, error)
 - ✅ Vue Frontend: UI structure and state management implemented
-- ⚠️ Laravel Backend: CloudFormation URL generation - **In Progress**
-- ⚠️ Laravel Backend: SNS webhook handler - **Not Started**
-- ⚠️ Laravel Backend: IAM Role ARN encryption - **Not Started**
-- ⚠️ Vue Frontend: Status polling - **Not Started**
-- ⚠️ Vue Frontend: Manual fallback UI - **Not Started**
-- ⚠️ Status: **Partial** - Core structure exists, integration needed
+- ✅ Laravel Backend: CloudFormation URL generation with stackName parameter
+- ✅ Laravel Backend: UniqueId derived from organization.orgId
+- ✅ Laravel Backend: ExternalId generated per account
+- ✅ Laravel Backend: IAM Role ARN encryption implemented
+- ✅ Vue Frontend: Status polling for pending accounts
+- ✅ Vue Frontend: Manual fallback UI implemented
+- ⚠️ Laravel Backend: SQS Queue polling service - **Not Started** (needs background job/command)
+- ⚠️ Status: **Partial** - Core functionality complete, SQS polling service needed
 
 ---
 

@@ -33,7 +33,8 @@ export default defineConfig({
         baseURL: process.env.PLAYWRIGHT_TEST_BASE_URL || 'http://localhost:8000',
         
         /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
-        trace: 'on-first-retry',
+        /* Change to 'on' to always collect traces for debugging */
+        trace: process.env.PWDEBUG ? 'on' : 'on-first-retry',
         
         /* Screenshot on failure */
         screenshot: 'only-on-failure',
@@ -69,9 +70,13 @@ export default defineConfig({
         // },
     ],
 
-    /* Run your local dev server before starting the tests */
+    /* Run your local dev servers before starting the tests */
     webServer: {
-        command: 'php artisan serve',
+        /* Use a script that starts both servers
+         * Only Laravel is health-checked (on port 8000)
+         * Vite is started in background - Laravel won't fully load without it
+         */
+        command: 'bash scripts/start-dev-servers.sh',
         url: 'http://localhost:8000',
         reuseExistingServer: !process.env.CI,
         timeout: 120 * 1000,

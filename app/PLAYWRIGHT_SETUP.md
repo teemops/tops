@@ -87,9 +87,12 @@ npm run test:e2e:report
 - Default: `http://localhost:8000`
 - Override: Set `PLAYWRIGHT_TEST_BASE_URL` environment variable
 
-### Web Server
-- Playwright automatically starts Laravel server if not running
-- Server URL: `http://localhost:8000`
+### Web Servers
+- Playwright automatically starts both servers if not running:
+  - **Laravel server**: `http://localhost:8000` (backend API and initial HTML)
+  - **Vite dev server**: `http://localhost:5173` (Vue assets and hot reload)
+- Both servers are required for the Laravel + Vue application to work properly
+- If servers are already running, Playwright will reuse them (unless in CI mode)
 
 ### Browsers
 - **Default**: Chromium
@@ -155,13 +158,28 @@ See `tests/e2e/README.md` for detailed documentation on:
 ### "Cannot find package '@playwright/test'"
 - Run: `npm install -D @playwright/test --legacy-peer-deps`
 
-### "Browser not found"
-- Run: `npx playwright install chromium`
+### "Browser not found" or "libnspr4.so: cannot open shared object file"
+- **Install system dependencies:**
+  ```bash
+  # On Ubuntu/Debian:
+  sudo apt-get update
+  sudo apt-get install -y libnspr4 libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libasound2
+  ```
+  Or use Playwright's installer (requires sudo):
+  ```bash
+  sudo npx playwright install-deps chromium
+  ```
+- **Install browser binaries:**
+  ```bash
+  npx playwright install chromium
+  ```
 - If you see "OS not officially supported" warning, it's safe to ignore - the fallback build works fine
 
 ### "Connection refused"
-- Ensure Laravel server is running: `php artisan serve`
-- Or set `PLAYWRIGHT_TEST_BASE_URL` environment variable
+- Playwright automatically starts both Laravel and Vite servers
+- If you see connection errors, ensure ports 8000 and 5173 are available
+- Or set `PLAYWRIGHT_TEST_BASE_URL` environment variable to use existing servers
+- Note: Both servers must be running for tests to work (Laravel + Vite)
 
 ### Tests fail with authentication errors
 - Seed test user: `php artisan db:seed --class=TestUserSeeder`

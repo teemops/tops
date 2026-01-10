@@ -17,8 +17,13 @@ const showDeleteModal = ref(false);
 const organizationToDelete = ref<Organization | null>(null);
 const deleting = ref(false);
 
-onMounted(() => {
-    fetchOrganizations();
+onMounted(async () => {
+    try {
+        await fetchOrganizations();
+    } catch (error) {
+        console.error('Failed to fetch organizations:', error);
+        // Error will be displayed in the error message div
+    }
 });
 
 const handleSwitch = async (org: Organization) => {
@@ -81,7 +86,7 @@ const formatDate = (dateString: string) => {
                 </div>
 
                 <!-- Error Message -->
-                <div v-if="error" class="mb-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                <div v-if="!loading && error" class="mb-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
                     <p class="text-sm text-red-800 dark:text-red-200">{{ error }}</p>
                 </div>
 
@@ -94,8 +99,25 @@ const formatDate = (dateString: string) => {
                     <p class="mt-4 text-sm text-gray-500 dark:text-gray-400">Loading organizations...</p>
                 </div>
 
+                <!-- Empty State -->
+                <div v-else-if="!loading && organizations.length === 0" class="text-center py-12">
+                    <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                    </svg>
+                    <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">No organizations</h3>
+                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Get started by creating a new organization.</p>
+                    <div class="mt-6">
+                        <PrimaryButton @click="showCreateModal = true">
+                            <svg class="-ml-1 mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                            </svg>
+                            Create Organization
+                        </PrimaryButton>
+                    </div>
+                </div>
+
                 <!-- Organizations Grid -->
-                <div v-else class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                <div v-else-if="organizations.length > 0" class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
                     <div
                         v-for="org in organizations"
                         :key="org.id"

@@ -167,6 +167,7 @@ const handleOAuth = async (provider: 'google' | 'github' | 'microsoft') => {
 
             <div>
                 <PrimaryButton
+                    id="register-submit"
                     class="w-full flex justify-center"
                     :class="{ 'opacity-25': form.processing }"
                     :disabled="form.processing"

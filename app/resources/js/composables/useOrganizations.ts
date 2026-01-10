@@ -28,6 +28,16 @@ export function useOrganizations() {
             const response = await axios.get('/api/organizations');
             organizations.value = response.data.organizations;
             
+            // Clear invalid organization ID if it doesn't exist in the list
+            const storedOrgId = localStorage.getItem('current_organization_id');
+            if (storedOrgId && organizations.value.length > 0) {
+                const orgExists = organizations.value.some(org => org.org_id === storedOrgId);
+                if (!orgExists) {
+                    localStorage.removeItem('current_organization_id');
+                    delete axios.defaults.headers.common['X-Organization-Id'];
+                }
+            }
+            
             // Set current organization to default if not set
             if (!currentOrganization.value && organizations.value.length > 0) {
                 const defaultOrg = organizations.value.find(org => org.is_default);
@@ -36,11 +46,34 @@ export function useOrganizations() {
                 // Store in localStorage
                 if (currentOrganization.value) {
                     localStorage.setItem('current_organization_id', currentOrganization.value.org_id);
+                    axios.defaults.headers.common['X-Organization-Id'] = currentOrganization.value.org_id;
                 }
+            } else if (organizations.value.length === 0) {
+                // No organizations exist - clear current organization
+                currentOrganization.value = null;
+                localStorage.removeItem('current_organization_id');
+                delete axios.defaults.headers.common['X-Organization-Id'];
             }
         } catch (err: any) {
-            error.value = err.response?.data?.message || 'Failed to load organizations';
+            error.value = err.response?.data?.message || err.response?.data?.error || 'Failed to load organizations';
             console.error('Error fetching organizations:', err);
+            
+            // If we get 404, it might mean no organizations exist
+            if (err.response?.status === 404) {
+                organizations.value = [];
+                currentOrganization.value = null;
+                localStorage.removeItem('current_organization_id');
+                delete axios.defaults.headers.common['X-Organization-Id'];
+            }
+            
+            // If we get 401, clear everything and let user re-authenticate
+            if (err.response?.status === 401) {
+                organizations.value = [];
+                currentOrganization.value = null;
+                localStorage.removeItem('current_organization_id');
+                delete axios.defaults.headers.common['X-Organization-Id'];
+                // Don't throw - let the page render so user can see the error
+            }
         } finally {
             loading.value = false;
         }
