@@ -2,6 +2,18 @@
 
 This document tracks feature completion status, practices compliance, and development priorities for the Laravel application.
 
+## Architecture Overview
+
+**Technology Stack**: Laravel 11/12 (PHP 8.2+) + Vue 3 + TypeScript + Inertia.js + Tailwind CSS v4
+
+**Architecture Pattern**: Laravel Monolith with Vue 3 frontend
+- **Backend**: Laravel 11/12 with MySQL database
+- **Frontend**: Vue 3 + TypeScript + Inertia.js (no separate API layer needed)
+- **Styling**: Tailwind CSS v4
+- **Authentication**: Firebase Authentication (OAuth + email/password)
+- **Queue**: Laravel Queues (database driver)
+- **Testing**: PHPUnit (unit/feature) + Playwright (E2E)
+
 Last Updated: January 2026
 
 ## Feature Completion Status
@@ -40,34 +52,34 @@ Last Updated: January 2026
 - **Next Steps**: None (complete)
 
 #### Organization Management
-- **Status**: ✅ Complete (Backend)
+- **Status**: ✅ Complete
 - **Implementation**:
-  - CRUD operations for organizations
+  - CRUD operations for organizations (API endpoints)
   - Default organization creation on signup
   - Multi-tenant isolation (organization scoping)
   - Organization context middleware
-  - API endpoints for organization management
-- **Missing**:
-  - Frontend UI for organization management
+  - Frontend UI (Organizations/Index, Organizations/Settings, CreateOrganizationModal)
   - Organization switching UI
-  - Tests
+- **Missing**:
+  - Tests (unit and integration)
 - **Practices Alignment**: ⚠️
   - Product: Simple, focused feature ✅
   - Database: Normalized schema, proper relationships ✅
   - Security: Organization-scoped data access ✅
   - Testing: Missing test coverage ❌
 - **Next Steps**: 
-  1. Implement frontend UI
-  2. Add tests
+  1. Add test coverage
 
 #### Development Environment
 - **Status**: ✅ Complete
 - **Implementation**:
-  - Laravel 11 application setup
-  - Vue 3 + Inertia.js frontend
+  - Laravel 11/12 application setup (PHP 8.2+)
+  - Vue 3 + TypeScript + Inertia.js frontend
+  - Tailwind CSS v4 for styling
   - MySQL database
   - Vite for asset compilation
-  - Development server setup
+  - Development server setup (concurrent dev script)
+  - Playwright for E2E testing
 - **Practices Alignment**: ✅
   - Architecture: Simple, maintainable dev setup ✅
 - **Next Steps**: None (complete)
@@ -80,64 +92,68 @@ Last Updated: January 2026
   - Database schema (AwsAccount model with encryption)
   - API endpoints (CRUD operations)
   - CloudFormation URL generation
-  - SNS callback handler
+  - SNS callback handler with signature verification
   - IAM Role ARN encryption
+  - Frontend UI (AwsAccounts/Index, AddAwsAccountModal)
 - **Missing**:
-  - Frontend UI for AWS account management
-  - Status polling
+  - Status polling/updates
   - Manual account entry fallback
-  - Tests
+  - Tests (unit and integration)
 - **Practices Alignment**: ⚠️
   - Security: Encryption implemented ✅
-  - Product: Feature incomplete, needs frontend ❌
+  - Product: Basic UI implemented, needs status updates ⚠️
+  - Testing: Missing test coverage ❌
 - **Priority**: High (core MVP feature)
 - **Next Steps**: 
-  1. Implement frontend UI
-  2. Add status polling
+  1. Add status polling for account setup
+  2. Add manual account entry fallback
   3. Add tests
 
 #### Scanning Functionality
 - **Status**: 🔄 Partial
 - **Completed**:
   - Database schema (Scan, ScanResult models)
-  - API endpoints (list, create, show, results)
-  - Background job processing (Laravel Queues)
-  - AWS Security Scanner service
+  - API endpoints (list, create, show, results, cancel)
+  - Background job processing (Laravel Queues with ProcessScanJob)
+  - AWS Security Scanner service (AwsSecurityScanner)
   - Security checks (S3, IAM, EC2, RDS)
+  - Scan status management (pending → running → completed/failed)
 - **Missing**:
-  - Frontend UI for scans
-  - Scan status updates
-  - Results display
-  - Tests
+  - Frontend UI for scans (list, create, view)
+  - Real-time scan status updates
+  - Results display UI
+  - Tests (unit and integration)
 - **Practices Alignment**: ⚠️
   - Architecture: Scanning engine implemented ✅
+  - Product: Backend complete, needs frontend ❌
   - Code Quality: Needs testing ❌
 - **Priority**: High (core MVP feature)
 - **Next Steps**:
-  1. Implement frontend UI
-  2. Add scan status updates
-  3. Add results display
+  1. Implement frontend UI for scans
+  2. Add real-time scan status updates
+  3. Add results display UI
   4. Add tests
 
 #### Results & Reporting
-- **Status**: 🔄 Schema Only
+- **Status**: 🔄 Backend Complete
 - **Completed**:
   - Database schema (ScanResult model)
-  - API endpoints for results
+  - API endpoints for results (GET /scans/{scanId}/results)
+  - Structured findings output
 - **Missing**:
-  - Frontend UI for results
+  - Frontend UI for results display
   - Report export (PDF, CSV, JSON)
-  - Dashboard analytics
+  - Dashboard analytics with real data
   - Finding status management (open/resolved/ignored)
   - Tests
 - **Practices Alignment**: ⚠️
-  - Product: Need to implement frontend ❌
+  - Product: Backend complete, needs frontend ❌
   - Code Quality: Export functionality needs implementation ❌
 - **Priority**: High (core MVP feature)
 - **Next Steps**:
-  1. Implement frontend UI
+  1. Implement frontend UI for results
   2. Add basic report export (start with JSON)
-  3. Implement dashboard analytics
+  3. Implement dashboard analytics with scan data
   4. Add finding status management
 
 ### ❌ Not Started Features
@@ -148,9 +164,16 @@ Last Updated: January 2026
 - **Practices Note**: Don't build until users request it
 
 #### Dashboard Analytics
-- **Status**: ❌ Not Started (UI exists but no data)
+- **Status**: 🔄 UI Exists, No Data
+- **Implementation**:
+  - Dashboard page exists (Dashboard.vue)
+- **Missing**:
+  - Analytics data integration
+  - Charts and metrics
+  - Recent scans display
+  - Summary statistics
 - **Priority**: Medium (part of MVP)
-- **Next Steps**: Implement after scanning is working
+- **Next Steps**: Implement after scanning frontend is complete
 
 #### Multi-Cloud Support (Azure, GCP)
 - **Status**: ❌ Not Started
@@ -205,8 +228,8 @@ Last Updated: January 2026
 ## Known Gaps & Technical Debt
 
 ### High Priority
-1. **Frontend UI Implementation**: Many backend features lack frontend UI
-2. **Test Coverage**: Need tests for critical paths
+1. **Frontend UI Implementation**: Scans and Results pages need frontend UI
+2. **Test Coverage**: Need tests for critical paths (organizations, AWS accounts, scans)
 3. **User Story Format**: Existing features need conversion to new template
 
 ### Medium Priority
@@ -222,11 +245,11 @@ Last Updated: January 2026
 
 ### Immediate (MVP Completion)
 1. ✅ Complete Authentication & User Management
-2. ✅ Complete Organization Management (backend)
-3. 🔄 Implement Frontend UI for Organizations
-4. 🔄 Complete AWS Account Management (frontend)
-5. 🔄 Complete Scanning Functionality (frontend)
-6. 🔄 Basic Results & Reporting (frontend)
+2. ✅ Complete Organization Management (backend + frontend)
+3. 🔄 Complete AWS Account Management (add status polling)
+4. 🔄 Complete Scanning Functionality (frontend UI)
+5. 🔄 Basic Results & Reporting (frontend UI)
+6. 🔄 Dashboard Analytics (connect to real data)
 
 ### Short Term (Post-MVP)
 1. Convert existing features to new user story format
@@ -251,10 +274,10 @@ Last Updated: January 2026
 - Implemented Laravel monolith architecture
 
 ### In Progress 🔄
+- Implementing scans and results frontend UI
+- Adding test coverage for critical features
 - Converting features to user story format
-- Assessing codebase against practices
-- Documenting progress and gaps
-- Implementing frontend UI
+- Connecting dashboard to real analytics data
 
 ### Planned 📋
 - Regular practices compliance reviews
