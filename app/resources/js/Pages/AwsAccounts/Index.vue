@@ -9,15 +9,26 @@ import PrimaryButton from '@/Components/PrimaryButton.vue';
 import Dropdown from '@/Components/Dropdown.vue';
 import DropdownLink from '@/Components/DropdownLink.vue';
 import AddAwsAccountModal from './AddAwsAccountModal.vue';
+import TextInput from '@/Components/TextInput.vue';
+import InputLabel from '@/Components/InputLabel.vue';
+import InputError from '@/Components/InputError.vue';
 
-const { accounts, loading, error, fetchAccounts, deleteAccount, startPolling, stopPolling } = useAwsAccounts();
+const { accounts, loading, error, fetchAccounts, updateAccount, deleteAccount, startPolling, stopPolling } = useAwsAccounts();
 const { currentOrganization } = useOrganizations();
 const { showSuccess, showError } = useNotifications();
 
 const showAddModal = ref(false);
 const showDeleteModal = ref(false);
+const deleteStep = ref<'confirm' | 'instructions'>('confirm');
 const accountToDelete = ref<AwsAccount | null>(null);
 const deleting = ref(false);
+const awsAccountIdInput = ref('');
+const awsAccountIdError = ref('');
+
+// Inline editing state
+const editingAccountId = ref<string | null>(null);
+const editingName = ref('');
+const saving = ref(false);
 
 const loadAccounts = async () => {
     if (currentOrganization.value?.org_id) {
@@ -46,25 +57,139 @@ watch(() => currentOrganization.value?.org_id, async () => {
     await loadAccounts();
 });
 
+// Inline editing functions
+const startEditing = (account: AwsAccount) => {
+    // Only allow editing for completed accounts
+    if (account.status !== 'completed') return;
+    
+    editingAccountId.value = account.id;
+    editingName.value = account.name;
+};
+
+const cancelEditing = () => {
+    editingAccountId.value = null;
+    editingName.value = '';
+};
+
+const saveEdit = async (accountId: string) => {
+    if (!editingName.value.trim()) {
+        showError('Account name cannot be empty');
+        return;
+    }
+
+    // Check if name actually changed
+    const account = accounts.value.find(acc => acc.id === accountId);
+    if (account && editingName.value.trim() === account.name) {
+        cancelEditing();
+        return;
+    }
+
+    saving.value = true;
+    try {
+        await updateAccount(accountId, editingName.value.trim());
+        showSuccess('Account name updated successfully');
+        editingAccountId.value = null;
+        editingName.value = '';
+    } catch (err: any) {
+        showError(err.response?.data?.message || err.response?.data?.error || 'Failed to update account name');
+        // Revert to original name on error
+        if (account) {
+            editingName.value = account.name;
+        }
+    } finally {
+        saving.value = false;
+    }
+};
+
+const handleKeydown = (event: KeyboardEvent, accountId: string) => {
+    if (event.key === 'Enter') {
+        event.preventDefault();
+        saveEdit(accountId);
+    } else if (event.key === 'Escape') {
+        event.preventDefault();
+        cancelEditing();
+    }
+};
+
+// Delete functions
 const handleDelete = (account: AwsAccount) => {
+    // Always show the modal - never delete directly
     accountToDelete.value = account;
+    deleteStep.value = 'confirm';
+    awsAccountIdInput.value = '';
+    awsAccountIdError.value = '';
     showDeleteModal.value = true;
 };
 
-const confirmDelete = async () => {
+const validateAwsAccountId = () => {
+    if (!accountToDelete.value) return false;
+
+    // For pending accounts, skip validation
+    if (!accountToDelete.value.awsAccountId) {
+        return true;
+    }
+
+    // Validate that entered ID matches
+    if (awsAccountIdInput.value.trim() !== accountToDelete.value.awsAccountId) {
+        awsAccountIdError.value = 'AWS account ID does not match';
+        return false;
+    }
+
+    awsAccountIdError.value = '';
+    return true;
+};
+
+const proceedToInstructions = async () => {
     if (!accountToDelete.value) return;
 
-    deleting.value = true;
-    try {
-        await deleteAccount(accountToDelete.value.id);
-        showSuccess('AWS account deleted successfully');
-        showDeleteModal.value = false;
-        accountToDelete.value = null;
-    } catch (err: any) {
-        showError(err.response?.data?.error || 'Failed to delete AWS account');
-    } finally {
-        deleting.value = false;
+    // For pending accounts (no AWS Account ID), allow immediate deletion
+    if (!accountToDelete.value.awsAccountId) {
+        try {
+            deleting.value = true;
+            await deleteAccount(accountToDelete.value.id);
+            showSuccess('AWS account deleted successfully');
+            closeDeleteModal();
+        } catch (err: any) {
+            showError(err.response?.data?.error || 'Failed to delete AWS account');
+        } finally {
+            deleting.value = false;
+        }
+        return;
     }
+
+    // For completed accounts, validate AWS account ID and move to instructions
+    // DO NOT delete here - deletion happens via SQS when CloudFormation stack is deleted
+    if (!validateAwsAccountId()) {
+        return;
+    }
+
+    // Move to instructions step
+    deleteStep.value = 'instructions';
+};
+
+const openCloudFormationConsole = async () => {
+    if (!accountToDelete.value) return;
+
+    try {
+        // Fetch CloudFormation URL from backend
+        const axios = (window as any).axios;
+        const response = await axios.get(`/api/aws-accounts/${accountToDelete.value.id}/cloudformation-url`);
+        
+        // Open AWS Console in new window
+        window.open(response.data.cloudFormationUrl, '_blank');
+        
+        showSuccess(`Opened AWS Console. Please delete the CloudFormation stack "${response.data.stackName}" to complete account removal.`);
+    } catch (err: any) {
+        showError('Failed to open AWS Console. Please manually navigate to CloudFormation in your AWS Console.');
+    }
+};
+
+const closeDeleteModal = () => {
+    showDeleteModal.value = false;
+    deleteStep.value = 'confirm';
+    accountToDelete.value = null;
+    awsAccountIdInput.value = '';
+    awsAccountIdError.value = '';
 };
 
 const getStatusBadge = (status: string) => {
@@ -186,7 +311,24 @@ const handleAccountCreated = async () => {
                             <div class="flex items-start justify-between">
                                 <div class="flex-1">
                                     <div class="flex items-center">
-                                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                                        <div v-if="editingAccountId === account.id" class="flex-1">
+                                            <TextInput
+                                                v-model="editingName"
+                                                @keydown="handleKeydown($event, account.id)"
+                                                @blur="saveEdit(account.id)"
+                                                class="text-lg font-semibold w-full"
+                                                autofocus
+                                            />
+                                        </div>
+                                        <h3
+                                            v-else
+                                            @click="startEditing(account)"
+                                            :class="[
+                                                'text-lg font-semibold text-gray-900 dark:text-white',
+                                                account.status === 'completed' ? 'cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors' : ''
+                                            ]"
+                                            :title="account.status === 'completed' ? 'Click to edit name' : ''"
+                                        >
                                             {{ account.name }}
                                         </h3>
                                     </div>
@@ -272,56 +414,134 @@ const handleAccountCreated = async () => {
         />
 
         <!-- Delete Confirmation Modal -->
-        <div
-            v-if="showDeleteModal"
-            class="fixed z-10 inset-0 overflow-y-auto"
-            @click.self="showDeleteModal = false"
-        >
+        <Teleport to="body">
+            <div
+                v-if="showDeleteModal"
+                class="fixed z-50 inset-0 overflow-y-auto"
+                @click.self="closeDeleteModal"
+            >
             <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
                 <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"></div>
                 <div class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-                    <div class="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                        <div class="sm:flex sm:items-start">
-                            <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900/30 sm:mx-0 sm:h-10 sm:w-10">
-                                <svg class="h-6 w-6 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                </svg>
-                            </div>
-                            <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
-                                <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white">
-                                    {{ accountToDelete?.status === 'pending' ? 'Cancel AWS Account Setup' : 'Remove AWS Account' }}
-                                </h3>
-                                <div class="mt-2">
-                                    <p class="text-sm text-gray-500 dark:text-gray-400">
-                                        <span v-if="accountToDelete?.status === 'pending'">
+                    <!-- Step 1: AWS Account ID Confirmation -->
+                    <div v-if="deleteStep === 'confirm'">
+                        <div class="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                            <div class="sm:flex sm:items-start">
+                                <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900/30 sm:mx-0 sm:h-10 sm:w-10">
+                                    <svg class="h-6 w-6 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                </div>
+                                <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+                                    <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white">
+                                        {{ accountToDelete?.status === 'pending' ? 'Cancel AWS Account Setup' : 'Remove AWS Account' }}
+                                    </h3>
+                                    <div class="mt-4">
+                                        <p v-if="accountToDelete?.status === 'pending'" class="text-sm text-gray-500 dark:text-gray-400 mb-4">
                                             Are you sure you want to cancel the setup for "{{ accountToDelete?.name }}"? This will remove the pending account.
-                                        </span>
-                                        <span v-else>
-                                            Are you sure you want to remove "{{ accountToDelete?.name }}"? This action cannot be undone.
-                                        </span>
-                                    </p>
+                                        </p>
+                                        <div v-else>
+                                            <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                                                Please enter the AWS account ID in the box below to remove this AWS account from your Organization in Teemops.
+                                            </p>
+                                            <div class="mb-4">
+                                                <p class="text-xs text-gray-600 dark:text-gray-400 mb-2">
+                                                    Account: <span class="font-semibold">{{ accountToDelete?.name }}</span>
+                                                </p>
+                                                <p class="text-xs text-gray-600 dark:text-gray-400">
+                                                    AWS Account ID: <span class="font-mono font-semibold">{{ accountToDelete?.awsAccountId }}</span>
+                                                </p>
+                                            </div>
+                                            <div>
+                                                <InputLabel for="aws_account_id" value="AWS Account ID" />
+                                                <TextInput
+                                                    id="aws_account_id"
+                                                    v-model="awsAccountIdInput"
+                                                    type="text"
+                                                    class="mt-1 block w-full"
+                                                    placeholder="123456789012"
+                                                    maxlength="12"
+                                                    @input="awsAccountIdError = ''"
+                                                />
+                                                <InputError :message="awsAccountIdError" class="mt-2" />
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
+                        <div class="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                            <button
+                                @click="proceedToInstructions"
+                                :disabled="!!(deleting || (accountToDelete?.awsAccountId && awsAccountIdInput.trim() !== accountToDelete.awsAccountId))"
+                                class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50"
+                            >
+                                {{ deleting ? 'Processing...' : (accountToDelete?.status === 'pending' ? 'Cancel Setup' : 'Proceed') }}
+                            </button>
+                            <button
+                                @click="closeDeleteModal"
+                                :disabled="deleting"
+                                class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-800 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50"
+                            >
+                                Cancel
+                            </button>
+                        </div>
                     </div>
-                    <div class="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                        <button
-                            @click="confirmDelete"
-                            :disabled="deleting"
-                            class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50"
-                        >
-                            {{ deleting ? 'Removing...' : (accountToDelete?.status === 'pending' ? 'Cancel Setup' : 'Remove') }}
-                        </button>
-                        <button
-                            @click="showDeleteModal = false"
-                            :disabled="deleting"
-                            class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-800 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50"
-                        >
-                            Cancel
-                        </button>
+
+                    <!-- Step 2: AWS Console Instructions -->
+                    <div v-else-if="deleteStep === 'instructions'">
+                        <div class="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                            <div class="sm:flex sm:items-start">
+                                <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 dark:bg-blue-900/30 sm:mx-0 sm:h-10 sm:w-10">
+                                    <svg class="h-6 w-6 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </div>
+                                <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+                                    <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white">
+                                        Delete CloudFormation Stack
+                                    </h3>
+                                    <div class="mt-4">
+                                        <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                                            To complete the removal of this AWS account, please delete the CloudFormation stack <span class="font-mono font-semibold">tops-vendor-audit</span> in your AWS Console.
+                                        </p>
+                                        <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-4">
+                                            <p class="text-sm text-blue-800 dark:text-blue-200 font-medium mb-2">Instructions:</p>
+                                            <ol class="list-decimal list-inside text-sm text-blue-700 dark:text-blue-300 space-y-1">
+                                                <li>Click "Proceed to AWS Console" below</li>
+                                                <li>Find and select the stack named <span class="font-mono font-semibold">tops-vendor-audit</span></li>
+                                                <li>Delete the stack from your AWS Console</li>
+                                                <li>The account will be automatically removed from Teemops once the stack is deleted</li>
+                                            </ol>
+                                        </div>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400">
+                                            Note: The account removal will be processed automatically via SQS when the CloudFormation stack is deleted.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                            <PrimaryButton
+                                @click="openCloudFormationConsole"
+                                class="sm:ml-3 sm:w-auto sm:text-sm"
+                            >
+                                <svg class="-ml-1 mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+                                </svg>
+                                Proceed to AWS Console
+                            </PrimaryButton>
+                            <button
+                                @click="closeDeleteModal"
+                                class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-800 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                            >
+                                Close
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
+            </div>
+        </Teleport>
     </SidebarAppLayout>
 </template>

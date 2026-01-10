@@ -1302,6 +1302,25 @@ Response: {
 
 ---
 
+## Future Roadmap
+
+### Low Priority Items
+
+#### Firebase Authentication Feature Flag
+**Feature**: Add environment variable feature flag for Firebase vs Laravel authentication
+
+**Description**: 
+- Add a feature flag as an environment variable `FIREBASE_USER_AUTH=true`
+- When `FIREBASE_USER_AUTH=true`: Username/password authentication uses Firebase User/pass authentication
+- When `FIREBASE_USER_AUTH=false`: Fallback to native Laravel user/password authentication for login/register
+
+**Implementation Notes**:
+- This allows switching between Firebase Authentication and Laravel's built-in authentication system
+- The feature flag should be checked at runtime to determine which authentication provider to use
+- Both authentication methods should maintain the same user experience and API contracts
+
+---
+
 ## Next Actions
 
 Once you provide answers to the questions above, I can:
