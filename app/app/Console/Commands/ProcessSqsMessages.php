@@ -175,73 +175,14 @@ class ProcessSqsMessages extends Command
 
         // Handle Create requests
         if ($requestType === 'Create') {
-            if (!$roleArn || !$externalId || !$uniqueId) {
-                $this->warn('Create message missing required fields (TopsRoleArn, TopsExternalId, TopsUniqueId), deleting from queue');
-                $this->sendCloudFormationResponse($responseUrl, 'FAILED', 'Missing required fields in ResourceProperties', $stackId, $requestId, $logicalResourceId, $physicalResourceId);
-                $this->deleteMessage($sqsClient, $queueUrl, $receiptHandle);
-                return;
-            }
-
-            // Find account by unique_id and external_id
-            // Note: unique_id is derived from orgId, so we need both to match
-            $account = AwsAccount::where('unique_id', $uniqueId)
-                ->where('external_id', $externalId)
-                ->first();
-
-            if (!$account) {
-                Log::warning('SQS message: Account not found', [
-                    'unique_id' => $uniqueId,
-                    'external_id' => $externalId,
-                    'request_type' => $requestType,
-                ]);
-                $this->warn("Account not found for unique_id: {$uniqueId}, external_id: {$externalId}");
-                // Send FAILED response to CloudFormation
-                $this->sendCloudFormationResponse($responseUrl, 'FAILED', "Account not found for unique_id: {$uniqueId}", $stackId, $requestId, $logicalResourceId, $physicalResourceId);
-                // Delete message even if account not found (prevents reprocessing)
-                $this->deleteMessage($sqsClient, $queueUrl, $receiptHandle);
-                return;
-            }
-
-            // Extract AWS Account ID from Role ARN
-            // Format: arn:aws:iam::123456789012:role/TeemOps
-            preg_match('/arn:aws:iam::(\d+):role\/(.+)/', $roleArn, $matches);
-            $awsAccountId = $matches[1] ?? null;
-
-            if (!$awsAccountId) {
-                $this->error("Could not extract AWS Account ID from Role ARN: {$roleArn}");
-                $this->sendCloudFormationResponse($responseUrl, 'FAILED', "Invalid Role ARN format: {$roleArn}", $stackId, $requestId, $logicalResourceId, $physicalResourceId);
-                return;
-            }
-
-            // Update account
-            $account->update([
-                'iam_role_arn' => $roleArn,
-                'aws_account_id' => $awsAccountId,
-                'name' => $account->name === 'Pending AWS Account' 
-                    ? "AWS Account {$awsAccountId}" 
-                    : $account->name,
-                'status' => 'completed',
-            ]);
-
-            $this->info("AWS account {$account->id} updated to completed status");
-
-            Log::info('AWS account activated via SQS message', [
-                'account_id' => $account->id,
-                'aws_account_id' => $awsAccountId,
-                'unique_id' => $uniqueId,
-                'external_id' => $externalId,
-                'request_type' => $requestType,
-            ]);
-
-            // Send SUCCESS response to CloudFormation
-            $this->sendCloudFormationResponse($responseUrl, 'SUCCESS', 'Successfully processed the request', $stackId, $requestId, $logicalResourceId, $physicalResourceId);
-
-            // Delete message from queue after successful processing
+            $this->handleCreateRequest($roleArn, $uniqueId, $externalId, $responseUrl, $stackId, $requestId, $logicalResourceId, $physicalResourceId);
             $this->deleteMessage($sqsClient, $queueUrl, $receiptHandle);
-        } else {
-            $this->warn("Unknown RequestType: {$requestType}, deleting from queue");
-            $this->deleteMessage($sqsClient, $queueUrl, $receiptHandle);
+            return;
         }
+
+        // Unknown request type
+        $this->warn("Unknown RequestType: {$requestType}, deleting from queue");
+        $this->deleteMessage($sqsClient, $queueUrl, $receiptHandle);
     }
 
     /**
@@ -251,7 +192,16 @@ class ProcessSqsMessages extends Command
     {
         if (!$uniqueId || !$externalId) {
             $this->warn('Delete request missing unique_id or external_id');
-            $this->sendCloudFormationResponse($responseUrl, 'SUCCESS', 'Delete request processed (no account found)', $stackId, $requestId, $logicalResourceId, $physicalResourceId);
+            $response = $this->sendCloudFormationResponse($responseUrl, 'SUCCESS', 'Delete request processed (no account found)', $stackId, $requestId, $logicalResourceId, $physicalResourceId);
+            
+            if (app()->environment(['local', 'dev'])) {
+                Log::info('AWS account deleted via SQS message (dev verbose)', [
+                    'unique_id' => $uniqueId,
+                    'external_id' => $externalId,
+                    'response_url' => $responseUrl,
+                    'response' => $response,
+                ]);
+            }
             return;
         }
 
@@ -271,13 +221,167 @@ class ProcessSqsMessages extends Command
         }
 
         // Always send SUCCESS for Delete (even if account not found)
-        $this->sendCloudFormationResponse($responseUrl, 'SUCCESS', 'Delete request processed', $stackId, $requestId, $logicalResourceId, $physicalResourceId);
+        // Use externalId as PhysicalResourceId if not provided (should be set from Create response)
+        $responsePhysicalResourceId = $physicalResourceId ?? $externalId;
+        $response = $this->sendCloudFormationResponse($responseUrl, 'SUCCESS', 'Delete request processed', $stackId, $requestId, $logicalResourceId, $responsePhysicalResourceId);
+        
+        if (app()->environment(['local', 'dev'])) {
+            $logData = [
+                'unique_id' => $uniqueId,
+                'external_id' => $externalId,
+                'response_url' => $responseUrl,
+                'response' => $response,
+            ];
+            
+            if ($account) {
+                $logData['account_id'] = $account->id;
+            }
+            
+            Log::info('AWS account deleted via SQS message (dev verbose)', $logData);
+        }
+    }
+
+    /**
+     * Handle Create request from CloudFormation
+     */
+    private function handleCreateRequest(?string $roleArn, ?string $uniqueId, ?string $externalId, string $responseUrl, string $stackId, string $requestId, ?string $logicalResourceId, ?string $physicalResourceId): void
+    {
+        if (!$roleArn || !$externalId || !$uniqueId) {
+            $this->warn('Create message missing required fields (TopsRoleArn, TopsExternalId, TopsUniqueId)');
+            $response = $this->sendCloudFormationResponse($responseUrl, 'FAILED', 'Missing required fields in ResourceProperties', $stackId, $requestId, $logicalResourceId, $physicalResourceId);
+            
+            if (app()->environment(['local', 'dev'])) {
+                Log::info('AWS account activated via SQS message (dev verbose)', [
+                    'unique_id' => $uniqueId,
+                    'external_id' => $externalId,
+                    'role_arn' => $roleArn,
+                    'request_type' => 'Create',
+                    'response_url' => $responseUrl,
+                    'response' => $response,
+                ]);
+            }
+            return;
+        }
+
+        // Find account by unique_id and external_id
+        // Note: unique_id is derived from orgId, so we need both to match
+        $account = AwsAccount::where('unique_id', $uniqueId)
+            ->where('external_id', $externalId)
+            ->first();
+
+        if (!$account) {
+            Log::warning('SQS message: Account not found', [
+                'unique_id' => $uniqueId,
+                'external_id' => $externalId,
+                'request_type' => 'Create',
+            ]);
+            $this->warn("Account not found for unique_id: {$uniqueId}, external_id: {$externalId}");
+            // Send FAILED response to CloudFormation
+            $response = $this->sendCloudFormationResponse($responseUrl, 'FAILED', "Account not found for unique_id: {$uniqueId}", $stackId, $requestId, $logicalResourceId, $physicalResourceId);
+            
+            if (app()->environment(['local', 'dev'])) {
+                Log::info('AWS account activated via SQS message (dev verbose)', [
+                    'unique_id' => $uniqueId,
+                    'external_id' => $externalId,
+                    'role_arn' => $roleArn,
+                    'request_type' => 'Create',
+                    'response_url' => $responseUrl,
+                    'response' => $response,
+                ]);
+            }
+            return;
+        }
+
+        // Extract AWS Account ID from Role ARN
+        // Format: arn:aws:iam::123456789012:role/TeemOps
+        preg_match('/arn:aws:iam::(\d+):role\/(.+)/', $roleArn, $matches);
+        $awsAccountId = $matches[1] ?? null;
+
+        if (!$awsAccountId) {
+            $this->error("Could not extract AWS Account ID from Role ARN: {$roleArn}");
+            $response = $this->sendCloudFormationResponse($responseUrl, 'FAILED', "Invalid Role ARN format: {$roleArn}", $stackId, $requestId, $logicalResourceId, $physicalResourceId);
+            
+            if (app()->environment('local')) {
+                Log::info('AWS account activated via SQS message (dev verbose)', [
+                    'account_id' => $account->id,
+                    'unique_id' => $uniqueId,
+                    'external_id' => $externalId,
+                    'role_arn' => $roleArn,
+                    'request_type' => 'Create',
+                    'response_url' => $responseUrl,
+                    'response' => $response,
+                ]);
+            }
+            return;
+        }
+
+        // Check for soft-deleted accounts with the same organization_id and aws_account_id
+        // This can happen if an account was deleted but the AWS account number is still present
+        // We need to permanently delete them to avoid unique constraint violations
+        $softDeletedAccounts = AwsAccount::onlyTrashed()
+            ->where('organization_id', $account->organization_id)
+            ->where('aws_account_id', $awsAccountId)
+            ->get();
+
+        if ($softDeletedAccounts->isNotEmpty()) {
+            foreach ($softDeletedAccounts as $softDeletedAccount) {
+                $this->info("Permanently deleting soft-deleted account {$softDeletedAccount->id} to resolve duplicate constraint");
+                Log::info('Permanently deleting soft-deleted AWS account to resolve duplicate', [
+                    'deleted_account_id' => $softDeletedAccount->id,
+                    'organization_id' => $account->organization_id,
+                    'aws_account_id' => $awsAccountId,
+                    'active_account_id' => $account->id,
+                ]);
+                $softDeletedAccount->forceDelete();
+            }
+        }
+
+        // Update account
+        // Use fill() and save() to ensure the mutator is called correctly
+        $account->fill([
+            'iam_role_arn' => $roleArn,
+            'aws_account_id' => $awsAccountId,
+            'name' => $account->name === 'Pending AWS Account' 
+                ? "AWS Account {$awsAccountId}" 
+                : $account->name,
+            'status' => 'completed',
+        ]);
+        $account->save();
+
+        $this->info("AWS account {$account->id} updated to completed status");
+
+        Log::info('AWS account activated via SQS message', [
+            'account_id' => $account->id,
+            'aws_account_id' => $awsAccountId,
+            'unique_id' => $uniqueId,
+            'external_id' => $externalId,
+            'request_type' => 'Create',
+        ]);
+
+        // Send SUCCESS response to CloudFormation
+        // For Create requests, PhysicalResourceId should be the externalId
+        $responsePhysicalResourceId = $physicalResourceId ?? $externalId;
+        $response = $this->sendCloudFormationResponse($responseUrl, 'SUCCESS', 'Successfully processed the request', $stackId, $requestId, $logicalResourceId, $responsePhysicalResourceId);
+        
+        if (app()->environment(['local', 'dev'])) {
+            Log::info('AWS account activated via SQS message (dev verbose)', [
+                'account_id' => $account->id,
+                'aws_account_id' => $awsAccountId,
+                'unique_id' => $uniqueId,
+                'external_id' => $externalId,
+                'request_type' => 'Create',
+                'response_url' => $responseUrl,
+                'response' => $response,
+            ]);
+        }
     }
 
     /**
      * Send response to CloudFormation custom resource ResponseURL
+     * 
+     * @return array The response data that was sent
      */
-    private function sendCloudFormationResponse(string $responseUrl, string $status, string $reason, string $stackId, string $requestId, ?string $logicalResourceId, ?string $physicalResourceId): void
+    private function sendCloudFormationResponse(string $responseUrl, string $status, string $reason, string $stackId, string $requestId, ?string $logicalResourceId, ?string $physicalResourceId): array
     {
         try {
             $response = [
@@ -303,6 +407,8 @@ class ProcessSqsMessages extends Command
                 'request_id' => $requestId,
                 'stack_id' => $stackId,
             ]);
+            
+            return $response;
         } catch (\Exception $e) {
             $this->error("Failed to send CloudFormation response: {$e->getMessage()}");
             Log::error('Failed to send CloudFormation response', [
@@ -310,6 +416,16 @@ class ProcessSqsMessages extends Command
                 'response_url' => $responseUrl,
                 'status' => $status,
             ]);
+            
+            // Return the response array even if sending failed, for logging purposes
+            return [
+                'Status' => $status,
+                'Reason' => $reason,
+                'StackId' => $stackId,
+                'RequestId' => $requestId,
+                'LogicalResourceId' => $logicalResourceId,
+                'PhysicalResourceId' => $physicalResourceId,
+            ];
         }
     }
 

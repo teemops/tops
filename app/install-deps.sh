@@ -69,8 +69,6 @@ if [ ! -f ".env" ]; then
 fi
 
 echo ""
-echo "✅ Laravel Starter Kit Vue setup complete!"
-echo ""
 echo "Next steps:"
 echo "1. Configure your .env file with database credentials"
 echo "2. Run migrations: php artisan migrate"
