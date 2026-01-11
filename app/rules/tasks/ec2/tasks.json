@@ -1,0 +1,54 @@
+{
+    "$schema": "tops/scan/tasks/schema.v1",
+    "name": "tasks.json",
+    "description": "Tasks for auditing AWS EC2 resources",
+    "config": {
+        "service": "ec2",
+        "start": "describeInstances",
+        "defaults": {
+            "actions": {
+                "params": "function(item) { return { InstanceIds: [item.InstanceId] } }"
+            }
+        }
+    },
+    "tasks": [
+        {
+            "describeInstances": {
+                "task": "describeInstances",
+                "id": "instance",
+                "key": "InstanceId",
+                "description": "List all EC2 instances",
+                "actions": [
+                    "describeSecurityGroups",
+                    "describeSubnets"
+                ],
+                "items": {
+                    "Reservations": [
+                        {
+                            "Instances": [
+                                {
+                                    "Name": "InstanceId",
+                                    "Type": "String"
+                                },
+                                {
+                                    "Name": "PublicIpAddress",
+                                    "Type": "String"
+                                },
+                                {
+                                    "Name": "PrivateIpAddress",
+                                    "Type": "String"
+                                },
+                                {
+                                    "Name": "State",
+                                    "Type": "Object"
+                                }
+                            ]
+                        }
+                    ]
+                }
+            },
+            "describeSecurityGroups": {},
+            "describeSubnets": {}
+        }
+    ]
+}

@@ -2,6 +2,11 @@ import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
 import { 
     getAuth, 
     signInWithPopup, 
+    signInWithEmailAndPassword,
+    createUserWithEmailAndPassword,
+    updateProfile,
+    sendPasswordResetEmail,
+    confirmPasswordReset,
     GoogleAuthProvider, 
     GithubAuthProvider,
     OAuthProvider,
@@ -158,6 +163,133 @@ export async function getIdToken(): Promise<string | null> {
         return null;
     }
     return await user.getIdToken();
+}
+
+// Sign in with email and password
+export async function signInWithEmailPassword(email: string, password: string): Promise<User> {
+    if (!auth) {
+        throw new Error('Firebase is not configured. Please add VITE_FIREBASE_* variables to your .env file and restart the dev server.');
+    }
+
+    try {
+        const result = await signInWithEmailAndPassword(auth, email, password);
+        return result.user;
+    } catch (error: any) {
+        // Handle specific Firebase errors
+        if (error.code === 'auth/user-not-found') {
+            throw new Error('No account found with this email address.');
+        } else if (error.code === 'auth/wrong-password') {
+            throw new Error('Incorrect password. Please try again.');
+        } else if (error.code === 'auth/invalid-email') {
+            throw new Error('Invalid email address.');
+        } else if (error.code === 'auth/user-disabled') {
+            throw new Error('This account has been disabled.');
+        } else if (error.code === 'auth/too-many-requests') {
+            throw new Error('Too many failed login attempts. Please try again later.');
+        }
+        throw error;
+    }
+}
+
+// Create user with email and password
+export async function createUserWithEmailPassword(email: string, password: string, name?: string): Promise<User> {
+    if (!auth) {
+        throw new Error('Firebase is not configured. Please add VITE_FIREBASE_* variables to your .env file and restart the dev server.');
+    }
+
+    try {
+        const result = await createUserWithEmailAndPassword(auth, email, password);
+        const user = result.user;
+        
+        // Update the user's display name if provided
+        if (name && user) {
+            await updateProfile(user, {
+                displayName: name,
+            });
+            // Reload user to get updated profile
+            await user.reload();
+        }
+        
+        return user;
+    } catch (error: any) {
+        // Handle specific Firebase errors
+        if (error.code === 'auth/email-already-in-use') {
+            throw new Error('An account with this email address already exists.');
+        } else if (error.code === 'auth/invalid-email') {
+            throw new Error('Invalid email address.');
+        } else if (error.code === 'auth/operation-not-allowed') {
+            throw new Error('Email/password authentication is not enabled. Please contact support.');
+        } else if (error.code === 'auth/weak-password') {
+            throw new Error('Password is too weak. Please choose a stronger password.');
+        }
+        throw error;
+    }
+}
+
+// Send password reset email
+export async function sendPasswordReset(email: string): Promise<void> {
+    if (!auth) {
+        throw new Error('Firebase is not configured. Please add VITE_FIREBASE_* variables to your .env file and restart the dev server.');
+    }
+
+    try {
+        await sendPasswordResetEmail(auth, email);
+    } catch (error: any) {
+        // Handle specific Firebase errors
+        if (error.code === 'auth/user-not-found') {
+            throw new Error('No account found with this email address.');
+        } else if (error.code === 'auth/invalid-email') {
+            throw new Error('Invalid email address.');
+        } else if (error.code === 'auth/too-many-requests') {
+            throw new Error('Too many password reset requests. Please try again later.');
+        }
+        throw error;
+    }
+}
+
+// Confirm password reset with action code
+export async function resetPasswordWithCode(actionCode: string, newPassword: string): Promise<void> {
+    if (!auth) {
+        throw new Error('Firebase is not configured. Please add VITE_FIREBASE_* variables to your .env file and restart the dev server.');
+    }
+
+    try {
+        await confirmPasswordReset(auth, actionCode, newPassword);
+    } catch (error: any) {
+        // Handle specific Firebase errors
+        if (error.code === 'auth/expired-action-code') {
+            throw new Error('The password reset link has expired. Please request a new one.');
+        } else if (error.code === 'auth/invalid-action-code') {
+            throw new Error('The password reset link is invalid. Please request a new one.');
+        } else if (error.code === 'auth/weak-password') {
+            throw new Error('Password is too weak. Please choose a stronger password.');
+        }
+        throw error;
+    }
+}
+
+// Update Firebase user profile (displayName, photoURL, etc.)
+export async function updateFirebaseProfile(updates: { displayName?: string; photoURL?: string }): Promise<void> {
+    if (!auth) {
+        throw new Error('Firebase is not configured. Please add VITE_FIREBASE_* variables to your .env file and restart the dev server.');
+    }
+
+    const user = auth.currentUser;
+    if (!user) {
+        throw new Error('No user is currently signed in.');
+    }
+
+    try {
+        await updateProfile(user, updates);
+        // Reload user to get updated profile
+        await user.reload();
+    } catch (error: any) {
+        // Handle specific Firebase errors
+        if (error.code === 'auth/requires-recent-login') {
+            throw new Error('Please sign out and sign back in to update your profile.');
+        }
+        throw error;
+    }
 }
 
 // Get current user

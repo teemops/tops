@@ -6,7 +6,7 @@ import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import { Head, Link, useForm, router } from '@inertiajs/vue3';
-import { signInWithOAuth, getIdToken } from '@/composables/useFirebase';
+import { signInWithOAuth, signInWithEmailPassword, getIdToken } from '@/composables/useFirebase';
 import { ref } from 'vue';
 
 defineProps<{
@@ -23,12 +23,34 @@ const form = useForm({
 const oauthLoading = ref<string | null>(null);
 const oauthError = ref<string | null>(null);
 
-const submit = () => {
-    form.post(route('login'), {
-        onFinish: () => {
-            form.reset('password');
-        },
-    });
+const submit = async () => {
+    form.clearErrors();
+    
+    try {
+        // Sign in with Firebase using email/password
+        const user = await signInWithEmailPassword(form.email, form.password);
+        
+        // Get the ID token
+        const token = await getIdToken();
+        
+        if (!token) {
+            throw new Error('Failed to get authentication token');
+        }
+
+        // Send token to backend to create Laravel session
+        router.post(route('firebase.verify'), { token }, {
+            onSuccess: () => {
+                // Redirect handled by backend
+            },
+            onError: (errors) => {
+                form.setError('email', errors.firebase || errors.message || 'Authentication failed');
+                form.reset('password');
+            },
+        });
+    } catch (error: any) {
+        form.setError('email', error.message || 'Authentication failed. Please try again.');
+        form.reset('password');
+    }
 };
 
 const handleOAuth = async (provider: 'google' | 'github' | 'microsoft') => {

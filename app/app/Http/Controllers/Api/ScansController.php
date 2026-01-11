@@ -109,22 +109,25 @@ class ScansController extends Controller
         // Verify AWS account belongs to organization
         $awsAccount = AwsAccount::where('id', $validated['aws_account_id'])
             ->where('organization_id', $organization->id)
-            ->where('status', 'active')
+            ->where('status', 'completed')
             ->firstOrFail();
 
         // Create scan record
         $scan = Scan::create([
             'organization_id' => $organization->id,
             'aws_account_id' => $awsAccount->id,
+            'scan_types' => $validated['scan_types'],
             'status' => 'pending',
         ]);
 
-        // Dispatch scan job to process asynchronously
-        \App\Jobs\ProcessScanJob::dispatch($scan);
+        // Dispatch scan job to SQS audit queue
+        \App\Jobs\ProcessAuditScanJob::dispatch($scan)
+            ->onConnection('sqs-audit');
 
         return response()->json([
             'id' => $scan->id,
             'awsAccountId' => $scan->aws_account_id,
+            'scanTypes' => $scan->scan_types,
             'status' => $scan->status,
             'createdAt' => $scan->created_at->toISOString(),
         ], 201);

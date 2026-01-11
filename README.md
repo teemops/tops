@@ -40,11 +40,22 @@ saas/
 2. **Follow setup instructions**:
    See [app/README.md](./app/README.md) for detailed setup instructions.
 
-3. **Or use the setup script**:
-   ```bash
-   cd app
-   ./setup-laravel.sh
-   ```
+### Test commands
+
+```bash	
+cd app
+php artisan test
+```
+
+individual tests:
+```bash
+cd app
+php artisan test --filter ProcessSqsMessagesTest
+php artisan test --filter=Scan --coverage
+php artisan test --filter=test_can_create_scan_with_scan_types
+php artisan test --filter="ScanModelTest|StoreScanRequestTest|ScansControllerTest|ProcessAuditScanJobTest|ProcessRegionScanJobTest|AwsSecurityScannerTest"
+
+```
 
 ### Development
 
@@ -58,6 +69,37 @@ php artisan serve
 ```bash
 cd app
 npm run dev
+```
+
+**Terminal 3 (Queue Worker)**:
+```bash
+cd app
+php artisan queue:work
+```
+
+**Terminal 4 (SQS Command)**:
+```bash
+cd app
+php artisan aws:process-sqs
+```
+
+**Terminal 5 (SQS Polling Service)**:
+```bash
+cd app
+php artisan aws:process-sqs --once
+```
+
+**Terminal 6 (Scheduler)**:
+```bash
+cd app
+php artisan schedule:run
+```
+
+**Terminal 7 (Queue Workers for SQS)**:
+```bash
+cd app
+php artisan queue:work sqs-audit --queue=teemops_audit
+php artisan queue:work sqs-audit-region --queue=teemops_audit_region
 ```
 
 Visit: http://localhost:8000

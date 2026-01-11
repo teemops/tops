@@ -22,7 +22,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'firebase_uid',
         'name',
         'email',
-        'password',
+        'password', // Optional - only used if Laravel password auth is enabled
     ];
 
     /**

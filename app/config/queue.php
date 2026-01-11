@@ -1,5 +1,18 @@
 <?php
 
+// Helper function to construct SQS prefix dynamically
+$buildSqsPrefix = function () {
+    $region = env('AWS_DEFAULT_REGION', 'us-east-1');
+    $accountId = env('AWS_PARENT_ACCOUNT_ID');
+    
+    if (!$accountId) {
+        // Fallback to placeholder if account ID not set
+        return 'https://sqs.' . $region . '.amazonaws.com/your-account-id';
+    }
+    
+    return 'https://sqs.' . $region . '.amazonaws.com/' . $accountId;
+};
+
 return [
 
     /*
@@ -57,8 +70,30 @@ return [
             'driver' => 'sqs',
             'key' => env('AWS_ACCESS_KEY_ID'),
             'secret' => env('AWS_SECRET_ACCESS_KEY'),
-            'prefix' => env('SQS_PREFIX', 'https://sqs.us-east-1.amazonaws.com/your-account-id'),
+            'prefix' => env('SQS_PREFIX', $buildSqsPrefix()),
             'queue' => env('SQS_QUEUE', 'default'),
+            'suffix' => env('SQS_SUFFIX'),
+            'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
+            'after_commit' => false,
+        ],
+
+        'sqs-audit' => [
+            'driver' => 'sqs',
+            'key' => env('AWS_ACCESS_KEY_ID'),
+            'secret' => env('AWS_SECRET_ACCESS_KEY'),
+            'prefix' => env('SQS_AUDIT_PREFIX', $buildSqsPrefix()),
+            'queue' => env('SQS_AUDIT_QUEUE', 'teemops_audit'),
+            'suffix' => env('SQS_SUFFIX'),
+            'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
+            'after_commit' => false,
+        ],
+
+        'sqs-audit-region' => [
+            'driver' => 'sqs',
+            'key' => env('AWS_ACCESS_KEY_ID'),
+            'secret' => env('AWS_SECRET_ACCESS_KEY'),
+            'prefix' => env('SQS_AUDIT_REGION_PREFIX', $buildSqsPrefix()),
+            'queue' => env('SQS_AUDIT_REGION_QUEUE', 'teemops_audit_region'),
             'suffix' => env('SQS_SUFFIX'),
             'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
             'after_commit' => false,

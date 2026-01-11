@@ -15,7 +15,7 @@ return new class extends Migration
             $table->uuid('id')->primary();
             $table->uuid('organization_id');
             $table->uuid('aws_account_id');
-            $table->enum('status', ['pending', 'running', 'completed', 'failed'])->default('pending');
+            $table->enum('status', ['pending', 'running', 'completed', 'failed', 'cancelled'])->default('pending');
             $table->timestamp('started_at')->nullable();
             $table->timestamp('completed_at')->nullable();
             $table->text('error_message')->nullable();
