@@ -134,5 +134,85 @@ class FirebaseAuthController extends Controller
                 ->withErrors(['firebase' => 'Authentication failed. Please try again.']);
         }
     }
+
+    /**
+     * Handle Firebase registration (email/password signup)
+     * Creates user in Laravel database after Firebase registration
+     */
+    public function register(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'token' => ['required', 'string'],
+            'name' => ['required', 'string', 'max:255'],
+        ]);
+
+        $token = $request->input('token');
+        $name = $request->input('name');
+
+        try {
+            $verifiedToken = $this->firebaseAuth->verifyIdToken($token);
+            $uid = $verifiedToken->claims()->get('sub');
+            $email = $verifiedToken->claims()->get('email');
+            $emailVerified = $verifiedToken->claims()->get('email_verified', false);
+            
+            // Check if user already exists
+            $existingUser = User::where('firebase_uid', $uid)->orWhere('email', $email)->first();
+            
+            if ($existingUser) {
+                // User already exists, log them in
+                Auth::login($existingUser, true);
+                $request->session()->regenerate();
+                
+                return redirect()->intended(route('dashboard', absolute: false))
+                    ->with('info', 'Account already exists. You have been logged in.');
+            }
+            
+            // Create new user in Laravel database
+            // Note: Password is stored in Firebase, not in Laravel
+            $user = User::create([
+                'firebase_uid' => $uid,
+                'name' => $name,
+                'email' => $email,
+                'email_verified_at' => $emailVerified ? now() : null,
+                // No password field - authentication is handled by Firebase
+            ]);
+
+            // Create default organization for new user
+            Organization::create([
+                'user_id' => $user->id,
+                'name' => $user->name . "'s Organization",
+                'is_default' => true,
+            ]);
+
+            // Log the user in
+            Auth::login($user, true);
+            $request->session()->regenerate();
+
+            // If email is not verified, redirect to verification notice
+            if (!$emailVerified) {
+                return redirect(route('verification.notice', absolute: false))
+                    ->with('info', 'Registration successful! Please check your email to verify your account.');
+            }
+
+            return redirect()->intended(route('dashboard', absolute: false))
+                ->with('success', 'Registration successful! Welcome to Teemops.');
+        } catch (\Exception $e) {
+            Log::error('Firebase registration failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'token_preview' => substr($token, 0, 20) . '...',
+            ]);
+
+            // For Inertia requests, return back with errors
+            if ($request->header('X-Inertia')) {
+                return back()->withErrors([
+                    'firebase' => 'Registration failed: ' . $e->getMessage(),
+                ]);
+            }
+
+            return redirect()->route('register')
+                ->withErrors(['firebase' => 'Registration failed. Please try again.']);
+        }
+    }
 }
 

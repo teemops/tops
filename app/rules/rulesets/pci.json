@@ -1,0 +1,6 @@
+{
+    "$schema": "tops/findings/ruleset/schema.v1",
+    "name": "pci.json",
+    "description": "PCI DSS compliance rule set",
+    "rules": []
+}

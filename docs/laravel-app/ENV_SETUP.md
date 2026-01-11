@@ -75,10 +75,37 @@ AWS_CLOUDFORMATION_TEMPLATE_URL=https://s3.amazonaws.com/your-bucket/teemops-clo
 AWS_DEFAULT_REGION=us-east-1
 ```
 
-**Optional AWS credentials** (if running scans from the same account):
+**AWS credentials** (required for SQS queues and scanning):
 ```env
 AWS_ACCESS_KEY_ID=your-access-key
 AWS_SECRET_ACCESS_KEY=your-secret-key
+AWS_DEFAULT_REGION=us-east-1
+```
+
+**SQS Queue Configuration** (required for scan processing):
+```env
+# AWS Account ID (required - used to construct SQS prefixes)
+AWS_PARENT_ACCOUNT_ID=123456789012
+
+# SQS Queue Names
+SQS_AUDIT_QUEUE=teemops_audit
+SQS_AUDIT_REGION_QUEUE=teemops_audit_region
+
+# Optional: Override auto-constructed prefixes (usually not needed)
+# SQS_AUDIT_PREFIX=https://sqs.us-east-1.amazonaws.com/123456789012
+# SQS_AUDIT_REGION_PREFIX=https://sqs.us-east-1.amazonaws.com/123456789012
+SQS_SUFFIX=
+
+# Optional: SQS ARNs (for reference/documentation)
+TOPS_AUDIT_SQS_ARN=arn:aws:sqs:us-east-1:123456789012:teemops_audit
+TOPS_AUDIT_REGION_SQS_ARN=arn:aws:sqs:us-east-1:123456789012:teemops_audit_region
+```
+
+**Note:** 
+- The SQS prefixes are **automatically constructed** from `AWS_DEFAULT_REGION` and `AWS_PARENT_ACCOUNT_ID`
+- Format: `https://sqs.{region}.amazonaws.com/{account-id}`
+- Example: `https://sqs.us-east-1.amazonaws.com/123456789012/teemops_audit`
+- You only need to set `SQS_AUDIT_PREFIX` or `SQS_AUDIT_REGION_PREFIX` if you want to override the auto-constructed value
 AWS_DEFAULT_REGION=us-east-1
 ```
 

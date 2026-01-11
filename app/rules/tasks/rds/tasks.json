@@ -1,0 +1,44 @@
+{
+    "$schema": "tops/scan/tasks/schema.v1",
+    "name": "tasks.json",
+    "description": "Tasks for auditing AWS RDS resources",
+    "config": {
+        "service": "rds",
+        "start": "describeDBInstances",
+        "defaults": {
+            "actions": {
+                "params": "function(item) { return { DBInstanceIdentifier: item.DBInstanceIdentifier } }"
+            }
+        }
+    },
+    "tasks": [
+        {
+            "describeDBInstances": {
+                "task": "describeDBInstances",
+                "id": "db_instance",
+                "key": "DBInstanceIdentifier",
+                "description": "List all RDS instances",
+                "actions": [
+                    "describeDBSnapshots"
+                ],
+                "items": {
+                    "DBInstances": [
+                        {
+                            "Name": "DBInstanceIdentifier",
+                            "Type": "String"
+                        },
+                        {
+                            "Name": "StorageEncrypted",
+                            "Type": "Boolean"
+                        },
+                        {
+                            "Name": "PubliclyAccessible",
+                            "Type": "Boolean"
+                        }
+                    ]
+                }
+            },
+            "describeDBSnapshots": {}
+        }
+    ]
+}

@@ -1,0 +1,111 @@
+{
+    "$schema": "tops/scan/tasks/schema.v1",
+    "name": "tasks.json",
+    "description": "Tasks for auditing AWS IAM resources",
+    "config": {
+        "service": "iam",
+        "start": "listUsers",
+        "defaults": {
+            "actions": {
+                "params": "function(item) { return { UserName: item.UserName } }"
+            }
+        }
+    },
+    "tasks": [
+        {
+            "listUsers": {
+                "task": "listUsers",
+                "id": "user",
+                "key": "Name",
+                "description": "List all users",
+                "actions": [
+                    "getUser",
+                    "listMFADevices",
+                    "listAccessKeys",
+                    "listUserPolicies",
+                    "listGroupsForUser",
+                    "listAttachedUserPolicies"
+                ],
+                "items": {
+                    "Users": [
+                        {
+                            "Name": "UserName",
+                            "Type": "String"
+                        },
+                        {
+                            "Name": "UserId",
+                            "Type": "String"
+                        },
+                        {
+                            "Name": "Arn",
+                            "Type": "String"
+                        },
+                        {
+                            "Name": "CreateDate",
+                            "Type": "Date"
+                        },
+                        {
+                            "Name": "PasswordLastUsed",
+                            "Type": "Date"
+                        },
+                        {
+                            "Name": "Path",
+                            "Type": "String"
+                        }
+                    ]
+                }
+            },
+            "getUser": {},
+            "listMFADevices": {},
+            "listAccessKeys": {},
+            "listUserPolicies": {},
+            "listGroupsForUser": {},
+            "listAttachedUserPolicies": {}
+        },
+        {
+            "listRoles": {
+                "task": "listRoles",
+                "id": "role",
+                "key": "RoleName",
+                "description": "List all roles",
+                "actions": [
+                    "getRole",
+                    "getRolePolicy",
+                    "listRolePolicies",
+                    "listAttachedRolePolicies"
+                ],
+                "items": {
+                    "Roles": [
+                        {
+                            "Name": "RoleName",
+                            "Type": "String"
+                        },
+                        {
+                            "Name": "RoleId",
+                            "Type": "String"
+                        },
+                        {
+                            "Name": "Arn",
+                            "Type": "String"
+                        },
+                        {
+                            "Name": "CreateDate",
+                            "Type": "Date"
+                        },
+                        {
+                            "Name": "Path",
+                            "Type": "String"
+                        },
+                        {
+                            "Name": "AssumeRolePolicyDocument",
+                            "Type": "String"
+                        }
+                    ]
+                }
+            },
+            "getRole": {},
+            "listRolePolicies": {},
+            "listAttachedRolePolicies": {}
+        }
+    ]
+}

@@ -1,0 +1,6 @@
+{
+    "$schema": "tops/findings/ruleset/schema.v1",
+    "name": "cis.json",
+    "description": "CIS AWS Foundations Benchmark rule set",
+    "rules": []
+}

@@ -1,0 +1,46 @@
+{
+    "$schema": "tops/scan/tasks/schema.v1",
+    "name": "tasks.json",
+    "description": "Tasks for auditing AWS S3 resources",
+    "config": {
+        "service": "s3",
+        "start": "listBuckets",
+        "defaults": {
+            "actions": {
+                "params": "function(item) { return { Bucket: item.Name } }"
+            }
+        }
+    },
+    "tasks": [
+        {
+            "listBuckets": {
+                "task": "listBuckets",
+                "id": "bucket",
+                "key": "Name",
+                "description": "List all buckets",
+                "actions": [
+                    "getPublicAccessBlock",
+                    "getBucketEncryption",
+                    "getBucketVersioning",
+                    "getBucketAcl"
+                ],
+                "items": {
+                    "Buckets": [
+                        {
+                            "Name": "Name",
+                            "Type": "String"
+                        },
+                        {
+                            "Name": "CreationDate",
+                            "Type": "Date"
+                        }
+                    ]
+                }
+            },
+            "getPublicAccessBlock": {},
+            "getBucketEncryption": {},
+            "getBucketVersioning": {},
+            "getBucketAcl": {}
+        }
+    ]
+}

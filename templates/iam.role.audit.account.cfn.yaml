@@ -10,13 +10,6 @@ Parameters:
     MinLength: 12
     MaxLength: 12
     Default: "660228977852"
-  AuditAWSAccountId:
-    Type: String
-    Description: "The AWS Account ID of CE MFA Access for ReportsAccess and Configuration"
-    AllowedPattern: "[0-9]{12}"
-    MinLength: 12
-    MaxLength: 12
-    Default: "660228977852"
   ExternalId:
     Type: String
     Description: "External STS ID DO NOT CHANGE"
@@ -32,7 +25,7 @@ Parameters:
 Resources:
   TopsCustomNotifier:
     Type: Custom::TeemopsPingSNS
-    Version: 1.0
+    Version: 1.1
     Properties:
       ServiceToken: !Join
         - ""
@@ -47,6 +40,7 @@ Resources:
       TopsExternalId: !Ref ExternalId
       TopsUniqueId: !Ref UniqueId
       TopsType: "audit"
+      TopsVersion: "1.1"
   TopsCWEventRole:
     Type: "AWS::IAM::Role"
     Properties:
@@ -83,7 +77,7 @@ Resources:
         Statement:
           - Effect: "Allow"
             Principal:
-              AWS: !Ref AuditAWSAccountId
+              AWS: !Ref ParentAWSAccountId
             Action:
               - "sts:AssumeRole"
             Condition:
@@ -174,6 +168,7 @@ Resources:
               - "cloudformation:ListChangeSets"
               - "cloudformation:ListStacks"
               - "cloudformation:ListStackResources"
+              - "cloudformation:GetTemplate"
             Resource: "arn:aws:cloudformation:*:*:stack/tops*"
       Roles:
         - !Ref TopsAuditSetup
@@ -188,6 +183,7 @@ Resources:
             Action:
               - "cloudformation:ListStacks"
               - "cloudformation:ListStackResources"
+              - "cloudformation:DescribeStacks"
             Resource: "*"
       Roles:
         - !Ref TopsAuditSetup

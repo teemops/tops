@@ -21,7 +21,8 @@ class StoreScanRequest extends FormRequest
     {
         return [
             'aws_account_id' => ['required', 'string', 'exists:aws_accounts,id'],
-            'scan_type' => ['sometimes', 'string', 'in:full,quick'],
+            'scan_types' => ['required', 'array', 'min:1'],
+            'scan_types.*' => ['required', 'string', 'in:ec2,iam,s3'],
         ];
     }
 }

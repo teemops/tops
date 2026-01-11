@@ -18,3 +18,5 @@ mysql-data/
 *.db-shm
 *.db-wal
 
+#outputs from tests
+outputs

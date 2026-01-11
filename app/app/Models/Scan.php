@@ -15,6 +15,7 @@ class Scan extends Model
     protected $fillable = [
         'organization_id',
         'aws_account_id',
+        'scan_types',
         'status',
         'started_at',
         'completed_at',
@@ -22,6 +23,7 @@ class Scan extends Model
     ];
 
     protected $casts = [
+        'scan_types' => 'array',
         'started_at' => 'datetime',
         'completed_at' => 'datetime',
     ];
@@ -48,5 +50,21 @@ class Scan extends Model
     public function results(): HasMany
     {
         return $this->hasMany(ScanResult::class);
+    }
+
+    /**
+     * Get the scan details (raw API responses)
+     */
+    public function details(): HasMany
+    {
+        return $this->hasMany(ScanDetail::class);
+    }
+
+    /**
+     * Validate scan types
+     */
+    public function hasScanType(string $type): bool
+    {
+        return in_array($type, $this->scan_types ?? []);
     }
 }
