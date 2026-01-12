@@ -117,9 +117,9 @@ class ProcessRegionScanJob implements ShouldQueue
                 'region' => $this->region,
             ]);
 
-            // Note: Scan completion status should be updated when all regions are done
-            // This could be handled via job batching or a separate tracking mechanism
-            // For now, we'll leave the scan status management to a separate process
+            // Check if all regions are complete and mark scan as completed if so
+            $this->scan->refresh();
+            $this->scan->checkAndMarkEc2ScanComplete();
         } catch (\Exception $e) {
             Log::error('Region scan failed', [
                 'scan_id' => $this->scan->id,

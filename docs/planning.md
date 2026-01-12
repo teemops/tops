@@ -1319,6 +1319,44 @@ Response: {
 - The feature flag should be checked at runtime to determine which authentication provider to use
 - Both authentication methods should maintain the same user experience and API contracts
 
+#### Secure Custom Rulesets Protection for Conditions
+**Feature**: Implement security measures to prevent arbitrary code execution in custom ruleset conditions
+
+**Description**:
+- Currently, the `ConditionEvaluator` uses PHP `eval()` to evaluate condition expressions from rulesets (e.g., `basic.json`, `cis.json`, `pci.json`)
+- The current implementation is safe because we control all ruleset files
+- In the future, we may allow customers to create and upload their own custom rulesets
+- Without proper security measures, malicious conditions could execute arbitrary PHP code, leading to:
+  - Remote code execution (RCE)
+  - Data exfiltration
+  - System compromise
+  - Privilege escalation
+
+**Security Requirements**:
+- Prevent execution of arbitrary PHP code in condition expressions
+- Allow only safe, whitelisted PHP functions and operations
+- Validate and sanitize all condition expressions before evaluation
+- Implement sandboxing or restricted execution environment
+- Log all condition evaluations for security auditing
+
+**Potential Implementation Approaches**:
+1. **AST-based Parser**: Parse PHP expressions into an Abstract Syntax Tree (AST) and validate against a whitelist of allowed operations
+2. **Expression Language Library**: Use a dedicated expression evaluator library (e.g., Symfony ExpressionLanguage) that provides built-in security
+3. **Sandboxed Execution**: Run condition evaluation in an isolated environment with restricted capabilities
+4. **Whitelist Validation**: Pre-validate conditions against a strict whitelist of allowed functions, operators, and patterns
+5. **Template-based Approach**: Provide a template system where customers can only use predefined condition templates
+
+**Implementation Notes**:
+- This is a critical security feature that must be implemented before allowing customer-uploaded rulesets
+- Consider implementing this as a separate "secure" mode that can be enabled when custom rulesets are allowed
+- Maintain backward compatibility with existing rulesets (basic.json, cis.json, pci.json)
+- Document allowed condition patterns and provide validation feedback to customers
+- Consider rate limiting condition evaluations to prevent resource exhaustion attacks
+
+**Related Files**:
+- `app/app/Services/RulesEngine/ConditionEvaluator.php` - Current implementation using `eval()`
+- `app/rules/rulesets/*.json` - Ruleset files containing condition expressions
+
 ---
 
 ## Next Actions

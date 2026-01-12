@@ -10,7 +10,7 @@
             "method": "listMFADevices",
             "description": "IAM Users should have MFA enabled",
             "severity": "high",
-            "condition": "r.MFADevices.length == 0"
+            "condition": "count($data['MFADevices'] ?? []) == 0"
         },
         {
             "rule": "tops-iam-002",
@@ -19,7 +19,7 @@
             "method": "listAccessKeys",
             "description": "Access Keys should not be used for IAM Users. Instead use IAM Identity Center to setup Single Sign-on.",
             "severity": "medium",
-            "condition": "r.AccessKeyMetadata.length > 0"
+            "condition": "count($data['AccessKeyMetadata'] ?? []) > 0"
         },
         {
             "rule": "tops-iam-003",
@@ -28,7 +28,7 @@
             "method": "listUserPolicies",
             "description": "IAM Users should not have inline IAM policies. Instead use IAM Groups to define IAM Policies and assign the user to the group.",
             "severity": "medium",
-            "condition": "r.PolicyNames.length > 0"
+            "condition": "count($data['PolicyNames'] ?? []) > 0"
         },
         {
             "rule": "tops-iam-004",
@@ -37,7 +37,7 @@
             "method": "listAttachedUserPolicies",
             "description": "IAM Policies should not be attached to IAM Users. Instead use IAM Groups to define IAM Policies and assign the user to the group.",
             "severity": "medium",
-            "condition": "r.AttachedPolicies.length > 0"
+            "condition": "count($data['AttachedPolicies'] ?? []) > 0"
         },
         {
             "rule": "tops-s3-001",
@@ -46,7 +46,7 @@
             "method": "getPublicAccessBlock",
             "description": "S3 Buckets should not be publicly available",
             "severity": "high",
-            "condition": "r==false || (r.PublicAccessBlockConfiguration.BlockPublicAcls == false || r.PublicAccessBlockConfiguration.BlockPublicPolicy == false || r.PublicAccessBlockConfiguration.IgnorePublicAcls == false || r.PublicAccessBlockConfiguration.RestrictPublicBuckets == false)"
+            "condition": "$data === false || !isset($data['PublicAccessBlockConfiguration']) || ($data['PublicAccessBlockConfiguration']['BlockPublicAcls'] ?? false) == false || ($data['PublicAccessBlockConfiguration']['BlockPublicPolicy'] ?? false) == false || ($data['PublicAccessBlockConfiguration']['IgnorePublicAcls'] ?? false) == false || ($data['PublicAccessBlockConfiguration']['RestrictPublicBuckets'] ?? false) == false"
         },
         {
             "rule": "tops-s3-002",
@@ -55,7 +55,7 @@
             "method": "getBucketEncryption",
             "description": "S3 Buckets should have encryption enabled",
             "severity": "medium",
-            "condition": "r.ServerSideEncryptionConfiguration.Rules[0].BucketKeyEnabled == false"
+            "condition": "($data['ServerSideEncryptionConfiguration']['Rules'][0]['BucketKeyEnabled'] ?? false) == false"
         },
         {
             "rule": "tops-s3-003",
@@ -64,7 +64,7 @@
             "method": "getBucketVersioning",
             "description": "S3 Buckets should have versioning enabled",
             "severity": "medium",
-            "condition": "r.Status != 'Enabled'"
+            "condition": "($data['Status'] ?? '') != 'Enabled'"
         },
         {
             "rule": "tops-ec2-002",
@@ -73,7 +73,7 @@
             "method": "describeInstances",
             "description": "EC2 Instances should not have a Public IP Address",
             "severity": "medium",
-            "condition": "r.PublicIpAddress != undefined"
+            "condition": "isset($data['PublicIpAddress'])"
         },
         {
             "rule": "tops-ec2-004",
@@ -82,7 +82,7 @@
             "method": "describeSubnets",
             "description": "EC2 Subnets should not have Public IP enabled by default",
             "severity": "medium",
-            "condition": "r.Subnets[0].MapPublicIpOnLaunch == true"
+            "condition": "($data['Subnets'][0]['MapPublicIpOnLaunch'] ?? false) == true"
         }
     ]
 }

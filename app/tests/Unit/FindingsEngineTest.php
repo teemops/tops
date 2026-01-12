@@ -53,7 +53,7 @@ class FindingsEngineTest extends TestCase
                     'method' => 'listMFADevices',
                     'description' => 'IAM Users should have MFA enabled',
                     'severity' => 'high',
-                    'condition' => 'r.MFADevices.length == 0',
+                    'condition' => "count(\$data['MFADevices'] ?? []) == 0",
                 ],
             ],
         ];
@@ -72,7 +72,7 @@ class FindingsEngineTest extends TestCase
         $mockEvaluator = Mockery::mock(ConditionEvaluator::class);
         $mockEvaluator->shouldReceive('evaluate')
             ->once()
-            ->with('r.MFADevices.length == 0', ['MFADevices' => []])
+            ->with("count(\$data['MFADevices'] ?? []) == 0", ['MFADevices' => []])
             ->andReturn(true);
 
         // Create FindingsEngine with mocked evaluator
@@ -131,7 +131,7 @@ class FindingsEngineTest extends TestCase
                     'method' => 'listMFADevices',
                     'description' => 'IAM Users should have MFA enabled',
                     'severity' => 'high',
-                    'condition' => 'r.MFADevices.length == 0',
+                    'condition' => "count(\$data['MFADevices'] ?? []) == 0",
                 ],
             ],
         ];
@@ -150,7 +150,7 @@ class FindingsEngineTest extends TestCase
         $mockEvaluator = Mockery::mock(ConditionEvaluator::class);
         $mockEvaluator->shouldReceive('evaluate')
             ->once()
-            ->with('r.MFADevices.length == 0', ['MFADevices' => [['SerialNumber' => 'arn:aws:iam::123456789012:mfa/test-user']]])
+            ->with("count(\$data['MFADevices'] ?? []) == 0", ['MFADevices' => [['SerialNumber' => 'arn:aws:iam::123456789012:mfa/test-user']]])
             ->andReturn(false);
 
         // Create FindingsEngine with mocked evaluator
@@ -202,7 +202,7 @@ class FindingsEngineTest extends TestCase
                     'method' => 'listMFADevices',
                     'description' => 'IAM Users should have MFA enabled',
                     'severity' => 'high',
-                    'condition' => 'r.MFADevices.length == 0',
+                    'condition' => "count(\$data['MFADevices'] ?? []) == 0",
                 ],
             ],
         ];
@@ -264,7 +264,7 @@ class FindingsEngineTest extends TestCase
                     'method' => 'listMFADevices',
                     'description' => 'IAM Users should have MFA enabled',
                     'severity' => 'high',
-                    'condition' => 'r.MFADevices.length == 0',
+                    'condition' => "count(\$data['MFADevices'] ?? []) == 0",
                 ],
             ],
         ];
@@ -278,7 +278,7 @@ class FindingsEngineTest extends TestCase
                     'method' => 'listAccessKeys',
                     'description' => 'Access Keys should not be used',
                     'severity' => 'medium',
-                    'condition' => 'r.AccessKeyMetadata.length > 0',
+                    'condition' => "count(\$data['AccessKeyMetadata'] ?? []) > 0",
                 ],
             ],
         ];
@@ -408,7 +408,7 @@ class FindingsEngineTest extends TestCase
                     'method' => 'listMFADevices',
                     'description' => 'IAM Users should have MFA enabled',
                     'severity' => 'high',
-                    'condition' => 'r.MFADevices.length == 0',
+                    'condition' => "count(\$data['MFADevices'] ?? []) == 0",
                 ],
             ],
         ];
@@ -477,7 +477,7 @@ class FindingsEngineTest extends TestCase
                     'method' => 'listAccessKeys',
                     'description' => 'Access Keys should not be used',
                     'severity' => 'medium',
-                    'condition' => 'r.AccessKeyMetadata.length > 0',
+                    'condition' => "count(\$data['AccessKeyMetadata'] ?? []) > 0",
                 ],
             ],
         ];
@@ -537,7 +537,7 @@ class FindingsEngineTest extends TestCase
                     'method' => 'listMFADevices',
                     'description' => 'IAM Users should have MFA enabled',
                     'severity' => 'high',
-                    'condition' => 'r.MFADevices.length == 0',
+                    'condition' => "count(\$data['MFADevices'] ?? []) == 0",
                 ],
             ],
         ];
@@ -617,7 +617,7 @@ class FindingsEngineTest extends TestCase
                     'method' => 'listMFADevices',
                     'description' => 'IAM Users should have MFA enabled',
                     'severity' => 'high',
-                    'condition' => 'r.MFADevices.length == 0',
+                    'condition' => "count(\$data['MFADevices'] ?? []) == 0",
                 ],
             ],
         ];
@@ -634,7 +634,7 @@ class FindingsEngineTest extends TestCase
         $mockEvaluator = Mockery::mock(ConditionEvaluator::class);
         $mockEvaluator->shouldReceive('evaluate')
             ->once()
-            ->with('r.MFADevices.length == 0', ['MFADevices' => []])
+            ->with("count(\$data['MFADevices'] ?? []) == 0", ['MFADevices' => []])
             ->andReturn(true);
 
         // Create FindingsEngine with mocked evaluator

@@ -55,12 +55,36 @@
                     ]
                 }
             },
-            "getUser": {},
-            "listMFADevices": {},
-            "listAccessKeys": {},
-            "listUserPolicies": {},
-            "listGroupsForUser": {},
-            "listAttachedUserPolicies": {}
+            "getUser": {
+                "params": {
+                    "UserName": "$item['UserName']"
+                }
+            },
+            "listMFADevices": {
+                "params": {
+                    "UserName": "$item['UserName']"
+                }
+            },
+            "listAccessKeys": {
+                "params": {
+                    "UserName": "$item['UserName']"
+                }
+            },
+            "listUserPolicies": {
+                "params": {
+                    "UserName": "$item['UserName']"
+                }
+            },
+            "listGroupsForUser": {
+                "params": {
+                    "UserName": "$item['UserName']"
+                }
+            },
+            "listAttachedUserPolicies": {
+                "params": {
+                    "UserName": "$item['UserName']"
+                }
+            }
         },
         {
             "listRoles": {
@@ -70,7 +94,6 @@
                 "description": "List all roles",
                 "actions": [
                     "getRole",
-                    "getRolePolicy",
                     "listRolePolicies",
                     "listAttachedRolePolicies"
                 ],
@@ -103,9 +126,21 @@
                     ]
                 }
             },
-            "getRole": {},
-            "listRolePolicies": {},
-            "listAttachedRolePolicies": {}
+            "getRole": {
+                "params": {
+                    "RoleName": "$item['RoleName']"
+                }
+            },
+            "listRolePolicies": {
+                "params": {
+                    "RoleName": "$item['RoleName']"
+                }
+            },
+            "listAttachedRolePolicies": {
+                "params": {
+                    "RoleName": "$item['RoleName']"
+                }
+            }
         }
     ]
 }
