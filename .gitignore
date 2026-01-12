@@ -20,3 +20,4 @@ mysql-data/
 
 #outputs from tests
 outputs
+vendor
