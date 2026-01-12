@@ -7,7 +7,9 @@
         "start": "listBuckets",
         "defaults": {
             "actions": {
-                "params": "function(item) { return { Bucket: item.Name } }"
+                "params": {
+                    "Bucket": "$item['Name']"
+                }
             }
         }
     },
@@ -36,11 +38,7 @@
                         }
                     ]
                 }
-            },
-            "getPublicAccessBlock": {},
-            "getBucketEncryption": {},
-            "getBucketVersioning": {},
-            "getBucketAcl": {}
+            }
         }
     ]
 }
