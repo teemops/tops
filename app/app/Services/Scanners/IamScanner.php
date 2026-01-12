@@ -16,6 +16,20 @@ class IamScanner extends AwsSecurityScanner
     {
         $iamClient = $this->createClient('iam', $credentials);
 
+        // Log params for debugging (especially for methods that require parameters)
+        if (in_array($method, ['getUser', 'listMFADevices', 'listAccessKeys', 'listUserPolicies', 'listGroupsForUser', 'listAttachedUserPolicies', 'getRole', 'listRolePolicies', 'listAttachedRolePolicies'])) {
+            Log::info("IAM API call with params", [
+                'method' => $method,
+                'params' => $params,
+                'params_count' => count($params),
+                'params_empty' => empty($params),
+                'has_username' => isset($params['UserName']),
+                'username_value' => $params['UserName'] ?? 'NOT SET',
+                'has_rolename' => isset($params['RoleName']),
+                'rolename_value' => $params['RoleName'] ?? 'NOT SET',
+            ]);
+        }
+
         try {
             return match ($method) {
                 'listUsers' => $iamClient->listUsers($params)->toArray(),

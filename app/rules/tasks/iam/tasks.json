@@ -7,7 +7,9 @@
         "start": "listUsers",
         "defaults": {
             "actions": {
-                "params": "function(item) { return { UserName: item.UserName } }"
+                "params": {
+                    "UserName": "$item['UserName']"
+                }
             }
         }
     },
@@ -19,12 +21,42 @@
                 "key": "Name",
                 "description": "List all users",
                 "actions": [
-                    "getUser",
-                    "listMFADevices",
+                    {
+                        "getUser": {
+                            "params": {
+                                "UserName": "$item['UserName']"
+                            }
+                        }
+                    },
+                    {
+                        "listMFADevices": {
+                            "params": {
+                                "UserName": "$item['UserName']"
+                            }
+                        }
+                    },
                     "listAccessKeys",
-                    "listUserPolicies",
-                    "listGroupsForUser",
-                    "listAttachedUserPolicies"
+                    {
+                        "listUserPolicies": {
+                            "params": {
+                                "UserName": "$item['UserName']"
+                            }
+                        }
+                    },
+                    {
+                        "listGroupsForUser": {
+                            "params": {
+                                "UserName": "$item['UserName']"
+                            }
+                        }
+                    },
+                    {
+                        "listAttachedUserPolicies": {
+                            "params": {
+                                "UserName": "$item['UserName']"
+                            }
+                        }
+                    }
                 ],
                 "items": {
                     "Users": [
@@ -54,36 +86,6 @@
                         }
                     ]
                 }
-            },
-            "getUser": {
-                "params": {
-                    "UserName": "$item['UserName']"
-                }
-            },
-            "listMFADevices": {
-                "params": {
-                    "UserName": "$item['UserName']"
-                }
-            },
-            "listAccessKeys": {
-                "params": {
-                    "UserName": "$item['UserName']"
-                }
-            },
-            "listUserPolicies": {
-                "params": {
-                    "UserName": "$item['UserName']"
-                }
-            },
-            "listGroupsForUser": {
-                "params": {
-                    "UserName": "$item['UserName']"
-                }
-            },
-            "listAttachedUserPolicies": {
-                "params": {
-                    "UserName": "$item['UserName']"
-                }
             }
         },
         {
@@ -93,9 +95,27 @@
                 "key": "RoleName",
                 "description": "List all roles",
                 "actions": [
-                    "getRole",
-                    "listRolePolicies",
-                    "listAttachedRolePolicies"
+                    {
+                        "getRole": {
+                            "params": {
+                                "RoleName": "$item['RoleName']"
+                            }
+                        }
+                    },
+                    {
+                        "listRolePolicies": {
+                            "params": {
+                                "RoleName": "$item['RoleName']"
+                            }
+                        }
+                    },
+                    {
+                        "listAttachedRolePolicies": {
+                            "params": {
+                                "RoleName": "$item['RoleName']"
+                            }
+                        }
+                    }
                 ],
                 "items": {
                     "Roles": [
@@ -124,21 +144,6 @@
                             "Type": "String"
                         }
                     ]
-                }
-            },
-            "getRole": {
-                "params": {
-                    "RoleName": "$item['RoleName']"
-                }
-            },
-            "listRolePolicies": {
-                "params": {
-                    "RoleName": "$item['RoleName']"
-                }
-            },
-            "listAttachedRolePolicies": {
-                "params": {
-                    "RoleName": "$item['RoleName']"
                 }
             }
         }

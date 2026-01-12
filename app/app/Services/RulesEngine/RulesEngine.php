@@ -57,7 +57,7 @@ class RulesEngine
                     continue;
                 }
                 
-                $this->executeTask($scan, $scanner, $service, $taskName, $taskConfig, $credentials, $region, $tasks);
+                $this->executeTask($scan, $scanner, $service, $taskName, $taskConfig, $credentials, $region);
             }
         }
     }
@@ -72,8 +72,7 @@ class RulesEngine
         string $taskName,
         array $taskConfig,
         array $credentials,
-        ?string $region = null,
-        array $allTasks = []
+        ?string $region = null
     ): void {
         try {
             // Execute the main task API call
@@ -107,9 +106,52 @@ class RulesEngine
                 $this->storeScanDetail($scan, $service, $resourceType, $resourceId, $taskName, $item, null, $region);
                 
                 // Execute actions for this item
-                foreach ($actions as $actionName) {
+                // Actions can be either:
+                // 1. New format: array of objects like [{"getUser": {"params": {...}}}]
+                // 2. Legacy format: array of strings like ["getUser", "listMFADevices"]
+                foreach ($actions as $action) {
                     try {
-                        $actionParams = $this->buildActionParams($item, $taskConfig, $actionName, $allTasks);
+                        // Extract action name and params based on format
+                        if (is_array($action) && !isset($action[0])) {
+                            // New format: object with action name as key
+                            // e.g., {"getUser": {"params": {...}}}
+                            $actionName = array_key_first($action);
+                            $actionConfig = $action[$actionName] ?? [];
+                            $actionParamsConfig = $actionConfig['params'] ?? null;
+                        } elseif (is_string($action)) {
+                            // Legacy format: simple string
+                            $actionName = $action;
+                            $actionParamsConfig = null;
+                        } else {
+                            Log::warning("Invalid action format", [
+                                'action' => $action,
+                                'action_type' => gettype($action),
+                            ]);
+                            continue;
+                        }
+                        
+                        // Build params from action config or fallback to defaults
+                        $actionParams = $this->buildActionParams($item, $taskConfig, $actionName, $actionParamsConfig);
+                        
+                        // Ensure params is always an array
+                        if (!is_array($actionParams)) {
+                            Log::error("buildActionParams did not return an array", [
+                                'action' => $actionName,
+                                'return_type' => gettype($actionParams),
+                                'return_value' => $actionParams,
+                            ]);
+                            $actionParams = [];
+                        }
+                        
+                        Log::debug("Executing action with params", [
+                            'action' => $actionName,
+                            'params' => $actionParams,
+                            'params_type' => gettype($actionParams),
+                            'params_is_array' => is_array($actionParams),
+                            'params_count' => is_array($actionParams) ? count($actionParams) : 0,
+                            'item_keys' => array_keys($item),
+                            'resource_id' => $resourceId,
+                        ]);
                         
                         if ($service === 'ec2' && $region) {
                             $actionResult = $scanner->executeApiCall($actionName, $credentials, $actionParams, $region);
@@ -207,61 +249,90 @@ class RulesEngine
 
     /**
      * Build parameters for action API call
+     * 
+     * @param array $item The item from the list operation (e.g., user, role)
+     * @param array $taskConfig The task configuration
+     * @param string $actionName The action name (e.g., "getUser", "listMFADevices")
+     * @param array|null $actionParamsConfig Params config from the action object (new format) or null
+     * @return array Parameters array for the API call
      */
-    private function buildActionParams(array $item, array $taskConfig, string $actionName, array $allTasks = []): array
+    private function buildActionParams(array $item, array $taskConfig, string $actionName, ?array $actionParamsConfig = null): array
     {
-        // First, check if the action task has params defined
-        $actionTaskConfig = $this->findActionTaskConfig($actionName, $allTasks);
-        
-        if ($actionTaskConfig && isset($actionTaskConfig['params'])) {
-            return $this->evaluateParams($actionTaskConfig['params'], $item);
+        // First, check if params are provided directly in the action config (new format)
+        if ($actionParamsConfig !== null && is_array($actionParamsConfig)) {
+            Log::debug('Using params from action config', [
+                'action' => $actionName,
+                'params_config' => $actionParamsConfig,
+            ]);
+            
+            $params = $this->evaluateParams($actionParamsConfig, $item);
+            
+            Log::debug('Evaluated params from action config', [
+                'action' => $actionName,
+                'params' => $params,
+            ]);
+            
+            return $params;
         }
         
-        // Fall back to default params function in config
+        Log::debug('No params in action config, checking defaults', [
+            'action' => $actionName,
+        ]);
+        
+        // Fall back to default params in task config
         $defaults = $taskConfig['defaults']['actions']['params'] ?? null;
         
-        if ($defaults) {
-            // For MVP, use simple mapping
-            // In production, you might want to evaluate the function
-            // For now, use common patterns
-            if (isset($item['UserName'])) {
-                return ['UserName' => $item['UserName']];
+        if ($defaults && is_array($defaults)) {
+            // New format: defaults is an array of params to evaluate
+            Log::debug('Using default params from task config', [
+                'action' => $actionName,
+                'defaults' => $defaults,
+            ]);
+            
+            $params = $this->evaluateParams($defaults, $item);
+            
+            Log::debug('Evaluated default params', [
+                'action' => $actionName,
+                'params' => $params,
+            ]);
+            
+            return $params;
+        } elseif ($defaults && is_string($defaults)) {
+            // Legacy format: defaults might be a function string (for backward compatibility)
+            Log::debug('Legacy defaults format detected, using fallback logic', [
+                'action' => $actionName,
+            ]);
+        }
+        
+        // Final fallback: try to infer params from item structure
+        if (isset($item['UserName'])) {
+            return ['UserName' => $item['UserName']];
+        }
+        if (isset($item['RoleName'])) {
+            return ['RoleName' => $item['RoleName']];
+        }
+        if (isset($item['BucketName'])) {
+            return ['Bucket' => $item['BucketName']];
+        }
+        if (isset($item['Name'])) {
+            // Try to determine the parameter name based on action
+            if (strpos($actionName, 'User') !== false) {
+                return ['UserName' => $item['Name']];
             }
-            if (isset($item['RoleName'])) {
-                return ['RoleName' => $item['RoleName']];
+            if (strpos($actionName, 'Role') !== false) {
+                return ['RoleName' => $item['Name']];
             }
-            if (isset($item['BucketName'])) {
-                return ['Bucket' => $item['BucketName']];
-            }
-            if (isset($item['Name'])) {
-                // Try to determine the parameter name based on action
-                if (strpos($actionName, 'User') !== false) {
-                    return ['UserName' => $item['Name']];
-                }
-                if (strpos($actionName, 'Role') !== false) {
-                    return ['RoleName' => $item['Name']];
-                }
-                if (strpos($actionName, 'Bucket') !== false || strpos($actionName, 'S3') !== false) {
-                    return ['Bucket' => $item['Name']];
-                }
+            if (strpos($actionName, 'Bucket') !== false || strpos($actionName, 'S3') !== false) {
+                return ['Bucket' => $item['Name']];
             }
         }
         
-        // Default: return item as-is (may need adjustment per service)
-        return $item;
-    }
-
-    /**
-     * Find action task configuration from all tasks
-     */
-    private function findActionTaskConfig(string $actionName, array $allTasks): ?array
-    {
-        foreach ($allTasks['tasks'] ?? [] as $taskGroup) {
-            if (isset($taskGroup[$actionName]) && !empty($taskGroup[$actionName])) {
-                return $taskGroup[$actionName];
-            }
-        }
-        return null;
+        // Default: return empty array (safer than returning item as-is)
+        Log::warning("Could not determine params for action", [
+            'action' => $actionName,
+            'item_keys' => array_keys($item),
+        ]);
+        return [];
     }
 
     /**
@@ -284,29 +355,84 @@ class RulesEngine
         
         foreach ($paramsConfig as $paramName => $paramValue) {
             if (is_string($paramValue)) {
-                // Check if it's a PHP expression (starts with $item or contains PHP syntax)
-                if (strpos($paramValue, '$item') !== false || strpos($paramValue, '[') !== false) {
+                // Check if it's a PHP expression (contains $item or PHP array syntax)
+                if (strpos($paramValue, '$item') !== false || preg_match('/\$[a-zA-Z_]/', $paramValue)) {
                     // PHP expression - evaluate it
                     try {
                         $value = $this->evaluatePhpExpression($paramValue, $item);
-                        $params[$paramName] = $value;
+                        
+                        Log::debug("Evaluated PHP expression for param", [
+                            'param' => $paramName,
+                            'expression' => $paramValue,
+                            'value' => $value,
+                            'value_type' => gettype($value),
+                        ]);
+                        
+                        if ($value === null) {
+                            Log::warning("Param expression evaluated to null", [
+                                'param' => $paramName,
+                                'expression' => $paramValue,
+                                'item_keys' => array_keys($item),
+                            ]);
+                        } else {
+                            // Ensure we store the actual value, not the expression string
+                            $params[$paramName] = $value;
+                        }
                     } catch (\Exception $e) {
-                        Log::warning("Failed to evaluate param expression", [
+                        Log::error("Failed to evaluate param expression", [
                             'param' => $paramName,
                             'expression' => $paramValue,
                             'error' => $e->getMessage(),
+                            'item_keys' => array_keys($item),
+                            'trace' => $e->getTraceAsString(),
                         ]);
                         // Try simple field access as fallback
-                        $params[$paramName] = $this->getFieldValue($paramValue, $item);
+                        $fallbackValue = $this->getFieldValue($paramValue, $item);
+                        if ($fallbackValue !== null) {
+                            $params[$paramName] = $fallbackValue;
+                        }
                     }
                 } else {
                     // Simple field name - extract from item
-                    $params[$paramName] = $this->getFieldValue($paramValue, $item);
+                    $value = $this->getFieldValue($paramValue, $item);
+                    if ($value !== null) {
+                        $params[$paramName] = $value;
+                    } else {
+                        Log::warning("Field not found in item", [
+                            'param' => $paramName,
+                            'field' => $paramValue,
+                            'item_keys' => array_keys($item),
+                        ]);
+                    }
                 }
             } else {
                 // Direct value (number, boolean, etc.)
                 $params[$paramName] = $paramValue;
             }
+        }
+        
+        // Ensure we always return an array (never null or string)
+        if (!is_array($params)) {
+            Log::error("evaluateParams did not return an array", [
+                'return_type' => gettype($params),
+                'return_value' => $params,
+                'params_config' => $paramsConfig,
+            ]);
+            return [];
+        }
+        
+        // Log final params for debugging
+        Log::debug("Final evaluated params array", [
+            'params' => $params,
+            'params_count' => count($params),
+            'is_array' => is_array($params),
+        ]);
+        
+        if (empty($params)) {
+            Log::warning("No params evaluated, returning empty array", [
+                'params_config' => $paramsConfig,
+                'item_keys' => array_keys($item),
+            ]);
         }
         
         return $params;
@@ -317,12 +443,25 @@ class RulesEngine
      */
     private function evaluatePhpExpression(string $expression, array $item): mixed
     {
-        // Replace $item with actual item array in expression
-        // Example: "$item['RoleName']" -> evaluates to item['RoleName']
+        // Evaluate PHP expression with $item available in scope
+        // Example: "$item['UserName']" -> evaluates to the actual UserName value
+        // Use string concatenation instead of interpolation to avoid quoting issues
         try {
             $result = (function ($expr, $item) {
                 extract(['item' => $item], EXTR_SKIP);
-                return eval("return {$expr};");
+                // The expression should already be valid PHP (e.g., "$item['UserName']")
+                // Use concatenation to safely build the eval string
+                // This ensures the expression is evaluated correctly without interpolation issues
+                $evalResult = eval('return ' . $expr . ';');
+                
+                // Log for debugging
+                \Illuminate\Support\Facades\Log::debug("PHP expression eval result", [
+                    'expression' => $expr,
+                    'result' => $evalResult,
+                    'result_type' => gettype($evalResult),
+                ]);
+                
+                return $evalResult;
             })($expression, $item);
             
             return $result;
@@ -330,6 +469,8 @@ class RulesEngine
             Log::error("PHP expression evaluation failed", [
                 'expression' => $expression,
                 'error' => $e->getMessage(),
+                'item_keys' => array_keys($item),
+                'trace' => $e->getTraceAsString(),
             ]);
             throw $e;
         }
