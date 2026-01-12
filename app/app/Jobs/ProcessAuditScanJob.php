@@ -93,6 +93,11 @@ class ProcessAuditScanJob implements ShouldQueue
                     $hasEc2Scan = true;
                     $regions = $scanner->getAvailableRegions($credentials);
 
+                    // Store expected regions count for completion tracking
+                    $this->scan->update([
+                        'expected_regions_count' => count($regions),
+                    ]);
+
                     foreach ($regions as $region) {
                         ProcessRegionScanJob::dispatch($this->scan, $region)
                             ->onConnection('sqs-audit-region');
@@ -121,8 +126,23 @@ class ProcessAuditScanJob implements ShouldQueue
                 }
             }
 
+            Log::info('All scan types processed, starting findings evaluation', [
+                'scan_id' => $this->scan->id,
+                'has_ec2' => $hasEc2Scan,
+                'scan_types' => $scanTypes,
+            ]);
+
             // Phase 2: Evaluate findings using FindingsEngine (only for non-EC2 scans)
+            Log::info('Starting findings evaluation phase', [
+                'scan_id' => $this->scan->id,
+                'has_ec2' => $hasEc2Scan,
+            ]);
+
             if (!$hasEc2Scan) {
+                Log::info('Evaluating findings for non-EC2 scan', [
+                    'scan_id' => $this->scan->id,
+                ]);
+
                 $conditionEvaluator = new ConditionEvaluator();
                 $findingsEngine = new FindingsEngine($conditionEvaluator);
                 
@@ -137,20 +157,74 @@ class ProcessAuditScanJob implements ShouldQueue
                     Log::error('Findings evaluation failed', [
                         'scan_id' => $this->scan->id,
                         'error' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString(),
                     ]);
                     // Don't fail the scan if findings evaluation fails
+                } catch (\Throwable $e) {
+                    // Catch any fatal errors too
+                    Log::error('Findings evaluation failed with fatal error', [
+                        'scan_id' => $this->scan->id,
+                        'error' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString(),
+                    ]);
                 }
 
-                // Mark scan as completed
-                $this->scan->update([
-                    'status' => 'completed',
-                    'completed_at' => now(),
+                // Mark scan as completed (ensure this happens even if findings evaluation failed)
+                // This MUST happen regardless of what happened above
+                Log::info('Attempting to mark scan as completed', [
+                    'scan_id' => $this->scan->id,
                 ]);
 
-                // Update AWS account last scan time
-                $awsAccount->update([
-                    'last_scan_at' => now(),
-                ]);
+                try {
+                    $this->scan->refresh(); // Reload to ensure we have latest status
+                    
+                    if ($this->scan->status === 'running') {
+                        $updateResult = $this->scan->update([
+                            'status' => 'completed',
+                            'completed_at' => now(),
+                        ]);
+
+                        if (!$updateResult) {
+                            Log::error('Scan update returned false', [
+                                'scan_id' => $this->scan->id,
+                            ]);
+                        }
+
+                        // Update AWS account last scan time
+                        $awsAccount->refresh();
+                        $awsAccount->update([
+                            'last_scan_at' => now(),
+                        ]);
+
+                        // Verify the update worked
+                        $this->scan->refresh();
+                        Log::info('Scan marked as completed successfully', [
+                            'scan_id' => $this->scan->id,
+                            'status' => $this->scan->status,
+                            'completed_at' => $this->scan->completed_at,
+                        ]);
+                    } else {
+                        Log::warning('Scan status is not running, skipping completion update', [
+                            'scan_id' => $this->scan->id,
+                            'current_status' => $this->scan->status,
+                        ]);
+                    }
+                } catch (\Exception $e) {
+                    Log::error('Failed to mark scan as completed', [
+                        'scan_id' => $this->scan->id,
+                        'error' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString(),
+                    ]);
+                    // Re-throw to ensure the job fails and can retry
+                    throw $e;
+                } catch (\Throwable $e) {
+                    Log::error('Failed to mark scan as completed (fatal error)', [
+                        'scan_id' => $this->scan->id,
+                        'error' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString(),
+                    ]);
+                    throw $e;
+                }
             } else {
                 // For EC2 scans, we'll track completion via region jobs
                 // The scan will be marked as completed when all regions are done
@@ -170,15 +244,41 @@ class ProcessAuditScanJob implements ShouldQueue
                 'trace' => $e->getTraceAsString(),
             ]);
 
-            // Update scan status to failed
-            $this->scan->update([
-                'status' => 'failed',
-                'completed_at' => now(),
-                'error_message' => $e->getMessage(),
-            ]);
+            // Check if scan has data but failed during findings evaluation
+            // In that case, mark as completed instead of failed
+            $this->scan->refresh();
+            $hasScanDetails = $this->scan->details()->exists();
+            
+            if ($hasScanDetails && !$hasEc2Scan && str_contains($e->getMessage(), 'Findings evaluation')) {
+                // If we have scan details and it's not an EC2 scan, mark as completed
+                // The findings evaluation failure shouldn't fail the entire scan
+                Log::warning('Marking scan as completed despite findings evaluation error', [
+                    'scan_id' => $this->scan->id,
+                    'error' => $e->getMessage(),
+                ]);
+                
+                $this->scan->update([
+                    'status' => 'completed',
+                    'completed_at' => now(),
+                    'error_message' => 'Findings evaluation failed: ' . $e->getMessage(),
+                ]);
+                
+                if ($this->scan->awsAccount) {
+                    $this->scan->awsAccount->update([
+                        'last_scan_at' => now(),
+                    ]);
+                }
+            } else {
+                // Update scan status to failed for other errors
+                $this->scan->update([
+                    'status' => 'failed',
+                    'completed_at' => now(),
+                    'error_message' => $e->getMessage(),
+                ]);
 
-            // Re-throw to trigger retry mechanism
-            throw $e;
+                // Re-throw to trigger retry mechanism
+                throw $e;
+            }
         }
     }
 

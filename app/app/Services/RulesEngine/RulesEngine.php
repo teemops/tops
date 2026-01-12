@@ -57,7 +57,7 @@ class RulesEngine
                     continue;
                 }
                 
-                $this->executeTask($scan, $scanner, $service, $taskName, $taskConfig, $credentials, $region);
+                $this->executeTask($scan, $scanner, $service, $taskName, $taskConfig, $credentials, $region, $tasks);
             }
         }
     }
@@ -72,7 +72,8 @@ class RulesEngine
         string $taskName,
         array $taskConfig,
         array $credentials,
-        ?string $region = null
+        ?string $region = null,
+        array $allTasks = []
     ): void {
         try {
             // Execute the main task API call
@@ -108,7 +109,7 @@ class RulesEngine
                 // Execute actions for this item
                 foreach ($actions as $actionName) {
                     try {
-                        $actionParams = $this->buildActionParams($item, $taskConfig, $actionName);
+                        $actionParams = $this->buildActionParams($item, $taskConfig, $actionName, $allTasks);
                         
                         if ($service === 'ec2' && $region) {
                             $actionResult = $scanner->executeApiCall($actionName, $credentials, $actionParams, $region);
@@ -207,9 +208,16 @@ class RulesEngine
     /**
      * Build parameters for action API call
      */
-    private function buildActionParams(array $item, array $taskConfig, string $actionName): array
+    private function buildActionParams(array $item, array $taskConfig, string $actionName, array $allTasks = []): array
     {
-        // Check for default params function in config
+        // First, check if the action task has params defined
+        $actionTaskConfig = $this->findActionTaskConfig($actionName, $allTasks);
+        
+        if ($actionTaskConfig && isset($actionTaskConfig['params'])) {
+            return $this->evaluateParams($actionTaskConfig['params'], $item);
+        }
+        
+        // Fall back to default params function in config
         $defaults = $taskConfig['defaults']['actions']['params'] ?? null;
         
         if ($defaults) {
@@ -241,6 +249,114 @@ class RulesEngine
         
         // Default: return item as-is (may need adjustment per service)
         return $item;
+    }
+
+    /**
+     * Find action task configuration from all tasks
+     */
+    private function findActionTaskConfig(string $actionName, array $allTasks): ?array
+    {
+        foreach ($allTasks['tasks'] ?? [] as $taskGroup) {
+            if (isset($taskGroup[$actionName]) && !empty($taskGroup[$actionName])) {
+                return $taskGroup[$actionName];
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Evaluate params configuration to build parameter array
+     * 
+     * Supports multiple formats:
+     * 1. PHP expressions: { "RoleName": "$item['RoleName']" }
+     * 2. Simple field access: { "UserName": "UserName" } (extracts from item)
+     * 3. Direct values: { "MaxItems": 100 }
+     * 
+     * Examples:
+     * - { "RoleName": "$item['RoleName']" } - PHP expression
+     * - { "UserName": "$item['UserName']" } - PHP expression
+     * - { "Bucket": "$item['Name']" } - PHP expression using Name field
+     * - { "MaxItems": 100 } - Direct value
+     */
+    private function evaluateParams(array $paramsConfig, array $item): array
+    {
+        $params = [];
+        
+        foreach ($paramsConfig as $paramName => $paramValue) {
+            if (is_string($paramValue)) {
+                // Check if it's a PHP expression (starts with $item or contains PHP syntax)
+                if (strpos($paramValue, '$item') !== false || strpos($paramValue, '[') !== false) {
+                    // PHP expression - evaluate it
+                    try {
+                        $value = $this->evaluatePhpExpression($paramValue, $item);
+                        $params[$paramName] = $value;
+                    } catch (\Exception $e) {
+                        Log::warning("Failed to evaluate param expression", [
+                            'param' => $paramName,
+                            'expression' => $paramValue,
+                            'error' => $e->getMessage(),
+                        ]);
+                        // Try simple field access as fallback
+                        $params[$paramName] = $this->getFieldValue($paramValue, $item);
+                    }
+                } else {
+                    // Simple field name - extract from item
+                    $params[$paramName] = $this->getFieldValue($paramValue, $item);
+                }
+            } else {
+                // Direct value (number, boolean, etc.)
+                $params[$paramName] = $paramValue;
+            }
+        }
+        
+        return $params;
+    }
+
+    /**
+     * Evaluate PHP expression for parameter value
+     */
+    private function evaluatePhpExpression(string $expression, array $item): mixed
+    {
+        // Replace $item with actual item array in expression
+        // Example: "$item['RoleName']" -> evaluates to item['RoleName']
+        try {
+            $result = (function ($expr, $item) {
+                extract(['item' => $item], EXTR_SKIP);
+                return eval("return {$expr};");
+            })($expression, $item);
+            
+            return $result;
+        } catch (\Throwable $e) {
+            Log::error("PHP expression evaluation failed", [
+                'expression' => $expression,
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * Get field value from item using dot notation or array access
+     */
+    private function getFieldValue(string $fieldPath, array $item): mixed
+    {
+        // Handle dot notation: "item.RoleName" -> item['RoleName']
+        $fieldPath = str_replace('item.', '', $fieldPath);
+        $fieldPath = trim($fieldPath);
+        
+        // Handle array access notation: "item['RoleName']" or "$item['RoleName']" -> extract field name
+        if (preg_match("/\['([^']+)'\]/", $fieldPath, $matches)) {
+            $fieldPath = $matches[1];
+        }
+        
+        // Handle simple field name (e.g., "RoleName", "UserName")
+        // Check if it exists in the item
+        if (isset($item[$fieldPath])) {
+            return $item[$fieldPath];
+        }
+        
+        // Try common variations (e.g., "Name" might map to "UserName" or "RoleName" depending on context)
+        return null;
     }
 
     /**
