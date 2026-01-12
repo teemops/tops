@@ -19,7 +19,14 @@ class Ec2Scanner extends AwsSecurityScanner
         try {
             return match ($method) {
                 'describeInstances' => $ec2Client->describeInstances($params)->toArray(),
+                'describeVpcs' => $ec2Client->describeVpcs($params)->toArray(),
                 'describeSubnets' => $ec2Client->describeSubnets($params)->toArray(),
+                'describeInternetGateways' => $ec2Client->describeInternetGateways($params)->toArray(),
+                'describeNatGateways' => $ec2Client->describeNatGateways($params)->toArray(),
+                'describeRouteTables' => $ec2Client->describeRouteTables($params)->toArray(),
+                'describeNetworkAcls' => $ec2Client->describeNetworkAcls($params)->toArray(),
+                'describeVpcPeeringConnections' => $ec2Client->describeVpcPeeringConnections($params)->toArray(),
+                'describeVpcEndpoints' => $ec2Client->describeVpcEndpoints($params)->toArray(),
                 'describeSecurityGroups' => $ec2Client->describeSecurityGroups($params)->toArray(),
                 'describeRegions' => $ec2Client->describeRegions($params)->toArray(),
                 default => throw new \InvalidArgumentException("Unknown EC2 method: {$method}"),

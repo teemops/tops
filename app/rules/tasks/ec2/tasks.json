@@ -69,6 +69,96 @@
                     ]
                 }
             }
+        },
+        {
+            "describeVpcs": {
+                "task": "describeVpcs",
+                "id": "vpc",
+                "key": "VpcId",
+                "description": "List all VPCs",
+                "actions": [
+                    {
+                        "describeSubnets": {
+                            "params": {
+                                "Filters": "[['Name' => 'vpc-id', 'Values' => [$item['VpcId']]]]"
+                            }
+                        }
+                    },
+                    {
+                        "describeInternetGateways": {
+                            "params": {
+                                "Filters": "[['Name' => 'attachment.vpc-id', 'Values' => [$item['VpcId']]]]"
+                            }
+                        }
+                    },
+                    {
+                        "describeNatGateways": {
+                            "params": {
+                                "Filter": "[['Name' => 'vpc-id', 'Values' => [$item['VpcId']]]]"
+                            }
+                        }
+                    },
+                    {
+                        "describeRouteTables": {
+                            "params": {
+                                "Filters": "[['Name' => 'vpc-id', 'Values' => [$item['VpcId']]]]"
+                            }
+                        }
+                    },
+                    {
+                        "describeNetworkAcls": {
+                            "params": {
+                                "Filters": "[['Name' => 'vpc-id', 'Values' => [$item['VpcId']]]]"
+                            }
+                        }
+                    },
+                    {
+                        "describeVpcPeeringConnections": {
+                            "params": {
+                                "Filters": "[['Name' => 'requester-vpc-info.vpc-id', 'Values' => [$item['VpcId']]], ['Name' => 'accepter-vpc-info.vpc-id', 'Values' => [$item['VpcId']]]]"
+                            }
+                        }
+                    },
+                    {
+                        "describeVpcEndpoints": {
+                            "params": {
+                                "Filters": "[['Name' => 'vpc-id', 'Values' => [$item['VpcId']]]]"
+                            }
+                        }
+                    },
+                    {
+                        "describeSecurityGroups": {
+                            "params": {
+                                "Filters": "[['Name' => 'vpc-id', 'Values' => [$item['VpcId']]]]"
+                            }
+                        }
+                    }
+                ],
+                "items": {
+                    "Vpcs": [
+                        {
+                            "Name": "VpcId",
+                            "Type": "String"
+                        },
+                        {
+                            "Name": "CidrBlock",
+                            "Type": "String"
+                        },
+                        {
+                            "Name": "State",
+                            "Type": "String"
+                        },
+                        {
+                            "Name": "IsDefault",
+                            "Type": "Boolean"
+                        },
+                        {
+                            "Name": "Tags",
+                            "Type": "Array"
+                        }
+                    ]
+                }
+            }
         }
     ]
 }
