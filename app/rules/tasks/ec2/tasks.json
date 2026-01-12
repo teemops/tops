@@ -21,8 +21,20 @@
                 "key": "InstanceId",
                 "description": "List all EC2 instances",
                 "actions": [
-                    "describeSecurityGroups",
-                    "describeSubnets"
+                    {
+                        "describeSecurityGroups": {
+                            "params": {
+                                "GroupIds": "array_column($item['SecurityGroups'] ?? [], 'GroupId')"
+                            }
+                        }
+                    },
+                    {
+                        "describeSubnets": {
+                            "params": {
+                                "SubnetIds": "[$item['SubnetId']]"
+                            }
+                        }
+                    }
                 ],
                 "items": {
                     "Reservations": [
@@ -43,6 +55,14 @@
                                 {
                                     "Name": "State",
                                     "Type": "Object"
+                                },
+                                {
+                                    "Name": "SecurityGroups",
+                                    "Type": "Array"
+                                },
+                                {
+                                    "Name": "SubnetId",
+                                    "Type": "String"
                                 }
                             ]
                         }

@@ -155,6 +155,9 @@ class RulesEngine
                         
                         if ($service === 'ec2' && $region) {
                             $actionResult = $scanner->executeApiCall($actionName, $credentials, $actionParams, $region);
+                        } elseif ($service === 's3') {
+                            // S3 handles region automatically for bucket-specific calls
+                            $actionResult = $scanner->executeApiCall($actionName, $credentials, $actionParams);
                         } else {
                             $actionResult = $scanner->executeApiCall($actionName, $credentials, $actionParams);
                         }
