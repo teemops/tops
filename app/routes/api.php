@@ -37,6 +37,7 @@ Route::middleware(['api', 'firebase.auth', 'organization.context'])->group(funct
     Route::get('/aws-accounts/{accountId}/cloudformation-url', [AwsAccountsController::class, 'getCloudFormationUrl']);
 
     // Scans
+    Route::get('/scan-types', [ScansController::class, 'scanTypes']);
     Route::get('/organizations/{orgId}/scans', [ScansController::class, 'index']);
     Route::post('/organizations/{orgId}/scans', [ScansController::class, 'store']);
     Route::get('/scans/{scanId}', [ScansController::class, 'show']);

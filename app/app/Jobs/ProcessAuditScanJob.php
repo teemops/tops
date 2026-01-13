@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\Scan;
 use App\Services\AwsSecurityScanner;
+use App\Services\ScanTypesService;
 use App\Services\RulesEngine\RulesEngine;
 use App\Services\RulesEngine\FindingsEngine;
 use App\Services\RulesEngine\ConditionEvaluator;
@@ -86,29 +87,39 @@ class ProcessAuditScanJob implements ShouldQueue
             // Phase 1: Execute scans using RulesEngine (data collection)
             $rulesEngine = new RulesEngine();
             $hasEc2Scan = false;
+            $hasRdsScan = false;
+            $regionBasedServices = ScanTypesService::getRegionBased();
 
             foreach ($scanTypes as $scanType) {
-                if ($scanType === 'ec2') {
-                    // For EC2, get regions and dispatch region-specific jobs
-                    $hasEc2Scan = true;
+                if (ScanTypesService::isRegionBased($scanType)) {
+                    // For EC2 and RDS, get regions and dispatch region-specific jobs
+                    if ($scanType === 'ec2') {
+                        $hasEc2Scan = true;
+                    } elseif ($scanType === 'rds') {
+                        $hasRdsScan = true;
+                    }
+                    
                     $regions = $scanner->getAvailableRegions($credentials);
 
                     // Store expected regions count for completion tracking
+                    // If multiple region-based services, use the max count
+                    $currentExpected = $this->scan->expected_regions_count ?? 0;
                     $this->scan->update([
-                        'expected_regions_count' => count($regions),
+                        'expected_regions_count' => max($currentExpected, count($regions)),
                     ]);
 
                     foreach ($regions as $region) {
-                        ProcessRegionScanJob::dispatch($this->scan, $region)
+                        ProcessRegionScanJob::dispatch($this->scan, $region, $scanType)
                             ->onConnection('sqs-audit-region');
                     }
 
-                    Log::info('EC2 scan dispatched to regions', [
+                    Log::info("{$scanType} scan dispatched to regions", [
                         'scan_id' => $this->scan->id,
+                        'service' => $scanType,
                         'regions_count' => count($regions),
                     ]);
                 } else {
-                    // Execute scan for non-EC2 services (IAM, S3, RDS)
+                    // Execute scan for non-region-based services (IAM, S3)
                     try {
                         $rulesEngine->executeScan($this->scan, $scanType, $credentials);
                         Log::info('Scan data collection completed', [
@@ -126,19 +137,25 @@ class ProcessAuditScanJob implements ShouldQueue
                 }
             }
 
+            $hasRegionBasedScan = $hasEc2Scan || $hasRdsScan;
+            
             Log::info('All scan types processed, starting findings evaluation', [
                 'scan_id' => $this->scan->id,
                 'has_ec2' => $hasEc2Scan,
+                'has_rds' => $hasRdsScan,
+                'has_region_based' => $hasRegionBasedScan,
                 'scan_types' => $scanTypes,
             ]);
 
-            // Phase 2: Evaluate findings using FindingsEngine (only for non-EC2 scans)
+            // Phase 2: Evaluate findings using FindingsEngine (only for non-region-based scans)
             Log::info('Starting findings evaluation phase', [
                 'scan_id' => $this->scan->id,
                 'has_ec2' => $hasEc2Scan,
+                'has_rds' => $hasRdsScan,
+                'has_region_based' => $hasRegionBasedScan,
             ]);
 
-            if (!$hasEc2Scan) {
+            if (!$hasRegionBasedScan) {
                 Log::info('Evaluating findings for non-EC2 scan', [
                     'scan_id' => $this->scan->id,
                 ]);
@@ -226,16 +243,20 @@ class ProcessAuditScanJob implements ShouldQueue
                     throw $e;
                 }
             } else {
-                // For EC2 scans, we'll track completion via region jobs
+                // For region-based scans (EC2, RDS), we'll track completion via region jobs
                 // The scan will be marked as completed when all regions are done
-                Log::info('Scan with EC2 type - waiting for region scans to complete', [
+                Log::info('Scan with region-based service - waiting for region scans to complete', [
                     'scan_id' => $this->scan->id,
+                    'has_ec2' => $hasEc2Scan,
+                    'has_rds' => $hasRdsScan,
                 ]);
             }
 
             Log::info('Scan processing completed', [
                 'scan_id' => $this->scan->id,
                 'has_ec2' => $hasEc2Scan,
+                'has_rds' => $hasRdsScan,
+                'has_region_based' => $hasRegionBasedScan,
             ]);
         } catch (\Exception $e) {
             Log::error('Scan failed', [
@@ -249,8 +270,8 @@ class ProcessAuditScanJob implements ShouldQueue
             $this->scan->refresh();
             $hasScanDetails = $this->scan->details()->exists();
             
-            if ($hasScanDetails && !$hasEc2Scan && str_contains($e->getMessage(), 'Findings evaluation')) {
-                // If we have scan details and it's not an EC2 scan, mark as completed
+            if ($hasScanDetails && !$hasRegionBasedScan && str_contains($e->getMessage(), 'Findings evaluation')) {
+                // If we have scan details and it's not a region-based scan, mark as completed
                 // The findings evaluation failure shouldn't fail the entire scan
                 Log::warning('Marking scan as completed despite findings evaluation error', [
                     'scan_id' => $this->scan->id,

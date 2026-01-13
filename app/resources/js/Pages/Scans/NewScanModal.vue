@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue';
+import { ref, watch, computed, onMounted } from 'vue';
 import { useScans } from '@/composables/useScans';
 import { useAwsAccounts } from '@/composables/useAwsAccounts';
 import { useOrganizations } from '@/composables/useOrganizations';
@@ -18,7 +18,7 @@ const emit = defineEmits<{
     created: [];
 }>();
 
-const { createScan } = useScans();
+const { createScan, scanTypes, fetchScanTypes } = useScans();
 const { accounts } = useAwsAccounts();
 const { currentOrganization } = useOrganizations();
 const { showSuccess, showError } = useNotifications();
@@ -30,6 +30,11 @@ const errors = ref<{ aws_account_id?: string[]; scan_types?: string[] }>({});
 
 const availableAccounts = computed(() => {
     return accounts.value.filter(acc => acc.status === 'completed');
+});
+
+// Fetch scan types on component mount
+onMounted(() => {
+    fetchScanTypes();
 });
 
 watch(() => props.modelValue, (newValue) => {
@@ -132,37 +137,23 @@ const handleCancel = () => {
                                     <div>
                                         <InputLabel value="Scan Types" />
                                         <div class="mt-2 space-y-2">
-                                            <label class="flex items-center">
+                                            <label
+                                                v-for="scanType in scanTypes"
+                                                :key="scanType.value"
+                                                class="flex items-center"
+                                            >
                                                 <input
                                                     type="checkbox"
                                                     v-model="selectedScanTypes"
-                                                    value="ec2"
+                                                    :value="scanType.value"
                                                     class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
                                                 />
-                                                <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">EC2</span>
-                                            </label>
-                                            <label class="flex items-center">
-                                                <input
-                                                    type="checkbox"
-                                                    v-model="selectedScanTypes"
-                                                    value="iam"
-                                                    class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
-                                                />
-                                                <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">IAM</span>
-                                            </label>
-                                            <label class="flex items-center">
-                                                <input
-                                                    type="checkbox"
-                                                    v-model="selectedScanTypes"
-                                                    value="s3"
-                                                    class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
-                                                />
-                                                <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">S3</span>
+                                                <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">{{ scanType.label }}</span>
                                             </label>
                                         </div>
                                         <InputError :message="errors.scan_types?.[0]" class="mt-2" />
                                         <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                            Select one or more scan types. EC2 scans will be processed per region.
+                                            Select one or more scan types. EC2 and RDS scans will be processed per region.
                                         </p>
                                     </div>
                                 </div>

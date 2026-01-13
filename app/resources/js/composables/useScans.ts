@@ -9,6 +9,7 @@ export interface Scan {
     awsAccountId: string;
     awsAccountName: string;
     status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+    scanTypes: string[];
     findingsCount: number;
     createdAt: string;
     startedAt?: string;
@@ -44,7 +45,13 @@ export interface ScanResultsResponse {
     offset: number;
 }
 
+export interface ScanType {
+    value: string;
+    label: string;
+}
+
 const scans = ref<Scan[]>([]);
+const scanTypes = ref<ScanType[]>([]);
 const loading = ref(false);
 const error = ref<string | null>(null);
 const pollingIntervals = ref<Map<string, number>>(new Map());
@@ -52,9 +59,28 @@ const pollingIntervals = ref<Map<string, number>>(new Map());
 export function useScans() {
     const { currentOrganization } = useOrganizations();
 
+    const fetchScanTypes = async () => {
+        try {
+            const response = await axios.get('/api/scan-types');
+            scanTypes.value = response.data.scanTypes;
+        } catch (err: any) {
+            console.error('Error fetching scan types:', err);
+            // Fallback to default scan types if API fails
+            scanTypes.value = [
+                { value: 'ec2', label: 'EC2' },
+                { value: 'iam', label: 'IAM' },
+                { value: 's3', label: 'S3' },
+                { value: 'rds', label: 'RDS' },
+            ];
+        }
+    };
+
     const fetchScans = async (orgId?: string, filters?: {
         awsAccountId?: string;
         status?: string;
+        scanType?: string;
+        sortBy?: string;
+        sortOrder?: 'asc' | 'desc';
         limit?: number;
         offset?: number;
     }) => {
@@ -71,6 +97,9 @@ export function useScans() {
             const params = new URLSearchParams();
             if (filters?.awsAccountId) params.append('aws_account_id', filters.awsAccountId);
             if (filters?.status) params.append('status', filters.status);
+            if (filters?.scanType) params.append('scan_type', filters.scanType);
+            if (filters?.sortBy) params.append('sort_by', filters.sortBy);
+            if (filters?.sortOrder) params.append('sort_order', filters.sortOrder);
             if (filters?.limit) params.append('limit', filters.limit.toString());
             if (filters?.offset) params.append('offset', filters.offset.toString());
 
@@ -218,8 +247,10 @@ export function useScans() {
 
     return {
         scans: computed(() => scans.value),
+        scanTypes: computed(() => scanTypes.value),
         loading: computed(() => loading.value),
         error: computed(() => error.value),
+        fetchScanTypes,
         fetchScans,
         createScan,
         getScan,
