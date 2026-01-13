@@ -36,22 +36,22 @@ class ScansController extends Controller
             ->firstOrFail();
 
         $query = Scan::with('awsAccount')
-            ->where('organization_id', $organization->id);
+            ->where('scans.organization_id', $organization->id);
 
         // Filter by AWS account
         if ($request->has('aws_account_id')) {
-            $query->where('aws_account_id', $request->input('aws_account_id'));
+            $query->where('scans.aws_account_id', $request->input('aws_account_id'));
         }
 
         // Filter by status
         if ($request->has('status')) {
-            $query->where('status', $request->input('status'));
+            $query->where('scans.status', $request->input('status'));
         }
 
         // Filter by scan type
         if ($request->has('scan_type')) {
             $scanType = $request->input('scan_type');
-            $query->whereJsonContains('scan_types', $scanType);
+            $query->whereJsonContains('scans.scan_types', $scanType);
         }
 
         // Sorting
@@ -65,38 +65,58 @@ class ScansController extends Controller
 
         // Handle different sort fields
         $needsCollectionSort = false;
+        $needsJoin = false;
         switch ($sortBy) {
             case 'started':
-                $query->orderBy('started_at', $sortOrder);
+                $query->orderBy('scans.started_at', $sortOrder);
                 break;
             case 'account':
+                // For account sorting, we need to join but get count first
+                $needsJoin = true;
                 $query->join('aws_accounts', 'scans.aws_account_id', '=', 'aws_accounts.id')
                     ->orderBy('aws_accounts.name', $sortOrder)
                     ->select('scans.*');
                 break;
             case 'status':
-                $query->orderBy('status', $sortOrder);
+                $query->orderBy('scans.status', $sortOrder);
                 break;
             case 'findings':
                 // For findings count, we need to sort after fetching
                 $needsCollectionSort = true;
-                $query->orderBy('created_at', $sortOrder);
+                $query->orderBy('scans.created_at', $sortOrder);
                 break;
             case 'types':
                 // For types, we'll sort by the first scan type alphabetically
                 $needsCollectionSort = true;
-                $query->orderBy('created_at', $sortOrder);
+                $query->orderBy('scans.created_at', $sortOrder);
                 break;
             default:
-                $query->orderBy('created_at', $sortOrder);
+                $query->orderBy('scans.created_at', $sortOrder);
         }
 
         // Pagination
         $limit = min($request->input('limit', 20), 100);
         $offset = max($request->input('offset', 0), 0);
 
-        // Get total count before pagination
-        $total = $query->count();
+        // Get total count before join to avoid ambiguous column errors
+        // Clone the query before join to get accurate count
+        if ($needsJoin) {
+            $countQuery = Scan::where('scans.organization_id', $organization->id);
+            // Apply same filters to count query
+            if ($request->has('aws_account_id')) {
+                $countQuery->where('scans.aws_account_id', $request->input('aws_account_id'));
+            }
+            if ($request->has('status')) {
+                $countQuery->where('scans.status', $request->input('status'));
+            }
+            if ($request->has('scan_type')) {
+                $scanType = $request->input('scan_type');
+                $countQuery->whereJsonContains('scans.scan_types', $scanType);
+            }
+            $total = $countQuery->count();
+        } else {
+            $total = $query->count();
+        }
 
         // For collection-based sorting, we need to get all results first
         if ($needsCollectionSort) {
