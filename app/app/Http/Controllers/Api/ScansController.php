@@ -8,11 +8,22 @@ use App\Models\AwsAccount;
 use App\Models\Organization;
 use App\Models\Scan;
 use App\Models\ScanResult;
+use App\Services\ScanTypesService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class ScansController extends Controller
 {
+    /**
+     * Get available scan types
+     */
+    public function scanTypes(): JsonResponse
+    {
+        return response()->json([
+            'scanTypes' => ScanTypesService::getAllWithLabels(),
+        ]);
+    }
+
     /**
      * List scans for an organization
      */
@@ -37,27 +48,99 @@ class ScansController extends Controller
             $query->where('status', $request->input('status'));
         }
 
+        // Filter by scan type
+        if ($request->has('scan_type')) {
+            $scanType = $request->input('scan_type');
+            $query->whereJsonContains('scan_types', $scanType);
+        }
+
+        // Sorting
+        $sortBy = $request->input('sort_by', 'created_at');
+        $sortOrder = $request->input('sort_order', 'desc');
+        
+        // Validate sort order
+        if (!in_array($sortOrder, ['asc', 'desc'])) {
+            $sortOrder = 'desc';
+        }
+
+        // Handle different sort fields
+        $needsCollectionSort = false;
+        switch ($sortBy) {
+            case 'started':
+                $query->orderBy('started_at', $sortOrder);
+                break;
+            case 'account':
+                $query->join('aws_accounts', 'scans.aws_account_id', '=', 'aws_accounts.id')
+                    ->orderBy('aws_accounts.name', $sortOrder)
+                    ->select('scans.*');
+                break;
+            case 'status':
+                $query->orderBy('status', $sortOrder);
+                break;
+            case 'findings':
+                // For findings count, we need to sort after fetching
+                $needsCollectionSort = true;
+                $query->orderBy('created_at', $sortOrder);
+                break;
+            case 'types':
+                // For types, we'll sort by the first scan type alphabetically
+                $needsCollectionSort = true;
+                $query->orderBy('created_at', $sortOrder);
+                break;
+            default:
+                $query->orderBy('created_at', $sortOrder);
+        }
+
         // Pagination
         $limit = min($request->input('limit', 20), 100);
         $offset = max($request->input('offset', 0), 0);
 
+        // Get total count before pagination
         $total = $query->count();
-        $scans = $query->orderBy('created_at', 'desc')
-            ->offset($offset)
-            ->limit($limit)
-            ->get()
-            ->map(function ($scan) {
-                return [
-                    'id' => $scan->id,
-                    'awsAccountId' => $scan->aws_account_id,
-                    'awsAccountName' => $scan->awsAccount->name ?? 'Unknown',
-                    'status' => $scan->status,
-                    'findingsCount' => $scan->results()->count(),
-                    'createdAt' => $scan->created_at->toISOString(),
-                    'startedAt' => $scan->started_at?->toISOString(),
-                    'completedAt' => $scan->completed_at?->toISOString(),
-                ];
-            });
+
+        // For collection-based sorting, we need to get all results first
+        if ($needsCollectionSort) {
+            $allScans = $query->get();
+        } else {
+            $allScans = $query->offset($offset)
+                ->limit($limit)
+                ->get();
+        }
+
+        $scans = $allScans->map(function ($scan) {
+            return [
+                'id' => $scan->id,
+                'awsAccountId' => $scan->aws_account_id,
+                'awsAccountName' => $scan->awsAccount->name ?? 'Unknown',
+                'status' => $scan->status,
+                'scanTypes' => $scan->scan_types ?? [],
+                'findingsCount' => $scan->results()->count(),
+                'createdAt' => $scan->created_at->toISOString(),
+                'startedAt' => $scan->started_at?->toISOString(),
+                'completedAt' => $scan->completed_at?->toISOString(),
+            ];
+        });
+
+        // Handle sorting by findings or types in the collection
+        if ($sortBy === 'findings') {
+            $scans = $scans->sortBy(function ($scan) {
+                return $scan['findingsCount'];
+            }, SORT_REGULAR, $sortOrder === 'desc');
+        } elseif ($sortBy === 'types') {
+            $scans = $scans->sortBy(function ($scan) {
+                $types = $scan['scanTypes'] ?? [];
+                if (empty($types)) {
+                    return '';
+                }
+                sort($types);
+                return $types[0];
+            }, SORT_REGULAR, $sortOrder === 'desc');
+        }
+
+        // Apply pagination for collection-sorted results
+        if ($needsCollectionSort) {
+            $scans = $scans->slice($offset, $limit)->values();
+        }
 
         return response()->json([
             'scans' => $scans,

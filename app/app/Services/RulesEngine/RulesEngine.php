@@ -77,7 +77,7 @@ class RulesEngine
         try {
             // Execute the main task API call
             $params = [];
-            if ($service === 'ec2' && $region) {
+            if (in_array($service, ['ec2', 'rds']) && $region) {
                 $result = $scanner->executeApiCall($taskName, $credentials, $params, $region);
             } else {
                 $result = $scanner->executeApiCall($taskName, $credentials, $params);
@@ -153,7 +153,7 @@ class RulesEngine
                             'resource_id' => $resourceId,
                         ]);
                         
-                        if ($service === 'ec2' && $region) {
+                        if (in_array($service, ['ec2', 'rds']) && $region) {
                             $actionResult = $scanner->executeApiCall($actionName, $credentials, $actionParams, $region);
                         } elseif ($service === 's3') {
                             // S3 handles region automatically for bucket-specific calls

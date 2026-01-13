@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\ScanTypesService;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -70,18 +71,22 @@ class Scan extends Model
     }
 
     /**
-     * Check if all EC2 region scans are complete and mark scan as completed if so
+     * Check if all region-based scans (EC2, RDS) are complete and mark scan as completed if so
      */
-    public function checkAndMarkEc2ScanComplete(): void
+    public function checkAndMarkRegionBasedScanComplete(): void
     {
-        // Only check if scan includes EC2 and is still running
-        if (!$this->hasScanType('ec2') || $this->status !== 'running') {
+        // Get region-based services in this scan
+        $regionBasedServices = ScanTypesService::getRegionBased();
+        $scanRegionServices = array_filter($this->scan_types ?? [], fn($type) => ScanTypesService::isRegionBased($type));
+        
+        // Only check if scan includes region-based services and is still running
+        if (empty($scanRegionServices) || $this->status !== 'running') {
             return;
         }
 
-        // Get all unique regions that have scan_details for EC2
+        // Get all unique regions that have scan_details for any region-based service
         $processedRegions = $this->details()
-            ->where('service', 'ec2')
+            ->whereIn('service', $regionBasedServices)
             ->distinct()
             ->pluck('region')
             ->filter()
@@ -107,21 +112,23 @@ class Scan extends Model
         }
 
         if ($shouldComplete) {
-            // Evaluate findings for non-EC2 scan types if they exist
-            $nonEc2Types = array_filter($this->scan_types ?? [], fn($type) => $type !== 'ec2');
+            // Evaluate findings for non-region-based scan types present in this scan
+            $nonRegionTypes = array_values(
+                array_intersect($this->scan_types ?? [], ScanTypesService::getNonRegionBased())
+            );
             
-            if (!empty($nonEc2Types)) {
+            if (!empty($nonRegionTypes)) {
                 try {
                     $conditionEvaluator = new \App\Services\RulesEngine\ConditionEvaluator();
                     $findingsEngine = new \App\Services\RulesEngine\FindingsEngine($conditionEvaluator);
                     $findingsEngine->evaluateScan($this, ['basic']);
                     
-                    \Illuminate\Support\Facades\Log::info('Findings evaluation completed for non-EC2 types', [
+                    \Illuminate\Support\Facades\Log::info('Findings evaluation completed for non-region-based types', [
                         'scan_id' => $this->id,
-                        'types' => $nonEc2Types,
+                        'types' => $nonRegionTypes,
                     ]);
                 } catch (\Exception $e) {
-                    \Illuminate\Support\Facades\Log::error('Findings evaluation failed for non-EC2 types', [
+                    \Illuminate\Support\Facades\Log::error('Findings evaluation failed for non-region-based types', [
                         'scan_id' => $this->id,
                         'error' => $e->getMessage(),
                     ]);
@@ -142,7 +149,7 @@ class Scan extends Model
                 ]);
             }
 
-            \Illuminate\Support\Facades\Log::info('EC2 scan marked as completed', [
+            \Illuminate\Support\Facades\Log::info('Region-based scan marked as completed', [
                 'scan_id' => $this->id,
                 'processed_regions' => $processedRegions,
                 'expected_regions' => $expectedRegions,

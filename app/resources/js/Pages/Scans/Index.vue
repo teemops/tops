@@ -10,7 +10,7 @@ import PrimaryButton from '@/Components/PrimaryButton.vue';
 import Dropdown from '@/Components/Dropdown.vue';
 import NewScanModal from './NewScanModal.vue';
 
-const { scans, loading, error, fetchScans, startPolling, stopPolling, cancelScan } = useScans();
+const { scans, loading, error, fetchScans, startPolling, stopPolling, cancelScan, scanTypes, fetchScanTypes } = useScans();
 const { accounts, fetchAccounts } = useAwsAccounts();
 const { currentOrganization } = useOrganizations();
 const { showSuccess, showError } = useNotifications();
@@ -18,6 +18,9 @@ const { showSuccess, showError } = useNotifications();
 const showNewScanModal = ref(false);
 const selectedAwsAccountId = ref<string>('');
 const selectedStatus = ref<string>('');
+const selectedScanType = ref<string>('');
+const sortBy = ref<string>('created_at');
+const sortOrder = ref<'asc' | 'desc'>('desc');
 
 // Load scans and accounts
 const loadData = async () => {
@@ -27,6 +30,9 @@ const loadData = async () => {
         await fetchScans(currentOrganization.value.org_id, {
             awsAccountId: selectedAwsAccountId.value || undefined,
             status: selectedStatus.value || undefined,
+            scanType: selectedScanType.value || undefined,
+            sortBy: sortBy.value,
+            sortOrder: sortOrder.value,
         });
         
         // Start polling for pending/running scans
@@ -39,6 +45,7 @@ const loadData = async () => {
 };
 
 onMounted(async () => {
+    await fetchScanTypes();
     await loadData();
 });
 
@@ -52,7 +59,7 @@ watch(() => currentOrganization.value?.org_id, async () => {
 });
 
 // Watch for filter changes
-watch([selectedAwsAccountId, selectedStatus], async () => {
+watch([selectedAwsAccountId, selectedStatus, selectedScanType, sortBy, sortOrder], async () => {
     await loadData();
 });
 
@@ -132,6 +139,31 @@ const formatDate = (dateString?: string) => {
 const clearFilters = () => {
     selectedAwsAccountId.value = '';
     selectedStatus.value = '';
+    selectedScanType.value = '';
+    sortBy.value = 'created_at';
+    sortOrder.value = 'desc';
+};
+
+const handleSort = (field: string) => {
+    if (sortBy.value === field) {
+        // Toggle sort order if clicking the same field
+        sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc';
+    } else {
+        // Set new sort field with default descending order
+        sortBy.value = field;
+        sortOrder.value = 'desc';
+    }
+};
+
+const formatScanTypes = (types: string[]) => {
+    if (!types || types.length === 0) return '—';
+    
+    const typeLabels = types.map(type => {
+        const scanType = scanTypes.value.find(st => st.value === type);
+        return scanType ? scanType.label : type.toUpperCase();
+    });
+    
+    return typeLabels.join(', ');
 };
 
 const availableAccounts = computed(() => {
@@ -163,7 +195,7 @@ const availableAccounts = computed(() => {
 
                 <!-- Filters -->
                 <div class="mb-6 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Account</label>
                             <select
@@ -192,6 +224,22 @@ const availableAccounts = computed(() => {
                                 <option value="completed">Completed</option>
                                 <option value="failed">Failed</option>
                                 <option value="cancelled">Cancelled</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Scan Type</label>
+                            <select
+                                v-model="selectedScanType"
+                                class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white text-sm"
+                            >
+                                <option value="">All types</option>
+                                <option
+                                    v-for="scanType in scanTypes"
+                                    :key="scanType.value"
+                                    :value="scanType.value"
+                                >
+                                    {{ scanType.label }}
+                                </option>
                             </select>
                         </div>
                         <div class="flex items-end">
@@ -241,10 +289,156 @@ const availableAccounts = computed(() => {
                     <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                         <thead class="bg-gray-50 dark:bg-gray-700">
                             <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Account</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Findings</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Started</th>
+                                <th 
+                                    @click="handleSort('account')"
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                                >
+                                    <div class="flex items-center space-x-1">
+                                        <span>Account</span>
+                                        <svg 
+                                            v-if="sortBy === 'account'"
+                                            class="h-4 w-4"
+                                            fill="none" 
+                                            stroke="currentColor" 
+                                            viewBox="0 0 24 24"
+                                        >
+                                            <path 
+                                                v-if="sortOrder === 'asc'"
+                                                stroke-linecap="round" 
+                                                stroke-linejoin="round" 
+                                                stroke-width="2" 
+                                                d="M5 15l7-7 7 7"
+                                            />
+                                            <path 
+                                                v-else
+                                                stroke-linecap="round" 
+                                                stroke-linejoin="round" 
+                                                stroke-width="2" 
+                                                d="M19 9l-7 7-7-7"
+                                            />
+                                        </svg>
+                                    </div>
+                                </th>
+                                <th 
+                                    @click="handleSort('status')"
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                                >
+                                    <div class="flex items-center space-x-1">
+                                        <span>Status</span>
+                                        <svg 
+                                            v-if="sortBy === 'status'"
+                                            class="h-4 w-4"
+                                            fill="none" 
+                                            stroke="currentColor" 
+                                            viewBox="0 0 24 24"
+                                        >
+                                            <path 
+                                                v-if="sortOrder === 'asc'"
+                                                stroke-linecap="round" 
+                                                stroke-linejoin="round" 
+                                                stroke-width="2" 
+                                                d="M5 15l7-7 7 7"
+                                            />
+                                            <path 
+                                                v-else
+                                                stroke-linecap="round" 
+                                                stroke-linejoin="round" 
+                                                stroke-width="2" 
+                                                d="M19 9l-7 7-7-7"
+                                            />
+                                        </svg>
+                                    </div>
+                                </th>
+                                <th 
+                                    @click="handleSort('types')"
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                                >
+                                    <div class="flex items-center space-x-1">
+                                        <span>Scan Types</span>
+                                        <svg 
+                                            v-if="sortBy === 'types'"
+                                            class="h-4 w-4"
+                                            fill="none" 
+                                            stroke="currentColor" 
+                                            viewBox="0 0 24 24"
+                                        >
+                                            <path 
+                                                v-if="sortOrder === 'asc'"
+                                                stroke-linecap="round" 
+                                                stroke-linejoin="round" 
+                                                stroke-width="2" 
+                                                d="M5 15l7-7 7 7"
+                                            />
+                                            <path 
+                                                v-else
+                                                stroke-linecap="round" 
+                                                stroke-linejoin="round" 
+                                                stroke-width="2" 
+                                                d="M19 9l-7 7-7-7"
+                                            />
+                                        </svg>
+                                    </div>
+                                </th>
+                                <th 
+                                    @click="handleSort('findings')"
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                                >
+                                    <div class="flex items-center space-x-1">
+                                        <span>Findings</span>
+                                        <svg 
+                                            v-if="sortBy === 'findings'"
+                                            class="h-4 w-4"
+                                            fill="none" 
+                                            stroke="currentColor" 
+                                            viewBox="0 0 24 24"
+                                        >
+                                            <path 
+                                                v-if="sortOrder === 'asc'"
+                                                stroke-linecap="round" 
+                                                stroke-linejoin="round" 
+                                                stroke-width="2" 
+                                                d="M5 15l7-7 7 7"
+                                            />
+                                            <path 
+                                                v-else
+                                                stroke-linecap="round" 
+                                                stroke-linejoin="round" 
+                                                stroke-width="2" 
+                                                d="M19 9l-7 7-7-7"
+                                            />
+                                        </svg>
+                                    </div>
+                                </th>
+                                <th 
+                                    @click="handleSort('started')"
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                                >
+                                    <div class="flex items-center space-x-1">
+                                        <span>Started</span>
+                                        <svg 
+                                            v-if="sortBy === 'started'"
+                                            class="h-4 w-4"
+                                            fill="none" 
+                                            stroke="currentColor" 
+                                            viewBox="0 0 24 24"
+                                        >
+                                            <path 
+                                                v-if="sortOrder === 'asc'"
+                                                stroke-linecap="round" 
+                                                stroke-linejoin="round" 
+                                                stroke-width="2" 
+                                                d="M5 15l7-7 7 7"
+                                            />
+                                            <path 
+                                                v-else
+                                                stroke-linecap="round" 
+                                                stroke-linejoin="round" 
+                                                stroke-width="2" 
+                                                d="M19 9l-7 7-7-7"
+                                            />
+                                        </svg>
+                                    </div>
+                                </th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
                             </tr>
                         </thead>
@@ -276,6 +470,9 @@ const availableAccounts = computed(() => {
                                         </svg>
                                         {{ getStatusBadge(scan.status).text }}
                                     </span>
+                                </td>
+                                <td class="px-6 py-4 text-sm text-gray-900 dark:text-white">
+                                    {{ formatScanTypes(scan.scanTypes || []) }}
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                                     <span v-if="scan.status === 'completed'">{{ scan.findingsCount }}</span>

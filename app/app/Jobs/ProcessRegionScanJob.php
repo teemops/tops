@@ -32,7 +32,8 @@ class ProcessRegionScanJob implements ShouldQueue
      */
     public function __construct(
         public Scan $scan,
-        public string $region
+        public string $region,
+        public string $service = 'ec2'
     ) {
         //
     }
@@ -74,17 +75,19 @@ class ProcessRegionScanJob implements ShouldQueue
             $scanner = new AwsSecurityScanner($roleArn, $externalId, $this->region);
             $credentials = $scanner->assumeRole();
 
-            // Phase 1: Execute EC2 scan using RulesEngine (data collection)
+            // Phase 1: Execute region-based scan using RulesEngine (data collection)
             $rulesEngine = new RulesEngine();
             try {
-                $rulesEngine->executeScan($this->scan, 'ec2', $credentials, $this->region);
-                Log::info('EC2 region scan data collection completed', [
+                $rulesEngine->executeScan($this->scan, $this->service, $credentials, $this->region);
+                Log::info("{$this->service} region scan data collection completed", [
                     'scan_id' => $this->scan->id,
+                    'service' => $this->service,
                     'region' => $this->region,
                 ]);
             } catch (\Exception $e) {
-                Log::error('EC2 region scan data collection failed', [
+                Log::error("{$this->service} region scan data collection failed", [
                     'scan_id' => $this->scan->id,
+                    'service' => $this->service,
                     'region' => $this->region,
                     'error' => $e->getMessage(),
                 ]);
@@ -99,13 +102,15 @@ class ProcessRegionScanJob implements ShouldQueue
                 // Evaluate findings using basic ruleset
                 $findingsEngine->evaluateScan($this->scan, ['basic']);
                 
-                Log::info('EC2 region scan findings evaluation completed', [
+                Log::info("{$this->service} region scan findings evaluation completed", [
                     'scan_id' => $this->scan->id,
+                    'service' => $this->service,
                     'region' => $this->region,
                 ]);
             } catch (\Exception $e) {
-                Log::error('EC2 region scan findings evaluation failed', [
+                Log::error("{$this->service} region scan findings evaluation failed", [
                     'scan_id' => $this->scan->id,
+                    'service' => $this->service,
                     'region' => $this->region,
                     'error' => $e->getMessage(),
                 ]);
@@ -114,12 +119,13 @@ class ProcessRegionScanJob implements ShouldQueue
 
             Log::info('Region scan completed', [
                 'scan_id' => $this->scan->id,
+                'service' => $this->service,
                 'region' => $this->region,
             ]);
 
             // Check if all regions are complete and mark scan as completed if so
             $this->scan->refresh();
-            $this->scan->checkAndMarkEc2ScanComplete();
+            $this->scan->checkAndMarkRegionBasedScanComplete();
         } catch (\Exception $e) {
             Log::error('Region scan failed', [
                 'scan_id' => $this->scan->id,
