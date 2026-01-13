@@ -40,6 +40,33 @@
             "condition": "count($data['AttachedPolicies'] ?? []) > 0"
         },
         {
+            "rule": "tops-iam-005",
+            "name": "IAM User Not in Groups",
+            "service": "iam",
+            "method": "listGroupsForUser",
+            "description": "IAM Users should be assigned to IAM Groups for better policy management",
+            "severity": "medium",
+            "condition": "count($data['Groups'] ?? []) == 0"
+        },
+        {
+            "rule": "tops-iam-006",
+            "name": "IAM Role Inline Policies",
+            "service": "iam",
+            "method": "listRolePolicies",
+            "description": "IAM Roles should not have inline IAM policies. Instead use managed policies or customer managed policies.",
+            "severity": "medium",
+            "condition": "count($data['PolicyNames'] ?? []) > 0"
+        },
+        {
+            "rule": "tops-iam-007",
+            "name": "IAM Role Attached Policies",
+            "service": "iam",
+            "method": "listAttachedRolePolicies",
+            "description": "IAM Roles should use least privilege policies. Review attached policies for excessive permissions.",
+            "severity": "low",
+            "condition": "count($data['AttachedPolicies'] ?? []) > 5"
+        },
+        {
             "rule": "tops-s3-001",
             "name": "S3 Public Access Block",
             "service": "s3",
@@ -67,6 +94,24 @@
             "condition": "($data['Status'] ?? '') != 'Enabled'"
         },
         {
+            "rule": "tops-s3-004",
+            "name": "S3 Bucket ACL Public Access",
+            "service": "s3",
+            "method": "getBucketAcl",
+            "description": "S3 Bucket ACL should not allow public access",
+            "severity": "high",
+            "condition": "isset($data['Grants']) && count(array_filter($data['Grants'] ?? [], function($grant) { return ($grant['Grantee']['Type'] ?? '') == 'Group' && ($grant['Grantee']['URI'] ?? '') == 'http://acs.amazonaws.com/groups/global/AllUsers'; })) > 0"
+        },
+        {
+            "rule": "tops-ec2-001",
+            "name": "EC2 Security Group Allows Public Access",
+            "service": "ec2",
+            "method": "describeSecurityGroups",
+            "description": "EC2 Security Groups should not allow inbound traffic from 0.0.0.0/0",
+            "severity": "high",
+            "condition": "isset($data['SecurityGroups']) && count(array_filter($data['SecurityGroups'] ?? [], function($sg) { return isset($sg['IpPermissions']) && count(array_filter($sg['IpPermissions'] ?? [], function($perm) { return isset($perm['IpRanges']) && count(array_filter($perm['IpRanges'] ?? [], function($range) { return ($range['CidrIp'] ?? '') == '0.0.0.0/0'; })) > 0; })) > 0; })) > 0"
+        },
+        {
             "rule": "tops-ec2-002",
             "name": "EC2 Public IP Address",
             "service": "ec2",
@@ -76,6 +121,15 @@
             "condition": "isset($data['PublicIpAddress'])"
         },
         {
+            "rule": "tops-ec2-003",
+            "name": "EC2 Default VPC in Use",
+            "service": "ec2",
+            "method": "describeVpcs",
+            "description": "Default VPCs should not be used in production environments",
+            "severity": "low",
+            "condition": "isset($data['Vpcs']) && count(array_filter($data['Vpcs'] ?? [], function($vpc) { return ($vpc['IsDefault'] ?? false) == true; })) > 0"
+        },
+        {
             "rule": "tops-ec2-004",
             "name": "Subnet Default Public IP",
             "service": "ec2",
@@ -83,6 +137,69 @@
             "description": "EC2 Subnets should not have Public IP enabled by default",
             "severity": "medium",
             "condition": "($data['Subnets'][0]['MapPublicIpOnLaunch'] ?? false) == true"
+        },
+        {
+            "rule": "tops-ec2-005",
+            "name": "EC2 Instance Without Termination Protection",
+            "service": "ec2",
+            "method": "describeInstances",
+            "description": "EC2 Instances should have termination protection enabled for production workloads",
+            "severity": "low",
+            "condition": "isset($data['DisableApiTermination']) && ($data['DisableApiTermination'] ?? false) == false"
+        },
+        {
+            "rule": "tops-rds-001",
+            "name": "RDS Instance Publicly Accessible",
+            "service": "rds",
+            "method": "describeDBInstances",
+            "description": "RDS Instances should not be publicly accessible",
+            "severity": "high",
+            "condition": "($data['PubliclyAccessible'] ?? false) == true"
+        },
+        {
+            "rule": "tops-rds-002",
+            "name": "RDS Instance Without Encryption",
+            "service": "rds",
+            "method": "describeDBInstances",
+            "description": "RDS Instances should have encryption enabled",
+            "severity": "high",
+            "condition": "($data['StorageEncrypted'] ?? false) == false"
+        },
+        {
+            "rule": "tops-rds-003",
+            "name": "RDS Instance Without Multi-AZ",
+            "service": "rds",
+            "method": "describeDBInstances",
+            "description": "RDS Instances should have Multi-AZ enabled for production workloads",
+            "severity": "medium",
+            "condition": "($data['MultiAZ'] ?? false) == false"
+        },
+        {
+            "rule": "tops-rds-004",
+            "name": "RDS Instance Without Backup Retention",
+            "service": "rds",
+            "method": "describeDBInstances",
+            "description": "RDS Instances should have automated backups enabled with appropriate retention period",
+            "severity": "medium",
+            "condition": "($data['BackupRetentionPeriod'] ?? 0) < 7"
+        },
+        {
+            "rule": "tops-rds-005",
+            "name": "RDS Cluster Without Encryption",
+            "service": "rds",
+            "method": "describeDBClusters",
+            "description": "RDS Clusters should have encryption enabled",
+            "severity": "high",
+            "condition": "($data['StorageEncrypted'] ?? false) == false"
+        },
+        {
+            "rule": "tops-rds-006",
+            "name": "RDS Cluster Without Backup Retention",
+            "service": "rds",
+            "method": "describeDBClusters",
+            "description": "RDS Clusters should have automated backups enabled with appropriate retention period",
+            "severity": "medium",
+            "condition": "($data['BackupRetentionPeriod'] ?? 0) < 7"
         }
     ]
 }
