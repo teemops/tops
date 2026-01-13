@@ -10,7 +10,7 @@ import PrimaryButton from '@/Components/PrimaryButton.vue';
 import Dropdown from '@/Components/Dropdown.vue';
 import NewScanModal from './NewScanModal.vue';
 
-const { scans, loading, error, fetchScans, startPolling, stopPolling, cancelScan, scanTypes, fetchScanTypes } = useScans();
+const { scans, loading, error, fetchScans, startPolling, stopPolling, cancelScan, scanTypes, fetchScanTypes, pagination } = useScans();
 const { accounts, fetchAccounts } = useAwsAccounts();
 const { currentOrganization } = useOrganizations();
 const { showSuccess, showError } = useNotifications();
@@ -19,20 +19,25 @@ const showNewScanModal = ref(false);
 const selectedAwsAccountId = ref<string>('');
 const selectedStatus = ref<string>('');
 const selectedScanType = ref<string>('');
-const sortBy = ref<string>('created_at');
+const sortBy = ref<string>('started');
 const sortOrder = ref<'asc' | 'desc'>('desc');
+const currentPage = ref<number>(1);
+const pageSize = ref<number>(20);
 
 // Load scans and accounts
 const loadData = async () => {
     if (currentOrganization.value?.org_id) {
         stopPolling(); // Stop any existing polling
         await fetchAccounts();
+        const offset = (currentPage.value - 1) * pageSize.value;
         await fetchScans(currentOrganization.value.org_id, {
             awsAccountId: selectedAwsAccountId.value || undefined,
             status: selectedStatus.value || undefined,
             scanType: selectedScanType.value || undefined,
             sortBy: sortBy.value,
             sortOrder: sortOrder.value,
+            limit: pageSize.value,
+            offset: offset,
         });
         
         // Start polling for pending/running scans
@@ -58,8 +63,14 @@ watch(() => currentOrganization.value?.org_id, async () => {
     await loadData();
 });
 
-// Watch for filter changes
+// Watch for filter changes - reset to page 1 when filters change
 watch([selectedAwsAccountId, selectedStatus, selectedScanType, sortBy, sortOrder], async () => {
+    currentPage.value = 1;
+    await loadData();
+});
+
+// Watch for page changes
+watch(currentPage, async () => {
     await loadData();
 });
 
@@ -140,9 +151,58 @@ const clearFilters = () => {
     selectedAwsAccountId.value = '';
     selectedStatus.value = '';
     selectedScanType.value = '';
-    sortBy.value = 'created_at';
+    sortBy.value = 'started';
     sortOrder.value = 'desc';
+    currentPage.value = 1;
 };
+
+const goToPage = (page: number) => {
+    const totalPages = Math.ceil((pagination.value.total || 0) / pageSize.value);
+    if (page >= 1 && page <= totalPages) {
+        currentPage.value = page;
+    }
+};
+
+const totalPages = computed(() => {
+    return Math.ceil((pagination.value.total || 0) / pageSize.value);
+});
+
+const getPageNumbers = computed(() => {
+    const pages: (number | string)[] = [];
+    const total = totalPages.value;
+    const current = currentPage.value;
+    
+    if (total <= 7) {
+        // Show all pages if 7 or fewer
+        for (let i = 1; i <= total; i++) {
+            pages.push(i);
+        }
+    } else {
+        // Show first page
+        pages.push(1);
+        
+        if (current > 3) {
+            pages.push('...');
+        }
+        
+        // Show pages around current
+        const start = Math.max(2, current - 1);
+        const end = Math.min(total - 1, current + 1);
+        
+        for (let i = start; i <= end; i++) {
+            pages.push(i);
+        }
+        
+        if (current < total - 2) {
+            pages.push('...');
+        }
+        
+        // Show last page
+        pages.push(total);
+    }
+    
+    return pages;
+});
 
 const handleSort = (field: string) => {
     if (sortBy.value === field) {
@@ -501,6 +561,79 @@ const availableAccounts = computed(() => {
                             </tr>
                         </tbody>
                     </table>
+                    
+                    <!-- Pagination -->
+                    <div v-if="pagination.total > 0" class="bg-white dark:bg-gray-800 px-4 py-3 flex items-center justify-between border-t border-gray-200 dark:border-gray-700 sm:px-6">
+                        <div class="flex-1 flex justify-between sm:hidden">
+                            <button
+                                @click="goToPage(currentPage - 1)"
+                                :disabled="currentPage === 1"
+                                class="relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                Previous
+                            </button>
+                            <button
+                                @click="goToPage(currentPage + 1)"
+                                :disabled="currentPage >= totalPages"
+                                class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                Next
+                            </button>
+                        </div>
+                        <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                            <div>
+                                <p class="text-sm text-gray-700 dark:text-gray-300">
+                                    Showing
+                                    <span class="font-medium">{{ (currentPage - 1) * pageSize + 1 }}</span>
+                                    to
+                                    <span class="font-medium">{{ Math.min(currentPage * pageSize, pagination.total) }}</span>
+                                    of
+                                    <span class="font-medium">{{ pagination.total }}</span>
+                                    results
+                                </p>
+                            </div>
+                            <div>
+                                <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                                    <button
+                                        @click="goToPage(currentPage - 1)"
+                                        :disabled="currentPage === 1"
+                                        class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        <span class="sr-only">Previous</span>
+                                        <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
+                                        </svg>
+                                    </button>
+                                    <button
+                                        v-for="(page, index) in getPageNumbers"
+                                        :key="index"
+                                        @click="typeof page === 'number' ? goToPage(page) : null"
+                                        :disabled="typeof page !== 'number'"
+                                        :class="[
+                                            'relative inline-flex items-center px-4 py-2 border text-sm font-medium',
+                                            typeof page === 'number'
+                                                ? page === currentPage
+                                                    ? 'z-10 bg-blue-50 dark:bg-blue-900/30 border-blue-500 dark:border-blue-500 text-blue-600 dark:text-blue-400'
+                                                    : 'bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 cursor-pointer'
+                                                : 'bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 cursor-default'
+                                        ]"
+                                    >
+                                        {{ page }}
+                                    </button>
+                                    <button
+                                        @click="goToPage(currentPage + 1)"
+                                        :disabled="currentPage >= totalPages"
+                                        class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        <span class="sr-only">Next</span>
+                                        <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                                        </svg>
+                                    </button>
+                                </nav>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

@@ -55,6 +55,12 @@ const scanTypes = ref<ScanType[]>([]);
 const loading = ref(false);
 const error = ref<string | null>(null);
 const pollingIntervals = ref<Map<string, number>>(new Map());
+const pagination = ref({
+    total: 0,
+    limit: 20,
+    offset: 0,
+    currentPage: 1,
+});
 
 export function useScans() {
     const { currentOrganization } = useOrganizations();
@@ -107,6 +113,14 @@ export function useScans() {
             const url = `/api/organizations/${orgIdToUse}/scans${queryString ? `?${queryString}` : ''}`;
             const response = await axios.get(url);
             scans.value = response.data.scans;
+            
+            // Update pagination info
+            pagination.value = {
+                total: response.data.total || 0,
+                limit: response.data.limit || 20,
+                offset: response.data.offset || 0,
+                currentPage: Math.floor((response.data.offset || 0) / (response.data.limit || 20)) + 1,
+            };
         } catch (err: any) {
             error.value = err.response?.data?.message || err.response?.data?.error || 'Failed to load scans';
             console.error('Error fetching scans:', err);
@@ -248,6 +262,7 @@ export function useScans() {
     return {
         scans: computed(() => scans.value),
         scanTypes: computed(() => scanTypes.value),
+        pagination: computed(() => pagination.value),
         loading: computed(() => loading.value),
         error: computed(() => error.value),
         fetchScanTypes,
