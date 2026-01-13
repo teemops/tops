@@ -67,6 +67,33 @@
             "condition": "count($data['AttachedPolicies'] ?? []) > 5"
         },
         {
+            "rule": "tops-iam-008",
+            "name": "IAM User with AdministratorAccess Policy",
+            "service": "iam",
+            "method": "listAttachedUserPolicies",
+            "description": "IAM Users should not have AdministratorAccess policy attached. Use least privilege principles and assign users to groups with appropriate permissions.",
+            "severity": "high",
+            "condition": "isset($data['AttachedPolicies']) && count(array_filter($data['AttachedPolicies'] ?? [], function($policy) { return ($policy['PolicyName'] ?? '') == 'AdministratorAccess' || strpos($policy['PolicyArn'] ?? '', 'AdministratorAccess') !== false; })) > 0"
+        },
+        {
+            "rule": "tops-iam-009",
+            "name": "IAM User with FullAccess Managed Policy",
+            "service": "iam",
+            "method": "listAttachedUserPolicies",
+            "description": "IAM Users should not have managed policies ending in 'FullAccess' attached. These policies grant full access to AWS services and violate least privilege principles.",
+            "severity": "high",
+            "condition": "isset($data['AttachedPolicies']) && count(array_filter($data['AttachedPolicies'] ?? [], function($policy) { $policyName = $policy['PolicyName'] ?? ''; return strlen($policyName) >= 11 && substr($policyName, -11) === 'FullAccess'; })) > 0"
+        },
+        {
+            "rule": "tops-iam-010",
+            "name": "IAM User with Wildcard Policies",
+            "service": "iam",
+            "method": "listUserPolicies",
+            "description": "IAM Users with inline policies may contain wildcard permissions (*) that grant full access to one or more services. Inline policies should be reviewed for least privilege compliance.",
+            "severity": "high",
+            "condition": "count($data['PolicyNames'] ?? []) > 0"
+        },
+        {
             "rule": "tops-s3-001",
             "name": "S3 Public Access Block",
             "service": "s3",
