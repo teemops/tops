@@ -54,8 +54,8 @@ class ScansController extends Controller
             $query->whereJsonContains('scans.scan_types', $scanType);
         }
 
-        // Sorting
-        $sortBy = $request->input('sort_by', 'created_at');
+        // Sorting - default to started_at desc
+        $sortBy = $request->input('sort_by', 'started');
         $sortOrder = $request->input('sort_order', 'desc');
         
         // Validate sort order
@@ -91,7 +91,9 @@ class ScansController extends Controller
                 $query->orderBy('scans.created_at', $sortOrder);
                 break;
             default:
-                $query->orderBy('scans.created_at', $sortOrder);
+                // Default to started_at, fallback to created_at if started_at is null
+                $query->orderBy('scans.started_at', $sortOrder)
+                    ->orderBy('scans.created_at', $sortOrder);
         }
 
         // Pagination
@@ -152,8 +154,9 @@ class ScansController extends Controller
                 if (empty($types)) {
                     return '';
                 }
-                sort($types);
-                return $types[0];
+                $sortedTypes = $types;
+                sort($sortedTypes);
+                return $sortedTypes[0];
             }, SORT_REGULAR, $sortOrder === 'desc');
         }
 
