@@ -1370,3 +1370,605 @@ Once you provide answers to the questions above, I can:
 
 Would you like me to proceed with the recommended defaults, or do you have specific preferences for any of the questions above?
 
+---
+
+## AWS Security Scanning Feature Roadmap
+
+### Research Summary
+
+This roadmap is based on comprehensive research of:
+- Top 20 AWS services requiring security auditing
+- Top 100 AWS security misconfigurations and vulnerabilities
+- CIS AWS Foundations Benchmark v5.0.0 (40 controls)
+- AWS Security Hub CSPM controls (500+ controls)
+- Prowler security checks (584+ checks across 85 AWS services)
+- Industry best practices from 2025-2026
+
+### Current Implementation Status
+
+**Currently Implemented Services:**
+- ✅ S3 (4 checks)
+- ✅ IAM (10 checks)
+- ✅ EC2/VPC (5 checks)
+- ✅ RDS (6 checks)
+
+**Total Current Checks:** ~25 rules
+
+---
+
+### Top 20 AWS Services Requiring Security Auditing
+
+Prioritized by enterprise adoption and security impact:
+
+| Priority | Service | Description | Current Status |
+|----------|---------|-------------|----------------|
+| 1 | **IAM** | Identity and Access Management | ✅ Partial |
+| 2 | **S3** | Object Storage | ✅ Partial |
+| 3 | **EC2** | Compute Instances | ✅ Partial |
+| 4 | **VPC** | Network Security | ✅ Partial |
+| 5 | **RDS** | Relational Databases | ✅ Partial |
+| 6 | **CloudTrail** | Audit Logging | ❌ Not Implemented |
+| 7 | **Lambda** | Serverless Functions | ❌ Not Implemented |
+| 8 | **KMS** | Key Management | ❌ Not Implemented |
+| 9 | **Secrets Manager** | Secrets Storage | ❌ Not Implemented |
+| 10 | **CloudWatch** | Monitoring & Logging | ❌ Not Implemented |
+| 11 | **EKS/ECS** | Container Services | ❌ Not Implemented |
+| 12 | **SNS/SQS** | Messaging Services | ❌ Not Implemented |
+| 13 | **API Gateway** | API Management | ❌ Not Implemented |
+| 14 | **CloudFront** | CDN & Edge Security | ❌ Not Implemented |
+| 15 | **ELB/ALB** | Load Balancers | ❌ Not Implemented |
+| 16 | **DynamoDB** | NoSQL Database | ❌ Not Implemented |
+| 17 | **Route 53** | DNS Security | ❌ Not Implemented |
+| 18 | **ACM** | Certificate Management | ❌ Not Implemented |
+| 19 | **Config** | Configuration Compliance | ❌ Not Implemented |
+| 20 | **GuardDuty** | Threat Detection | ❌ Not Implemented |
+
+---
+
+### Top 100 AWS Security Issues by Category
+
+#### Category 1: Identity & Access Management (IAM) - 20 Issues
+
+**HIGH SEVERITY:**
+1. Root account without MFA enabled
+2. Root account access keys exist
+3. IAM users without MFA
+4. IAM policies with wildcard (*:*) permissions
+5. IAM users with AdministratorAccess policy
+6. IAM users with console access but no MFA
+7. Inactive IAM users (90+ days)
+8. Access keys not rotated (90+ days)
+9. IAM password policy not compliant
+10. Cross-account IAM role trust relationships too permissive
+
+**MEDIUM SEVERITY:**
+11. IAM users with inline policies
+12. IAM groups with inline policies
+13. IAM roles with inline policies
+14. IAM users not in groups
+15. IAM policies attached directly to users
+16. IAM users with multiple access keys
+17. Console passwords not rotated (90+ days)
+18. IAM roles with excessive permissions
+19. Service-linked roles with overly permissive policies
+20. IAM Access Analyzer not enabled
+
+#### Category 2: Storage Security (S3, EBS, EFS) - 15 Issues
+
+**HIGH SEVERITY:**
+21. S3 buckets publicly accessible
+22. S3 buckets without encryption at rest
+23. S3 bucket policies allowing public access
+24. S3 buckets with ACL allowing AllUsers
+25. EBS volumes unencrypted
+26. EBS snapshots shared publicly
+
+**MEDIUM SEVERITY:**
+27. S3 buckets without versioning
+28. S3 buckets without logging enabled
+29. S3 buckets without lifecycle policies
+30. S3 Object Lock not enabled for compliance data
+31. EFS file systems unencrypted
+32. EFS without backup policy
+33. S3 buckets without MFA delete enabled
+34. S3 cross-region replication not enabled for DR
+35. S3 bucket keys not enabled for cost optimization
+
+#### Category 3: Network Security (VPC, Security Groups, NACLs) - 15 Issues
+
+**HIGH SEVERITY:**
+36. Security groups allowing 0.0.0.0/0 on SSH (22)
+37. Security groups allowing 0.0.0.0/0 on RDP (3389)
+38. Security groups allowing 0.0.0.0/0 on all ports
+39. Default VPC in use
+40. VPC flow logs not enabled
+41. Network ACLs allowing unrestricted inbound traffic
+
+**MEDIUM SEVERITY:**
+42. Security groups with unrestricted outbound rules
+43. Subnets auto-assign public IP enabled
+44. Missing NAT Gateway for private subnet internet access
+45. VPC endpoints not configured for AWS services
+46. Unused security groups
+47. Unused Elastic IP addresses
+48. VPC peering without proper route table configuration
+49. Transit Gateway attachments without encryption
+50. Network firewall not configured
+
+#### Category 4: Compute Security (EC2, Lambda, ECS/EKS) - 15 Issues
+
+**HIGH SEVERITY:**
+51. EC2 instances with public IP addresses
+52. EC2 instances with IMDSv1 enabled (SSRF vulnerable)
+53. Lambda functions with wildcard IAM permissions
+54. Lambda functions in public subnet
+55. EKS cluster endpoint publicly accessible
+56. ECS tasks running as root
+
+**MEDIUM SEVERITY:**
+57. EC2 instances without termination protection
+58. EC2 instances using default security group
+59. Lambda functions without VPC configuration
+60. Lambda environment variables with secrets in plaintext
+61. ECS tasks without logging enabled
+62. EKS cluster logging not enabled
+63. EC2 instances without detailed monitoring
+64. Auto Scaling groups without health checks
+65. Lambda functions with deprecated runtimes
+
+#### Category 5: Database Security (RDS, DynamoDB, ElastiCache) - 12 Issues
+
+**HIGH SEVERITY:**
+66. RDS instances publicly accessible
+67. RDS instances without encryption
+68. RDS snapshots shared publicly
+69. DynamoDB tables without encryption
+70. ElastiCache clusters without encryption in transit
+
+**MEDIUM SEVERITY:**
+71. RDS instances without Multi-AZ
+72. RDS automated backups disabled
+73. RDS instances with default parameter groups
+74. DynamoDB tables without point-in-time recovery
+75. ElastiCache without automatic failover
+76. RDS instances without enhanced monitoring
+77. Aurora clusters without deletion protection
+
+#### Category 6: Logging & Monitoring (CloudTrail, CloudWatch, Config) - 10 Issues
+
+**HIGH SEVERITY:**
+78. CloudTrail not enabled in all regions
+79. CloudTrail logs not encrypted
+80. CloudTrail log file validation disabled
+81. CloudWatch Log Groups without retention policy
+
+**MEDIUM SEVERITY:**
+82. CloudTrail not integrated with CloudWatch
+83. AWS Config not enabled
+84. GuardDuty not enabled
+85. Security Hub not enabled
+86. CloudWatch alarms not configured for root login
+87. VPC flow logs not sent to CloudWatch
+
+#### Category 7: Encryption & Key Management (KMS, ACM, Secrets Manager) - 8 Issues
+
+**HIGH SEVERITY:**
+88. KMS keys without rotation enabled
+89. KMS keys scheduled for deletion
+90. Secrets Manager secrets without rotation
+91. ACM certificates expiring soon (<30 days)
+
+**MEDIUM SEVERITY:**
+92. KMS keys with overly permissive policies
+93. Secrets Manager without VPC endpoint
+94. ACM certificates using RSA-1024
+95. Customer managed keys not used for sensitive data
+
+#### Category 8: Application Security (API Gateway, CloudFront, ELB) - 5 Issues
+
+**HIGH SEVERITY:**
+96. API Gateway without authentication
+97. CloudFront without WAF
+98. ALB without HTTPS listener
+99. ALB using outdated TLS policy
+
+**MEDIUM SEVERITY:**
+100. CloudFront without access logging
+
+---
+
+### Prioritized Feature Roadmap
+
+Features are prioritized by:
+1. **Security Impact** - How critical is this for AWS account security
+2. **Implementation Simplicity** - How easy is it to implement
+
+#### Stage 1: Foundation Security (HIGH Impact, SIMPLE Implementation)
+*Timeline: Sprint 1-2*
+
+**1.1 CloudTrail Security Scanner** ⭐ HIGHEST PRIORITY
+- [ ] Check CloudTrail enabled in all regions
+- [ ] Check CloudTrail log encryption enabled
+- [ ] Check CloudTrail log file validation enabled
+- [ ] Check CloudTrail integrated with CloudWatch
+- [ ] Check CloudTrail S3 bucket not publicly accessible
+- [ ] Check CloudTrail logging for global services
+
+*Impact: Critical for audit compliance and incident response*
+*Complexity: Low - Simple API calls*
+
+**1.2 Enhanced IAM Scanner**
+- [ ] Root account MFA check
+- [ ] Root account access keys check
+- [ ] IAM password policy compliance
+- [ ] Access key rotation check (90+ days)
+- [ ] Inactive user detection (90+ days)
+- [ ] Console password rotation check
+- [ ] IAM Access Analyzer enabled check
+- [ ] Support policy analysis for wildcards
+
+*Impact: Prevents account compromise*
+*Complexity: Low - Extends existing scanner*
+
+**1.3 Enhanced S3 Scanner**
+- [ ] S3 bucket logging enabled check
+- [ ] S3 bucket lifecycle policy check
+- [ ] S3 MFA delete enabled check
+- [ ] S3 object lock check for compliance data
+- [ ] S3 cross-region replication check
+
+*Impact: Data protection and compliance*
+*Complexity: Low - Extends existing scanner*
+
+**1.4 EBS Volume Scanner**
+- [ ] EBS volume encryption check
+- [ ] EBS snapshot encryption check
+- [ ] EBS snapshot public sharing check
+- [ ] Unused EBS volumes detection
+
+*Impact: Data protection*
+*Complexity: Low - Simple API calls*
+
+#### Stage 2: Network & Compute Security (HIGH Impact, MEDIUM Implementation)
+*Timeline: Sprint 3-4*
+
+**2.1 Enhanced VPC/Network Scanner**
+- [ ] VPC flow logs enabled check
+- [ ] Security group SSH/RDP from 0.0.0.0/0 check
+- [ ] Security group all ports from 0.0.0.0/0 check
+- [ ] Network ACL unrestricted access check
+- [ ] Unused security groups detection
+- [ ] Unused Elastic IPs detection
+- [ ] VPC endpoint configuration check
+- [ ] NAT Gateway configuration check
+
+*Impact: Prevents unauthorized access*
+*Complexity: Medium - Multiple related checks*
+
+**2.2 EC2 Security Scanner Enhancements**
+- [ ] IMDSv2 enforcement check
+- [ ] EC2 detailed monitoring check
+- [ ] EC2 using default security group check
+- [ ] Auto Scaling health check configuration
+
+*Impact: Prevents SSRF and improves visibility*
+*Complexity: Medium - Requires instance metadata checks*
+
+**2.3 Lambda Security Scanner** ⭐ NEW SERVICE
+- [ ] Lambda IAM role permissions check
+- [ ] Lambda VPC configuration check
+- [ ] Lambda environment variable secrets check
+- [ ] Lambda deprecated runtime check
+- [ ] Lambda public URL check
+- [ ] Lambda reserved concurrency check
+
+*Impact: Serverless security*
+*Complexity: Medium - New scanner implementation*
+
+**2.4 RDS/Database Scanner Enhancements**
+- [ ] RDS enhanced monitoring check
+- [ ] RDS deletion protection check
+- [ ] RDS using default parameter group check
+- [ ] RDS Performance Insights check
+- [ ] RDS minor version auto-upgrade check
+
+*Impact: Database reliability and security*
+*Complexity: Low - Extends existing scanner*
+
+#### Stage 3: Encryption & Secrets (HIGH Impact, MEDIUM Implementation)
+*Timeline: Sprint 5-6*
+
+**3.1 KMS Security Scanner** ⭐ NEW SERVICE
+- [ ] KMS key rotation enabled check
+- [ ] KMS key deletion scheduled check
+- [ ] KMS key policy permissions check
+- [ ] Customer managed keys usage check
+- [ ] KMS key cross-account access check
+
+*Impact: Encryption key management*
+*Complexity: Medium - New scanner implementation*
+
+**3.2 Secrets Manager Scanner** ⭐ NEW SERVICE
+- [ ] Secrets rotation enabled check
+- [ ] Secrets rotation schedule check
+- [ ] Secrets without recent access check
+- [ ] Secrets with overly permissive policies
+- [ ] VPC endpoint for Secrets Manager check
+
+*Impact: Credentials security*
+*Complexity: Medium - New scanner implementation*
+
+**3.3 ACM Certificate Scanner** ⭐ NEW SERVICE
+- [ ] Certificate expiration check (<30, <7 days)
+- [ ] Certificate validation method check
+- [ ] Certificate key algorithm check (RSA-2048+)
+- [ ] Unused certificates detection
+- [ ] Certificate transparency logging check
+
+*Impact: TLS/SSL security*
+*Complexity: Low - Simple API calls*
+
+#### Stage 4: Security Services Integration (MEDIUM Impact, MEDIUM Implementation)
+*Timeline: Sprint 7-8*
+
+**4.1 GuardDuty Scanner** ⭐ NEW SERVICE
+- [ ] GuardDuty enabled in all regions check
+- [ ] GuardDuty findings severity check
+- [ ] GuardDuty S3 protection enabled check
+- [ ] GuardDuty EKS protection enabled check
+- [ ] GuardDuty malware protection enabled check
+
+*Impact: Threat detection coverage*
+*Complexity: Medium - New scanner implementation*
+
+**4.2 AWS Config Scanner** ⭐ NEW SERVICE
+- [ ] Config enabled in all regions check
+- [ ] Config recording all resource types check
+- [ ] Config delivery channel configured check
+- [ ] Config rules compliance status check
+
+*Impact: Configuration compliance*
+*Complexity: Medium - New scanner implementation*
+
+**4.3 Security Hub Scanner** ⭐ NEW SERVICE
+- [ ] Security Hub enabled check
+- [ ] Security Hub standards enabled check
+- [ ] Security Hub findings integration check
+- [ ] Security Hub cross-region aggregation check
+
+*Impact: Centralized security view*
+*Complexity: Medium - New scanner implementation*
+
+**4.4 CloudWatch Security Scanner** ⭐ NEW SERVICE
+- [ ] CloudWatch log groups retention check
+- [ ] CloudWatch log groups encryption check
+- [ ] Root login alarm configured check
+- [ ] Unauthorized API call alarm check
+- [ ] IAM policy change alarm check
+- [ ] Security group change alarm check
+
+*Impact: Monitoring and alerting*
+*Complexity: Medium - New scanner implementation*
+
+#### Stage 5: Application & Container Security (MEDIUM Impact, HIGH Implementation)
+*Timeline: Sprint 9-12*
+
+**5.1 API Gateway Scanner** ⭐ NEW SERVICE
+- [ ] API Gateway authentication check
+- [ ] API Gateway authorization check
+- [ ] API Gateway WAF integration check
+- [ ] API Gateway logging enabled check
+- [ ] API Gateway throttling configured check
+- [ ] API Gateway TLS version check
+
+*Impact: API security*
+*Complexity: High - Complex API structure*
+
+**5.2 CloudFront Scanner** ⭐ NEW SERVICE
+- [ ] CloudFront HTTPS enforcement check
+- [ ] CloudFront TLS version check
+- [ ] CloudFront WAF integration check
+- [ ] CloudFront access logging check
+- [ ] CloudFront origin access control check
+- [ ] CloudFront geo-restriction check
+
+*Impact: CDN and edge security*
+*Complexity: High - Multiple configuration points*
+
+**5.3 ELB/ALB Scanner** ⭐ NEW SERVICE
+- [ ] ALB HTTPS listener check
+- [ ] ALB TLS security policy check
+- [ ] ALB access logging check
+- [ ] ALB deletion protection check
+- [ ] ALB WAF integration check
+- [ ] NLB cross-zone load balancing check
+
+*Impact: Load balancer security*
+*Complexity: Medium - Multiple load balancer types*
+
+**5.4 EKS Security Scanner** ⭐ NEW SERVICE
+- [ ] EKS cluster endpoint private check
+- [ ] EKS cluster logging enabled check
+- [ ] EKS cluster secrets encryption check
+- [ ] EKS node group configuration check
+- [ ] EKS pod security policy check
+
+*Impact: Kubernetes security*
+*Complexity: Very High - Complex K8s integration*
+
+**5.5 ECS Security Scanner** ⭐ NEW SERVICE
+- [ ] ECS task definition secrets check
+- [ ] ECS task execution role check
+- [ ] ECS cluster Container Insights check
+- [ ] ECS service network configuration check
+- [ ] Fargate platform version check
+
+*Impact: Container security*
+*Complexity: High - Multiple ECS configurations*
+
+#### Stage 6: Messaging & Data Services (MEDIUM Impact, MEDIUM Implementation)
+*Timeline: Sprint 13-14*
+
+**6.1 SNS Security Scanner** ⭐ NEW SERVICE
+- [ ] SNS topic encryption check
+- [ ] SNS topic policy cross-account check
+- [ ] SNS topic HTTPS delivery check
+- [ ] SNS subscription protocol check
+
+*Impact: Messaging security*
+*Complexity: Medium - New scanner implementation*
+
+**6.2 SQS Security Scanner** ⭐ NEW SERVICE
+- [ ] SQS queue encryption check
+- [ ] SQS queue policy cross-account check
+- [ ] SQS dead letter queue configured check
+- [ ] SQS VPC endpoint check
+
+*Impact: Queue security*
+*Complexity: Medium - New scanner implementation*
+
+**6.3 DynamoDB Scanner** ⭐ NEW SERVICE
+- [ ] DynamoDB encryption check
+- [ ] DynamoDB point-in-time recovery check
+- [ ] DynamoDB deletion protection check
+- [ ] DynamoDB auto-scaling check
+- [ ] DynamoDB stream encryption check
+
+*Impact: NoSQL database security*
+*Complexity: Medium - New scanner implementation*
+
+**6.4 ElastiCache Scanner** ⭐ NEW SERVICE
+- [ ] ElastiCache encryption at rest check
+- [ ] ElastiCache encryption in transit check
+- [ ] ElastiCache automatic failover check
+- [ ] ElastiCache auth token check (Redis)
+- [ ] ElastiCache automatic backup check
+
+*Impact: Cache security*
+*Complexity: Medium - New scanner implementation*
+
+#### Stage 7: Advanced Features (MEDIUM Impact, HIGH Implementation)
+*Timeline: Sprint 15-18*
+
+**7.1 EFS Security Scanner** ⭐ NEW SERVICE
+- [ ] EFS encryption at rest check
+- [ ] EFS encryption in transit check
+- [ ] EFS backup policy check
+- [ ] EFS lifecycle policy check
+- [ ] EFS access point configuration check
+
+*Impact: File storage security*
+*Complexity: Medium - New scanner implementation*
+
+**7.2 ECR Security Scanner** ⭐ NEW SERVICE
+- [ ] ECR image scanning enabled check
+- [ ] ECR encryption check
+- [ ] ECR lifecycle policy check
+- [ ] ECR repository policy check
+- [ ] ECR immutable tags check
+
+*Impact: Container image security*
+*Complexity: Medium - New scanner implementation*
+
+**7.3 Route 53 Scanner** ⭐ NEW SERVICE
+- [ ] Route 53 DNSSEC enabled check
+- [ ] Route 53 health check configuration
+- [ ] Route 53 query logging check
+- [ ] Route 53 Resolver DNSSEC validation check
+
+*Impact: DNS security*
+*Complexity: High - DNS configuration complexity*
+
+**7.4 Cognito Scanner** ⭐ NEW SERVICE
+- [ ] Cognito MFA configuration check
+- [ ] Cognito password policy check
+- [ ] Cognito advanced security check
+- [ ] Cognito unauthenticated identities check
+- [ ] Cognito WAF integration check
+
+*Impact: Authentication security*
+*Complexity: High - Multiple Cognito features*
+
+**7.5 Redshift Scanner** ⭐ NEW SERVICE
+- [ ] Redshift encryption check
+- [ ] Redshift public accessibility check
+- [ ] Redshift SSL enforcement check
+- [ ] Redshift audit logging check
+- [ ] Redshift automated snapshot check
+
+*Impact: Data warehouse security*
+*Complexity: Medium - Similar to RDS*
+
+---
+
+### CIS AWS Foundations Benchmark v5.0 Alignment
+
+The roadmap aligns with CIS AWS Foundations Benchmark v5.0.0 sections:
+
+| CIS Section | Coverage | Implementation Stage |
+|-------------|----------|---------------------|
+| 1. IAM | Partial → Full | Stage 1 |
+| 2. Storage | Partial → Full | Stage 1 |
+| 3. Logging | Not Started | Stage 1 |
+| 4. Monitoring | Not Started | Stage 4 |
+| 5. Networking | Partial → Full | Stage 2 |
+
+---
+
+### Implementation Summary
+
+| Stage | New Services | New Checks | Estimated Sprints |
+|-------|--------------|------------|-------------------|
+| Stage 1 | 1 (CloudTrail) | ~25 | 2 |
+| Stage 2 | 1 (Lambda) | ~25 | 2 |
+| Stage 3 | 3 (KMS, Secrets, ACM) | ~20 | 2 |
+| Stage 4 | 4 (GuardDuty, Config, Security Hub, CloudWatch) | ~25 | 2 |
+| Stage 5 | 5 (API GW, CloudFront, ELB, EKS, ECS) | ~30 | 4 |
+| Stage 6 | 4 (SNS, SQS, DynamoDB, ElastiCache) | ~20 | 2 |
+| Stage 7 | 5 (EFS, ECR, Route53, Cognito, Redshift) | ~25 | 4 |
+
+**Total New Checks:** ~170 additional security checks
+**Total Services:** 24 AWS services (from current 4)
+**Total Timeline:** ~18 sprints
+
+---
+
+### Quick Wins (Can be implemented immediately)
+
+These checks can be added to existing scanners with minimal effort:
+
+1. **IAM Scanner Additions** (1-2 days each):
+   - Root account MFA check
+   - Password policy check
+   - Access key age check
+   - Inactive user check
+
+2. **S3 Scanner Additions** (1 day each):
+   - Bucket logging check
+   - Lifecycle policy check
+
+3. **EC2 Scanner Additions** (1 day each):
+   - IMDSv2 check
+   - Detailed monitoring check
+
+4. **RDS Scanner Additions** (1 day each):
+   - Deletion protection check
+   - Enhanced monitoring check
+
+---
+
+### Architecture Considerations
+
+For the new scanners, follow the existing pattern:
+
+1. **Create Scanner Class**: `app/Services/Scanners/{Service}Scanner.php`
+2. **Create Tasks File**: `app/rules/tasks/{service}/tasks.json`
+3. **Add Rules**: `app/rules/rulesets/basic.json`
+4. **Register Scanner**: Update `ScanTypesService.php`
+
+Each new scanner should:
+- Use AWS SDK v3 PHP
+- Follow the existing task/action pattern
+- Support regional and global resources appropriately
+- Include proper error handling for missing permissions
+
