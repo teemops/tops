@@ -69,7 +69,7 @@ Once PHP 8.2+ and Composer are installed:
 
 ```bash
 cd /home/ben/dev/saas/app
-./setup-laravel.sh
+./install-deps.sh
 ```
 
 This will:
