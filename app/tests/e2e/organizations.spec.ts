@@ -1,10 +1,30 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, request } from '@playwright/test';
 import { AuthHelper } from './helpers/auth';
 import { OrganizationHelper } from './helpers/organizations';
 
 test.describe('Organizations Feature', () => {
     let authHelper: AuthHelper;
     let orgHelper: OrganizationHelper;
+
+    // Clear rate limiter before all tests in this file
+    test.beforeAll(async () => {
+        const baseURL = process.env.PLAYWRIGHT_TEST_BASE_URL || 'http://localhost:8000';
+        const requestContext = await request.newContext({ baseURL });
+        
+        try {
+            await requestContext.post('/api/test/clear-rate-limiter', {
+                data: { email: 'test@auditaws.cloud' },
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                },
+            });
+        } catch (error) {
+            console.warn('[Organizations Tests] Could not clear rate limiter:', error);
+        }
+        
+        await requestContext.dispose();
+    });
 
     test.beforeEach(async ({ page }) => {
         authHelper = new AuthHelper(page);
