@@ -51,10 +51,37 @@ export class AuthHelper {
     }
 
     /**
+     * Clear the rate limiter for an email address
+     * This prevents "Too many failed login attempts" errors during testing
+     */
+    async clearRateLimiter(email: string): Promise<void> {
+        try {
+            const response = await this.page.request.post('http://localhost:8000/api/test/clear-rate-limiter', {
+                data: { email },
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                },
+            });
+            
+            if (!response.ok()) {
+                console.warn(`[Auth] Failed to clear rate limiter: ${response.status()}`);
+            }
+        } catch (error) {
+            // Silently ignore - rate limiter clearing is best effort
+            console.warn('[Auth] Could not clear rate limiter:', error);
+        }
+    }
+
+    /**
      * Login with email and password
      */
     async login(email: string = 'test@auditaws.cloud', password: string = 'password'): Promise<void> {
         await this.debugLog('Starting login');
+        
+        // Clear rate limiter before attempting login to prevent throttling during tests
+        await this.clearRateLimiter(email);
+        
         await this.page.goto('/login');
         // Wait for page to load and inputs to be visible
         await this.page.waitForSelector('input#email', { state: 'visible' });
@@ -65,36 +92,11 @@ export class AuthHelper {
         await this.page.fill('input#email', email);
         await this.page.fill('input#password', password);
         
-        // Wait for Inertia form submission - Inertia makes a POST request
-        const [response] = await Promise.all([
-            this.page.waitForResponse(
-                response => {
-                    const url = response.url();
-                    const method = response.request().method();
-                    return (url.includes('/login') || url.endsWith('/login')) && method === 'POST';
-                },
-                { timeout: 10000 }
-            ),
-            // Click submit button
-            this.page.locator('button:has-text("Sign in")').or(this.page.locator('button[type="submit"]')).click(),
-        ]);
+        // Click submit button and wait for navigation
+        // Don't wait for specific response - Inertia handles redirects client-side
+        await this.page.locator('button:has-text("Sign in")').or(this.page.locator('button[type="submit"]')).click();
         
-        // Check response status - successful login should return 200 or 302
-        const status = response.status();
-        if (status !== 200 && status !== 302) {
-            // Wait a moment for error messages to appear
-            await this.page.waitForTimeout(500);
-            // Check for validation errors on the page
-            const errorElement = this.page.locator('.text-red-600, .text-red-400, [role="alert"], .InputError').first();
-            const errorMessage = await errorElement.textContent().catch(() => null);
-            if (errorMessage) {
-                throw new Error(`Login failed: ${errorMessage.trim()}`);
-            }
-            throw new Error(`Login failed with status ${status}`);
-        }
-        
-        // Wait for navigation to dashboard
-        // Inertia does client-side navigation, so wait for either URL change or dashboard content
+        // Wait for navigation to dashboard or for error to appear
         try {
             await Promise.race([
                 this.page.waitForURL('**/dashboard', { timeout: 15000 }),
@@ -104,6 +106,8 @@ export class AuthHelper {
             // If navigation failed, check if we're still on login page (might have errors)
             const currentUrl = this.page.url();
             if (currentUrl.includes('/login')) {
+                // Wait a moment for error messages to render
+                await this.page.waitForTimeout(500);
                 const errorElement = this.page.locator('.text-red-600, .text-red-400, [role="alert"], .InputError').first();
                 const errorMessage = await errorElement.textContent().catch(() => null);
                 throw new Error(`Login failed - still on login page${errorMessage ? `: ${errorMessage.trim()}` : ''}`);

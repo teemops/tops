@@ -17,3 +17,13 @@ yarn-error.log
 /.idea
 /.vscode
 
+/tests/e2e/debug-*.png
+
+/tests/e2e/debug-*.log
+
+/tests/e2e/debug-*.trace
+/tests/e2e/**/*.webm
+/tests/e2e/**/*.mp4
+
+/test-results/
+/playwright-report/
