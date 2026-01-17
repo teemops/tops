@@ -12,7 +12,16 @@ echo "Check aws cli"
 #check if awscli is installed
 if ! [ -x "$(command -v aws)" ]; then
   echo 'awscli is not installed.' >&2
-  sudo apt-get update && sudo apt-get install -y awscli
+  #install aws cli v2
+  curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+  unzip awscliv2.zip
+  sudo ./aws/install
+  rm -f awscliv2.zip
+  rm -rf aws
+  #check if awscli is installed
+  if ! [ -x "$(command -v aws)" ]; then
+    echo 'awscli is not installed.' >&2
+  fi
 fi
 #install php8.3
 
@@ -20,7 +29,7 @@ echo "Check php"
 #check if php is installed
 if ! [ -x "$(command -v php)" ]; then
   echo 'php is not installed.' >&2
-  sudo apt-get install -y php8.3
+  sudo apt-get install -y php8.3 php8.3-cli php8.3-common php8.3-mysql php8.3-zip php8.3-gd php8.3-mbstring php8.3-curl php8.3-xml php8.3-bcmath
 fi
 #install node
 echo "Check nodejs"
@@ -35,8 +44,13 @@ echo "Check nginx"
 #check if nginx is installed
 if ! [ -x "$(command -v nginx)" ]; then
   echo 'nginx is not installed.' >&2
-  sudo apt-get install -y nginx
+  sudo apt-get install -y nginx php8.3-fpm
 fi
+#configure php-fpm
+echo "Configure php-fpm"
+sudo cp /home/ubuntu/files/php/php.ini /etc/php/8.3/fpm/php.ini
+sudo systemctl restart php8.3-fpm
+
 #configure nginx
 #copy nginx config file to /etc/nginx folders
 sudo cp /home/ubuntu/files/nginx/nginx.conf /etc/nginx/nginx.conf
@@ -63,6 +77,15 @@ echo "updating supervisor configuration"
 
 sudo cp -r /home/ubuntu/files/supervisor/* /etc/supervisor/conf.d/
 sudo supervisorctl reload
+
+# Install Composer
+echo "Installing Composer"
+if ! [ -x "$(command -v composer)" ]; then
+  echo 'Composer is not installed.' >&2
+  curl -sS https://getcomposer.org/installer | php
+  sudo mv composer.phar /usr/local/bin/composer
+  sudo chmod +x /usr/local/bin/composer
+fi
 
 #setup apps directory
 
