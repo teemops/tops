@@ -1,0 +1,151 @@
+{
+    "$schema": "tops/scan/tasks/schema.v1",
+    "name": "tasks.json",
+    "description": "Tasks for auditing AWS IAM resources",
+    "config": {
+        "service": "iam",
+        "start": "listUsers",
+        "defaults": {
+            "actions": {
+                "params": {
+                    "UserName": "$item['UserName']"
+                }
+            }
+        }
+    },
+    "tasks": [
+        {
+            "listUsers": {
+                "task": "listUsers",
+                "id": "user",
+                "key": "Name",
+                "description": "List all users",
+                "actions": [
+                    {
+                        "getUser": {
+                            "params": {
+                                "UserName": "$item['UserName']"
+                            }
+                        }
+                    },
+                    {
+                        "listMFADevices": {
+                            "params": {
+                                "UserName": "$item['UserName']"
+                            }
+                        }
+                    },
+                    "listAccessKeys",
+                    {
+                        "listUserPolicies": {
+                            "params": {
+                                "UserName": "$item['UserName']"
+                            }
+                        }
+                    },
+                    {
+                        "listGroupsForUser": {
+                            "params": {
+                                "UserName": "$item['UserName']"
+                            }
+                        }
+                    },
+                    {
+                        "listAttachedUserPolicies": {
+                            "params": {
+                                "UserName": "$item['UserName']"
+                            }
+                        }
+                    }
+                ],
+                "items": {
+                    "Users": [
+                        {
+                            "Name": "UserName",
+                            "Type": "String"
+                        },
+                        {
+                            "Name": "UserId",
+                            "Type": "String"
+                        },
+                        {
+                            "Name": "Arn",
+                            "Type": "String"
+                        },
+                        {
+                            "Name": "CreateDate",
+                            "Type": "Date"
+                        },
+                        {
+                            "Name": "PasswordLastUsed",
+                            "Type": "Date"
+                        },
+                        {
+                            "Name": "Path",
+                            "Type": "String"
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "listRoles": {
+                "task": "listRoles",
+                "id": "role",
+                "key": "RoleName",
+                "description": "List all roles",
+                "actions": [
+                    {
+                        "getRole": {
+                            "params": {
+                                "RoleName": "$item['RoleName']"
+                            }
+                        }
+                    },
+                    {
+                        "listRolePolicies": {
+                            "params": {
+                                "RoleName": "$item['RoleName']"
+                            }
+                        }
+                    },
+                    {
+                        "listAttachedRolePolicies": {
+                            "params": {
+                                "RoleName": "$item['RoleName']"
+                            }
+                        }
+                    }
+                ],
+                "items": {
+                    "Roles": [
+                        {
+                            "Name": "RoleName",
+                            "Type": "String"
+                        },
+                        {
+                            "Name": "RoleId",
+                            "Type": "String"
+                        },
+                        {
+                            "Name": "Arn",
+                            "Type": "String"
+                        },
+                        {
+                            "Name": "CreateDate",
+                            "Type": "Date"
+                        },
+                        {
+                            "Name": "Path",
+                            "Type": "String"
+                        },
+                        {
+                            "Name": "AssumeRolePolicyDocument",
+                            "Type": "String"
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+}

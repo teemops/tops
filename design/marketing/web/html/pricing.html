@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pricing - Teemops AWS Security Scanning</title>
+    <meta name="description" content="Simple, transparent pricing for AWS security scanning. Free tier available. Plans from $99/month. No credit card required to start.">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#2563eb',
+                        'primary-dark': '#1d4ed8',
+                        secondary: '#0f172a',
+                        accent: '#10b981',
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-white text-gray-900">
+    <!-- Navigation -->
+    <nav class="fixed w-full bg-white/95 backdrop-blur-sm border-b border-gray-100 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center">
+                    <a href="index.html" class="text-2xl font-bold text-primary">Teemops</a>
+                </div>
+                <div class="hidden md:flex items-center space-x-8">
+                    <a href="features.html" class="text-gray-600 hover:text-gray-900">Features</a>
+                    <a href="pricing.html" class="text-primary font-medium">Pricing</a>
+                    <a href="#" class="text-gray-600 hover:text-gray-900">Docs</a>
+                    <a href="#" class="text-gray-600 hover:text-gray-900">Login</a>
+                    <a href="#" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-dark transition">Start Free</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero -->
+    <section class="pt-32 pb-16 bg-gray-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <h1 class="text-4xl md:text-5xl font-bold mb-4">Simple Pricing. No Surprises.</h1>
+            <p class="text-xl text-gray-600 mb-8">Start free. Upgrade when you're ready. Cancel anytime.</p>
+            
+            <!-- Billing Toggle -->
+            <div class="flex items-center justify-center gap-4 mb-8">
+                <span class="text-gray-600">Monthly</span>
+                <button id="billing-toggle" class="relative w-14 h-7 bg-primary rounded-full transition" onclick="toggleBilling()">
+                    <span id="toggle-dot" class="absolute right-1 top-1 w-5 h-5 bg-white rounded-full transition-all"></span>
+                </button>
+                <span class="text-gray-600">Annual</span>
+                <span class="bg-accent/10 text-accent text-sm font-medium px-3 py-1 rounded-full">Save 20%</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Pricing Cards -->
+    <section class="py-16 -mt-8">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+                
+                <!-- Free Tier -->
+                <div class="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+                    <h3 class="text-lg font-semibold mb-2">Free</h3>
+                    <p class="text-gray-500 text-sm mb-4">Perfect for getting started</p>
+                    <div class="mb-6">
+                        <span class="text-4xl font-bold">$0</span>
+                        <span class="text-gray-500">/month</span>
+                    </div>
+                    <a href="#" class="block w-full text-center border border-gray-300 text-gray-700 px-4 py-3 rounded-lg font-medium hover:bg-gray-50 transition mb-6">
+                        Get Started Free
+                    </a>
+                    <ul class="space-y-3 text-sm">
+                        <li class="flex items-start gap-2">
+                            <svg class="w-5 h-5 text-accent flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span><strong>1</strong> AWS account</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <svg class="w-5 h-5 text-accent flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span>Weekly scans</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <svg class="w-5 h-5 text-accent flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span><strong>25+</strong> security checks</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <svg class="w-5 h-5 text-accent flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span>Email alerts</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <svg class="w-5 h-5 text-accent flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span>7-day history</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <svg class="w-5 h-5 text-accent flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span>Community support</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Starter -->
+                <div class="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+                    <h3 class="text-lg font-semibold mb-2">Starter</h3>
+                    <p class="text-gray-500 text-sm mb-4">For small teams and startups</p>
+                    <div class="mb-6">
+                        <span class="text-4xl font-bold" id="starter-price">$99</span>
+                        <span class="text-gray-500">/month</span>
+                    </div>
+                    <a href="#" class="block w-full text-center bg-primary text-white px-4 py-3 rounded-lg font-medium hover:bg-primary-dark transition mb-6">
+                        Start 14-Day Trial
+                    </a>
+                    <ul class="space-y-3 text-sm">
+                        <li class="flex items-start gap-2">
+                            <svg class="w-5 h-5 text-accent flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span>Up to <strong>3</strong> AWS accounts</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <svg class="w-5 h-5 text-accent flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span>Daily scans</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <svg class="w-5 h-5 text-accent flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span><strong>100+</strong> security checks</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <svg class="w-5 h-5 text-accent flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span>CIS Benchmark reports</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <svg class="w-5 h-5 text-accent flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span>Email + Slack alerts</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <svg class="w-5 h-5 text-accent flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span>30-day history</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <svg class="w-5 h-5 text-accent flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span>Email support</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Pro (Popular) -->
+                <div class="bg-white rounded-2xl border-2 border-primary p-6 shadow-lg relative">
+                    <div class="absolute -top-3 left-1/2 -translate-x-1/2">
+                        <span class="bg-primary text-white text-sm font-medium px-4 py-1 rounded-full">Most Popular</span>
+                    </div>
+                    <h3 class="text-lg font-semibold mb-2">Pro</h3>
+                    <p class="text-gray-500 text-sm mb-4">For growing companies</p>
+                    <div class="mb-6">
+                        <span class="text-4xl font-bold" id="pro-price">$299</span>
+                        <span class="text-gray-500">/month</span>
+                    </div>
+                    <a href="#" class="block w-full text-center bg-primary text-white px-4 py-3 rounded-lg font-medium hover:bg-primary-dark transition mb-6">
+                        Start 14-Day Trial
+                    </a>
+                    <p class="text-sm text-gray-500 mb-4">Everything in Starter, plus:</p>
+                    <ul class="space-y-3 text-sm">
+                        <li class="flex items-start gap-2">
+                            <svg class="w-5 h-5 text-accent flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span>Up to <strong>10</strong> AWS accounts</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <svg class="w-5 h-5 text-accent flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span>Hourly scan scheduling</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <svg class="w-5 h-5 text-accent flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span><strong>PCI-DSS</strong> reports</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <svg class="w-5 h-5 text-accent flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span><strong>SOC 2</strong> reports</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <svg class="w-5 h-5 text-accent flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span>API access</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <svg class="w-5 h-5 text-accent flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span>90-day history</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <svg class="w-5 h-5 text-accent flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span>Priority support</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Business -->
+                <div class="bg-gray-900 rounded-2xl p-6 text-white">
+                    <h3 class="text-lg font-semibold mb-2">Business</h3>
+                    <p class="text-gray-400 text-sm mb-4">For larger organizations</p>
+                    <div class="mb-6">
+                        <span class="text-4xl font-bold">Custom</span>
+                    </div>
+                    <a href="#" class="block w-full text-center bg-white text-gray-900 px-4 py-3 rounded-lg font-medium hover:bg-gray-100 transition mb-6">
+                        Contact Sales
+                    </a>
+                    <p class="text-sm text-gray-400 mb-4">Everything in Pro, plus:</p>
+                    <ul class="space-y-3 text-sm">
+                        <li class="flex items-start gap-2">
+                            <svg class="w-5 h-5 text-accent flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span><strong>Unlimited</strong> AWS accounts</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <svg class="w-5 h-5 text-accent flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span>Real-time continuous scanning</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <svg class="w-5 h-5 text-accent flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span>Custom compliance frameworks</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <svg class="w-5 h-5 text-accent flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span>SSO/SAML integration</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <svg class="w-5 h-5 text-accent flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span>Dedicated account manager</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <svg class="w-5 h-5 text-accent flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span>SLA guarantee</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <svg class="w-5 h-5 text-accent flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span>Phone support</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Feature Comparison Table -->
+    <section class="py-16 bg-gray-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 class="text-2xl font-bold text-center mb-8">Compare Plans</h2>
+            <div class="overflow-x-auto">
+                <table class="w-full bg-white rounded-xl shadow-sm">
+                    <thead>
+                        <tr class="border-b border-gray-200">
+                            <th class="text-left py-4 px-6 font-medium text-gray-500">Feature</th>
+                            <th class="text-center py-4 px-6 font-semibold">Free</th>
+                            <th class="text-center py-4 px-6 font-semibold">Starter</th>
+                            <th class="text-center py-4 px-6 font-semibold text-primary">Pro</th>
+                            <th class="text-center py-4 px-6 font-semibold">Business</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-sm">
+                        <tr class="border-b border-gray-100">
+                            <td class="py-4 px-6 font-medium">AWS Accounts</td>
+                            <td class="py-4 px-6 text-center">1</td>
+                            <td class="py-4 px-6 text-center">3</td>
+                            <td class="py-4 px-6 text-center">10</td>
+                            <td class="py-4 px-6 text-center">Unlimited</td>
+                        </tr>
+                        <tr class="border-b border-gray-100 bg-gray-50/50">
+                            <td class="py-4 px-6 font-medium">Scan Frequency</td>
+                            <td class="py-4 px-6 text-center">Weekly</td>
+                            <td class="py-4 px-6 text-center">Daily</td>
+                            <td class="py-4 px-6 text-center">Hourly</td>
+                            <td class="py-4 px-6 text-center">Real-time</td>
+                        </tr>
+                        <tr class="border-b border-gray-100">
+                            <td class="py-4 px-6 font-medium">Security Checks</td>
+                            <td class="py-4 px-6 text-center">25+</td>
+                            <td class="py-4 px-6 text-center">100+</td>
+                            <td class="py-4 px-6 text-center">100+</td>
+                            <td class="py-4 px-6 text-center">100+</td>
+                        </tr>
+                        <tr class="border-b border-gray-100 bg-gray-50/50">
+                            <td class="py-4 px-6 font-medium">CIS Benchmarks</td>
+                            <td class="py-4 px-6 text-center">Basic</td>
+                            <td class="py-4 px-6 text-center text-accent">✓</td>
+                            <td class="py-4 px-6 text-center text-accent">✓</td>
+                            <td class="py-4 px-6 text-center text-accent">✓</td>
+                        </tr>
+                        <tr class="border-b border-gray-100">
+                            <td class="py-4 px-6 font-medium">PCI-DSS Reports</td>
+                            <td class="py-4 px-6 text-center text-gray-300">—</td>
+                            <td class="py-4 px-6 text-center text-gray-300">—</td>
+                            <td class="py-4 px-6 text-center text-accent">✓</td>
+                            <td class="py-4 px-6 text-center text-accent">✓</td>
+                        </tr>
+                        <tr class="border-b border-gray-100 bg-gray-50/50">
+                            <td class="py-4 px-6 font-medium">SOC 2 Reports</td>
+                            <td class="py-4 px-6 text-center text-gray-300">—</td>
+                            <td class="py-4 px-6 text-center text-gray-300">—</td>
+                            <td class="py-4 px-6 text-center text-accent">✓</td>
+                            <td class="py-4 px-6 text-center text-accent">✓</td>
+                        </tr>
+                        <tr class="border-b border-gray-100">
+                            <td class="py-4 px-6 font-medium">Slack Integration</td>
+                            <td class="py-4 px-6 text-center text-gray-300">—</td>
+                            <td class="py-4 px-6 text-center text-accent">✓</td>
+                            <td class="py-4 px-6 text-center text-accent">✓</td>
+                            <td class="py-4 px-6 text-center text-accent">✓</td>
+                        </tr>
+                        <tr class="border-b border-gray-100 bg-gray-50/50">
+                            <td class="py-4 px-6 font-medium">API Access</td>
+                            <td class="py-4 px-6 text-center text-gray-300">—</td>
+                            <td class="py-4 px-6 text-center text-gray-300">—</td>
+                            <td class="py-4 px-6 text-center text-accent">✓</td>
+                            <td class="py-4 px-6 text-center text-accent">✓</td>
+                        </tr>
+                        <tr class="border-b border-gray-100">
+                            <td class="py-4 px-6 font-medium">Finding History</td>
+                            <td class="py-4 px-6 text-center">7 days</td>
+                            <td class="py-4 px-6 text-center">30 days</td>
+                            <td class="py-4 px-6 text-center">90 days</td>
+                            <td class="py-4 px-6 text-center">Unlimited</td>
+                        </tr>
+                        <tr class="border-b border-gray-100 bg-gray-50/50">
+                            <td class="py-4 px-6 font-medium">Team Members</td>
+                            <td class="py-4 px-6 text-center">1</td>
+                            <td class="py-4 px-6 text-center">5</td>
+                            <td class="py-4 px-6 text-center">15</td>
+                            <td class="py-4 px-6 text-center">Unlimited</td>
+                        </tr>
+                        <tr class="border-b border-gray-100">
+                            <td class="py-4 px-6 font-medium">SSO/SAML</td>
+                            <td class="py-4 px-6 text-center text-gray-300">—</td>
+                            <td class="py-4 px-6 text-center text-gray-300">—</td>
+                            <td class="py-4 px-6 text-center text-gray-300">—</td>
+                            <td class="py-4 px-6 text-center text-accent">✓</td>
+                        </tr>
+                        <tr>
+                            <td class="py-4 px-6 font-medium">Support</td>
+                            <td class="py-4 px-6 text-center">Community</td>
+                            <td class="py-4 px-6 text-center">Email</td>
+                            <td class="py-4 px-6 text-center">Priority</td>
+                            <td class="py-4 px-6 text-center">Dedicated</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <!-- FAQ Section -->
+    <section class="py-16">
+        <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 class="text-2xl font-bold text-center mb-8">Frequently Asked Questions</h2>
+            <div class="space-y-4">
+                <details class="bg-white rounded-lg border border-gray-200 p-4 group" open>
+                    <summary class="font-medium cursor-pointer flex justify-between items-center">
+                        Do I need a credit card to start?
+                        <svg class="w-5 h-5 transition group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </summary>
+                    <p class="mt-4 text-gray-600">
+                        No. The free tier requires no credit card. We only ask for payment when you upgrade to a paid plan.
+                    </p>
+                </details>
+                
+                <details class="bg-white rounded-lg border border-gray-200 p-4 group">
+                    <summary class="font-medium cursor-pointer flex justify-between items-center">
+                        Can I change plans anytime?
+                        <svg class="w-5 h-5 transition group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </summary>
+                    <p class="mt-4 text-gray-600">
+                        Yes. Upgrade, downgrade, or cancel at any time. Changes take effect immediately, and we prorate any differences.
+                    </p>
+                </details>
+                
+                <details class="bg-white rounded-lg border border-gray-200 p-4 group">
+                    <summary class="font-medium cursor-pointer flex justify-between items-center">
+                        What AWS permissions do you need?
+                        <svg class="w-5 h-5 transition group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </summary>
+                    <p class="mt-4 text-gray-600">
+                        We use a read-only IAM role. We never modify, delete, or create resources in your AWS account. See our Security page for details.
+                    </p>
+                </details>
+                
+                <details class="bg-white rounded-lg border border-gray-200 p-4 group">
+                    <summary class="font-medium cursor-pointer flex justify-between items-center">
+                        Is there a discount for startups or non-profits?
+                        <svg class="w-5 h-5 transition group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </summary>
+                    <p class="mt-4 text-gray-600">
+                        Yes. We offer 50% off for early-stage startups (under $1M funding) and registered non-profits. Contact us to apply.
+                    </p>
+                </details>
+                
+                <details class="bg-white rounded-lg border border-gray-200 p-4 group">
+                    <summary class="font-medium cursor-pointer flex justify-between items-center">
+                        Can I get a refund?
+                        <svg class="w-5 h-5 transition group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </summary>
+                    <p class="mt-4 text-gray-600">
+                        We offer a 14-day money-back guarantee on all paid plans. No questions asked.
+                    </p>
+                </details>
+            </div>
+        </div>
+    </section>
+
+    <!-- Enterprise CTA -->
+    <section class="py-16 bg-gray-900 text-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <h2 class="text-3xl font-bold mb-4">Need More?</h2>
+            <p class="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
+                For organizations with complex requirements, custom integrations, or regulatory needs—let's talk.
+            </p>
+            <div class="flex flex-wrap justify-center gap-4 text-sm text-gray-400 mb-8">
+                <span>• Unlimited AWS accounts</span>
+                <span>• Custom compliance frameworks</span>
+                <span>• Dedicated support</span>
+                <span>• Volume discounts</span>
+            </div>
+            <a href="#" class="inline-block bg-white text-gray-900 px-8 py-4 rounded-lg font-semibold hover:bg-gray-100 transition">
+                Contact Sales
+            </a>
+        </div>
+    </section>
+
+    <!-- Final CTA -->
+    <section class="py-16">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <h2 class="text-3xl font-bold mb-4">Start Securing Your AWS Today</h2>
+            <p class="text-xl text-gray-600 mb-8">No credit card required. Free tier available forever.</p>
+            <a href="#" class="inline-block bg-primary text-white px-8 py-4 rounded-lg font-semibold hover:bg-primary-dark transition">
+                Get Started Free
+            </a>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-gray-900 text-gray-400 py-16">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid md:grid-cols-4 gap-8 mb-12">
+                <div>
+                    <div class="text-2xl font-bold text-white mb-4">Teemops</div>
+                    <p class="text-sm">AWS security scanning made simple for growing tech companies.</p>
+                </div>
+                <div>
+                    <h4 class="font-semibold text-white mb-4">Product</h4>
+                    <ul class="space-y-2 text-sm">
+                        <li><a href="features.html" class="hover:text-white">Features</a></li>
+                        <li><a href="pricing.html" class="hover:text-white">Pricing</a></li>
+                        <li><a href="#" class="hover:text-white">Documentation</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="font-semibold text-white mb-4">Company</h4>
+                    <ul class="space-y-2 text-sm">
+                        <li><a href="#" class="hover:text-white">About</a></li>
+                        <li><a href="#" class="hover:text-white">Contact</a></li>
+                        <li><a href="#" class="hover:text-white">Security</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="font-semibold text-white mb-4">Legal</h4>
+                    <ul class="space-y-2 text-sm">
+                        <li><a href="#" class="hover:text-white">Privacy Policy</a></li>
+                        <li><a href="#" class="hover:text-white">Terms of Service</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="border-t border-gray-800 pt-8 text-center text-sm">
+                <p>&copy; 2026 Teemops. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        let isAnnual = true;
+        function toggleBilling() {
+            isAnnual = !isAnnual;
+            const toggle = document.getElementById('toggle-dot');
+            const starterPrice = document.getElementById('starter-price');
+            const proPrice = document.getElementById('pro-price');
+            
+            if (isAnnual) {
+                toggle.classList.remove('left-1');
+                toggle.classList.add('right-1');
+                starterPrice.textContent = '$79';
+                proPrice.textContent = '$249';
+            } else {
+                toggle.classList.remove('right-1');
+                toggle.classList.add('left-1');
+                starterPrice.textContent = '$99';
+                proPrice.textContent = '$299';
+            }
+        }
+    </script>
+</body>
+</html>

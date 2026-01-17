@@ -146,7 +146,7 @@ class ProcessSqsMessages extends Command
         }
 
         // Extract CloudFormation request details
-        $requestType = $cloudFormationMessage['RequestType'] ?? null; // Create or Delete
+        $requestType = $cloudFormationMessage['RequestType'] ?? null; // Create, Update, or Delete
         $responseUrl = $cloudFormationMessage['ResponseURL'] ?? null;
         $stackId = $cloudFormationMessage['StackId'] ?? null;
         $requestId = $cloudFormationMessage['RequestId'] ?? null;
@@ -176,6 +176,13 @@ class ProcessSqsMessages extends Command
         // Handle Create requests
         if ($requestType === 'Create') {
             $this->handleCreateRequest($roleArn, $uniqueId, $externalId, $responseUrl, $stackId, $requestId, $logicalResourceId, $physicalResourceId);
+            $this->deleteMessage($sqsClient, $queueUrl, $receiptHandle);
+            return;
+        }
+
+        // Handle Update requests
+        if ($requestType === 'Update') {
+            $this->handleUpdateRequest($roleArn, $uniqueId, $externalId, $responseUrl, $stackId, $requestId, $logicalResourceId, $physicalResourceId);
             $this->deleteMessage($sqsClient, $queueUrl, $receiptHandle);
             return;
         }
@@ -370,6 +377,101 @@ class ProcessSqsMessages extends Command
                 'unique_id' => $uniqueId,
                 'external_id' => $externalId,
                 'request_type' => 'Create',
+                'response_url' => $responseUrl,
+                'response' => $response,
+            ]);
+        }
+    }
+
+    /**
+     * Handle Update request from CloudFormation
+     */
+    private function handleUpdateRequest(?string $roleArn, ?string $uniqueId, ?string $externalId, string $responseUrl, string $stackId, string $requestId, ?string $logicalResourceId, ?string $physicalResourceId): void
+    {
+        // If we have the required fields, try to update the account
+        if ($roleArn && $uniqueId && $externalId) {
+            // Find account by unique_id and external_id
+            $account = AwsAccount::where('unique_id', $uniqueId)
+                ->where('external_id', $externalId)
+                ->first();
+
+            if ($account) {
+                // Check if the IAM Role ARN has changed
+                $currentRoleArn = $account->iam_role_arn;
+                
+                if ($currentRoleArn !== $roleArn) {
+                    // Extract AWS Account ID from Role ARN
+                    // Format: arn:aws:iam::123456789012:role/TeemOps
+                    preg_match('/arn:aws:iam::(\d+):role\/(.+)/', $roleArn, $matches);
+                    $awsAccountId = $matches[1] ?? null;
+
+                    if ($awsAccountId) {
+                        // Update the account with new IAM Role ARN and AWS Account ID
+                        $account->fill([
+                            'iam_role_arn' => $roleArn,
+                            'aws_account_id' => $awsAccountId,
+                        ]);
+                        $account->save();
+
+                        $this->info("AWS account {$account->id} updated with new IAM Role ARN");
+                        Log::info('AWS account IAM Role ARN updated via SQS message', [
+                            'account_id' => $account->id,
+                            'aws_account_id' => $awsAccountId,
+                            'unique_id' => $uniqueId,
+                            'external_id' => $externalId,
+                            'request_type' => 'Update',
+                        ]);
+                    } else {
+                        $this->warn("Could not extract AWS Account ID from Role ARN: {$roleArn}");
+                        Log::warning('Update request: Invalid Role ARN format', [
+                            'role_arn' => $roleArn,
+                            'unique_id' => $uniqueId,
+                            'external_id' => $externalId,
+                        ]);
+                    }
+                } else {
+                    $this->info("IAM Role ARN unchanged for account {$account->id}");
+                    Log::info('AWS account Update request: IAM Role ARN unchanged', [
+                        'account_id' => $account->id,
+                        'unique_id' => $uniqueId,
+                        'external_id' => $externalId,
+                    ]);
+                }
+            } else {
+                $this->warn("Account not found for Update request: unique_id={$uniqueId}, external_id={$externalId}");
+                Log::warning('Update request: Account not found', [
+                    'unique_id' => $uniqueId,
+                    'external_id' => $externalId,
+                ]);
+            }
+        } else {
+            $this->warn('Update request missing required fields (TopsRoleArn, TopsExternalId, TopsUniqueId)');
+            Log::warning('Update request missing required fields', [
+                'has_role_arn' => !empty($roleArn),
+                'has_unique_id' => !empty($uniqueId),
+                'has_external_id' => !empty($externalId),
+            ]);
+        }
+
+        // Always send SUCCESS response for Update requests
+        // Use PhysicalResourceId from the request if available
+        $responsePhysicalResourceId = $physicalResourceId;
+        $response = $this->sendCloudFormationResponse($responseUrl, 'SUCCESS', 'Update request processed', $stackId, $requestId, $logicalResourceId, $responsePhysicalResourceId);
+        
+        $this->info("Update request processed successfully");
+        Log::info('CloudFormation Update request processed', [
+            'request_id' => $requestId,
+            'stack_id' => $stackId,
+            'logical_resource_id' => $logicalResourceId,
+            'physical_resource_id' => $physicalResourceId,
+        ]);
+        
+        if (app()->environment(['local', 'dev'])) {
+            Log::info('AWS account updated via SQS message (dev verbose)', [
+                'request_type' => 'Update',
+                'role_arn' => $roleArn,
+                'unique_id' => $uniqueId,
+                'external_id' => $externalId,
                 'response_url' => $responseUrl,
                 'response' => $response,
             ]);

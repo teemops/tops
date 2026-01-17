@@ -1,0 +1,164 @@
+{
+    "$schema": "tops/scan/tasks/schema.v1",
+    "name": "tasks.json",
+    "description": "Tasks for auditing AWS EC2 resources",
+    "config": {
+        "service": "ec2",
+        "start": "describeInstances",
+        "defaults": {
+            "actions": {
+                "params": {
+                    "InstanceIds": "$item['InstanceId']"
+                }
+            }
+        }
+    },
+    "tasks": [
+        {
+            "describeInstances": {
+                "task": "describeInstances",
+                "id": "instance",
+                "key": "InstanceId",
+                "description": "List all EC2 instances",
+                "actions": [
+                    {
+                        "describeSecurityGroups": {
+                            "params": {
+                                "GroupIds": "array_column($item['SecurityGroups'] ?? [], 'GroupId')"
+                            }
+                        }
+                    },
+                    {
+                        "describeSubnets": {
+                            "params": {
+                                "SubnetIds": "[$item['SubnetId']]"
+                            }
+                        }
+                    }
+                ],
+                "items": {
+                    "Reservations": [
+                        {
+                            "Instances": [
+                                {
+                                    "Name": "InstanceId",
+                                    "Type": "String"
+                                },
+                                {
+                                    "Name": "PublicIpAddress",
+                                    "Type": "String"
+                                },
+                                {
+                                    "Name": "PrivateIpAddress",
+                                    "Type": "String"
+                                },
+                                {
+                                    "Name": "State",
+                                    "Type": "Object"
+                                },
+                                {
+                                    "Name": "SecurityGroups",
+                                    "Type": "Array"
+                                },
+                                {
+                                    "Name": "SubnetId",
+                                    "Type": "String"
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "describeVpcs": {
+                "task": "describeVpcs",
+                "id": "vpc",
+                "key": "VpcId",
+                "description": "List all VPCs",
+                "actions": [
+                    {
+                        "describeSubnets": {
+                            "params": {
+                                "Filters": "[['Name' => 'vpc-id', 'Values' => [$item['VpcId']]]]"
+                            }
+                        }
+                    },
+                    {
+                        "describeInternetGateways": {
+                            "params": {
+                                "Filters": "[['Name' => 'attachment.vpc-id', 'Values' => [$item['VpcId']]]]"
+                            }
+                        }
+                    },
+                    {
+                        "describeNatGateways": {
+                            "params": {
+                                "Filter": "[['Name' => 'vpc-id', 'Values' => [$item['VpcId']]]]"
+                            }
+                        }
+                    },
+                    {
+                        "describeRouteTables": {
+                            "params": {
+                                "Filters": "[['Name' => 'vpc-id', 'Values' => [$item['VpcId']]]]"
+                            }
+                        }
+                    },
+                    {
+                        "describeNetworkAcls": {
+                            "params": {
+                                "Filters": "[['Name' => 'vpc-id', 'Values' => [$item['VpcId']]]]"
+                            }
+                        }
+                    },
+                    {
+                        "describeVpcPeeringConnections": {
+                            "params": {
+                                "Filters": "[['Name' => 'requester-vpc-info.vpc-id', 'Values' => [$item['VpcId']]], ['Name' => 'accepter-vpc-info.vpc-id', 'Values' => [$item['VpcId']]]]"
+                            }
+                        }
+                    },
+                    {
+                        "describeVpcEndpoints": {
+                            "params": {
+                                "Filters": "[['Name' => 'vpc-id', 'Values' => [$item['VpcId']]]]"
+                            }
+                        }
+                    },
+                    {
+                        "describeSecurityGroups": {
+                            "params": {
+                                "Filters": "[['Name' => 'vpc-id', 'Values' => [$item['VpcId']]]]"
+                            }
+                        }
+                    }
+                ],
+                "items": {
+                    "Vpcs": [
+                        {
+                            "Name": "VpcId",
+                            "Type": "String"
+                        },
+                        {
+                            "Name": "CidrBlock",
+                            "Type": "String"
+                        },
+                        {
+                            "Name": "State",
+                            "Type": "String"
+                        },
+                        {
+                            "Name": "IsDefault",
+                            "Type": "Boolean"
+                        },
+                        {
+                            "Name": "Tags",
+                            "Type": "Array"
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+}

@@ -1,0 +1,157 @@
+{
+    "$schema": "tops/scan/tasks/schema.v1",
+    "name": "tasks.json",
+    "description": "Tasks for auditing AWS RDS resources",
+    "config": {
+        "service": "rds",
+        "start": "describeDBInstances",
+        "defaults": {
+            "actions": {
+                "params": {
+                    "DBInstanceIdentifier": "$item['DBInstanceIdentifier']"
+                }
+            }
+        }
+    },
+    "tasks": [
+        {
+            "describeDBInstances": {
+                "task": "describeDBInstances",
+                "id": "db_instance",
+                "key": "DBInstanceIdentifier",
+                "description": "List all RDS instances",
+                "actions": [
+                    {
+                        "describeDBSnapshots": {
+                            "params": {
+                                "DBInstanceIdentifier": "$item['DBInstanceIdentifier']"
+                            }
+                        }
+                    },
+                    {
+                        "describeDBSubnetGroups": {
+                            "params": {
+                                "DBSubnetGroupName": "$item['DBSubnetGroup']['DBSubnetGroupName']"
+                            }
+                        }
+                    },
+                    {
+                        "describeDBParameterGroups": {
+                            "params": {
+                                "DBParameterGroupName": "$item['DBParameterGroups'][0]['DBParameterGroupName'] ?? null"
+                            }
+                        }
+                    }
+                ],
+                "items": {
+                    "DBInstances": [
+                        {
+                            "Name": "DBInstanceIdentifier",
+                            "Type": "String"
+                        },
+                        {
+                            "Name": "DBInstanceClass",
+                            "Type": "String"
+                        },
+                        {
+                            "Name": "Engine",
+                            "Type": "String"
+                        },
+                        {
+                            "Name": "EngineVersion",
+                            "Type": "String"
+                        },
+                        {
+                            "Name": "StorageEncrypted",
+                            "Type": "Boolean"
+                        },
+                        {
+                            "Name": "PubliclyAccessible",
+                            "Type": "Boolean"
+                        },
+                        {
+                            "Name": "BackupRetentionPeriod",
+                            "Type": "Integer"
+                        },
+                        {
+                            "Name": "MultiAZ",
+                            "Type": "Boolean"
+                        },
+                        {
+                            "Name": "DBSubnetGroup",
+                            "Type": "Object"
+                        },
+                        {
+                            "Name": "DBParameterGroups",
+                            "Type": "Array"
+                        },
+                        {
+                            "Name": "VpcSecurityGroups",
+                            "Type": "Array"
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "describeDBClusters": {
+                "task": "describeDBClusters",
+                "id": "db_cluster",
+                "key": "DBClusterIdentifier",
+                "description": "List all RDS clusters",
+                "actions": [
+                    {
+                        "describeDBClusterSnapshots": {
+                            "params": {
+                                "DBClusterIdentifier": "$item['DBClusterIdentifier']"
+                            }
+                        }
+                    },
+                    {
+                        "describeDBClusterParameterGroups": {
+                            "params": {
+                                "DBClusterParameterGroupName": "$item['DBClusterParameterGroup']"
+                            }
+                        }
+                    }
+                ],
+                "items": {
+                    "DBClusters": [
+                        {
+                            "Name": "DBClusterIdentifier",
+                            "Type": "String"
+                        },
+                        {
+                            "Name": "Engine",
+                            "Type": "String"
+                        },
+                        {
+                            "Name": "EngineVersion",
+                            "Type": "String"
+                        },
+                        {
+                            "Name": "StorageEncrypted",
+                            "Type": "Boolean"
+                        },
+                        {
+                            "Name": "BackupRetentionPeriod",
+                            "Type": "Integer"
+                        },
+                        {
+                            "Name": "DatabaseName",
+                            "Type": "String"
+                        },
+                        {
+                            "Name": "DBClusterParameterGroup",
+                            "Type": "String"
+                        },
+                        {
+                            "Name": "VpcSecurityGroups",
+                            "Type": "Array"
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+}

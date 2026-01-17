@@ -37,6 +37,7 @@ Route::middleware(['api', 'firebase.auth', 'organization.context'])->group(funct
     Route::get('/aws-accounts/{accountId}/cloudformation-url', [AwsAccountsController::class, 'getCloudFormationUrl']);
 
     // Scans
+    Route::get('/scan-types', [ScansController::class, 'scanTypes']);
     Route::get('/organizations/{orgId}/scans', [ScansController::class, 'index']);
     Route::post('/organizations/{orgId}/scans', [ScansController::class, 'store']);
     Route::get('/scans/{scanId}', [ScansController::class, 'show']);
@@ -57,5 +58,11 @@ if (app()->environment(['testing', 'local'])) {
         
         // Verify email by email address (for test users, no auth required in testing)
         Route::post('/verify-email-by-address', [E2ETestController::class, 'verifyEmailByAddress']);
+
+        // Clear login rate limiter (for E2E tests that run multiple logins)
+        Route::post('/clear-rate-limiter', [E2ETestController::class, 'clearRateLimiter']);
+
+        // Reset test state (clears rate limiters and other test state)
+        Route::post('/reset-test-state', [E2ETestController::class, 'resetTestState']);
     });
 }

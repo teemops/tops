@@ -1,0 +1,232 @@
+{
+    "$schema": "tops/findings/ruleset/schema.v1",
+    "name": "basic.json",
+    "description": "Basic rule set for auditing AWS environments",
+    "rules": [
+        {
+            "rule": "tops-iam-001",
+            "name": "IAM User MFA Token",
+            "service": "iam",
+            "method": "listMFADevices",
+            "description": "IAM Users should have MFA enabled",
+            "severity": "high",
+            "condition": "count($data['MFADevices'] ?? []) == 0"
+        },
+        {
+            "rule": "tops-iam-002",
+            "name": "IAM User Access Keys",
+            "service": "iam",
+            "method": "listAccessKeys",
+            "description": "Access Keys should not be used for IAM Users. Instead use IAM Identity Center to setup Single Sign-on.",
+            "severity": "medium",
+            "condition": "count($data['AccessKeyMetadata'] ?? []) > 0"
+        },
+        {
+            "rule": "tops-iam-003",
+            "name": "IAM User Inline Policies",
+            "service": "iam",
+            "method": "listUserPolicies",
+            "description": "IAM Users should not have inline IAM policies. Instead use IAM Groups to define IAM Policies and assign the user to the group.",
+            "severity": "medium",
+            "condition": "count($data['PolicyNames'] ?? []) > 0"
+        },
+        {
+            "rule": "tops-iam-004",
+            "name": "IAM User Attached Policies",
+            "service": "iam",
+            "method": "listAttachedUserPolicies",
+            "description": "IAM Policies should not be attached to IAM Users. Instead use IAM Groups to define IAM Policies and assign the user to the group.",
+            "severity": "medium",
+            "condition": "count($data['AttachedPolicies'] ?? []) > 0"
+        },
+        {
+            "rule": "tops-iam-005",
+            "name": "IAM User Not in Groups",
+            "service": "iam",
+            "method": "listGroupsForUser",
+            "description": "IAM Users should be assigned to IAM Groups for better policy management",
+            "severity": "medium",
+            "condition": "count($data['Groups'] ?? []) == 0"
+        },
+        {
+            "rule": "tops-iam-006",
+            "name": "IAM Role Inline Policies",
+            "service": "iam",
+            "method": "listRolePolicies",
+            "description": "IAM Roles should not have inline IAM policies. Instead use managed policies or customer managed policies.",
+            "severity": "medium",
+            "condition": "count($data['PolicyNames'] ?? []) > 0"
+        },
+        {
+            "rule": "tops-iam-007",
+            "name": "IAM Role Attached Policies",
+            "service": "iam",
+            "method": "listAttachedRolePolicies",
+            "description": "IAM Roles should use least privilege policies. Review attached policies for excessive permissions.",
+            "severity": "low",
+            "condition": "count($data['AttachedPolicies'] ?? []) > 5"
+        },
+        {
+            "rule": "tops-iam-008",
+            "name": "IAM User with AdministratorAccess Policy",
+            "service": "iam",
+            "method": "listAttachedUserPolicies",
+            "description": "IAM Users should not have AdministratorAccess policy attached. Use least privilege principles and assign users to groups with appropriate permissions.",
+            "severity": "high",
+            "condition": "isset($data['AttachedPolicies']) && count(array_filter($data['AttachedPolicies'] ?? [], function($policy) { return ($policy['PolicyName'] ?? '') == 'AdministratorAccess' || strpos($policy['PolicyArn'] ?? '', 'AdministratorAccess') !== false; })) > 0"
+        },
+        {
+            "rule": "tops-iam-009",
+            "name": "IAM User with FullAccess Managed Policy",
+            "service": "iam",
+            "method": "listAttachedUserPolicies",
+            "description": "IAM Users should not have managed policies ending in 'FullAccess' attached. These policies grant full access to AWS services and violate least privilege principles.",
+            "severity": "high",
+            "condition": "isset($data['AttachedPolicies']) && count(array_filter($data['AttachedPolicies'] ?? [], function($policy) { $policyName = $policy['PolicyName'] ?? ''; return strlen($policyName) >= 11 && substr($policyName, -11) === 'FullAccess'; })) > 0"
+        },
+        {
+            "rule": "tops-iam-010",
+            "name": "IAM User with Wildcard Policies",
+            "service": "iam",
+            "method": "listUserPolicies",
+            "description": "IAM Users with inline policies may contain wildcard permissions (*) that grant full access to one or more services. Inline policies should be reviewed for least privilege compliance.",
+            "severity": "high",
+            "condition": "count($data['PolicyNames'] ?? []) > 0"
+        },
+        {
+            "rule": "tops-s3-001",
+            "name": "S3 Public Access Block",
+            "service": "s3",
+            "method": "getPublicAccessBlock",
+            "description": "S3 Buckets should not be publicly available",
+            "severity": "high",
+            "condition": "$data === false || !isset($data['PublicAccessBlockConfiguration']) || ($data['PublicAccessBlockConfiguration']['BlockPublicAcls'] ?? false) == false || ($data['PublicAccessBlockConfiguration']['BlockPublicPolicy'] ?? false) == false || ($data['PublicAccessBlockConfiguration']['IgnorePublicAcls'] ?? false) == false || ($data['PublicAccessBlockConfiguration']['RestrictPublicBuckets'] ?? false) == false"
+        },
+        {
+            "rule": "tops-s3-002",
+            "name": "S3 Bucket Encryption",
+            "service": "s3",
+            "method": "getBucketEncryption",
+            "description": "S3 Buckets should have encryption enabled",
+            "severity": "medium",
+            "condition": "($data['ServerSideEncryptionConfiguration']['Rules'][0]['BucketKeyEnabled'] ?? false) == false"
+        },
+        {
+            "rule": "tops-s3-003",
+            "name": "S3 Bucket versioning",
+            "service": "s3",
+            "method": "getBucketVersioning",
+            "description": "S3 Buckets should have versioning enabled",
+            "severity": "medium",
+            "condition": "($data['Status'] ?? '') != 'Enabled'"
+        },
+        {
+            "rule": "tops-s3-004",
+            "name": "S3 Bucket ACL Public Access",
+            "service": "s3",
+            "method": "getBucketAcl",
+            "description": "S3 Bucket ACL should not allow public access",
+            "severity": "high",
+            "condition": "isset($data['Grants']) && count(array_filter($data['Grants'] ?? [], function($grant) { return ($grant['Grantee']['Type'] ?? '') == 'Group' && ($grant['Grantee']['URI'] ?? '') == 'http://acs.amazonaws.com/groups/global/AllUsers'; })) > 0"
+        },
+        {
+            "rule": "tops-ec2-001",
+            "name": "EC2 Security Group Allows Public Access",
+            "service": "ec2",
+            "method": "describeSecurityGroups",
+            "description": "EC2 Security Groups should not allow inbound traffic from 0.0.0.0/0",
+            "severity": "high",
+            "condition": "isset($data['SecurityGroups']) && count(array_filter($data['SecurityGroups'] ?? [], function($sg) { return isset($sg['IpPermissions']) && count(array_filter($sg['IpPermissions'] ?? [], function($perm) { return isset($perm['IpRanges']) && count(array_filter($perm['IpRanges'] ?? [], function($range) { return ($range['CidrIp'] ?? '') == '0.0.0.0/0'; })) > 0; })) > 0; })) > 0"
+        },
+        {
+            "rule": "tops-ec2-002",
+            "name": "EC2 Public IP Address",
+            "service": "ec2",
+            "method": "describeInstances",
+            "description": "EC2 Instances should not have a Public IP Address",
+            "severity": "medium",
+            "condition": "isset($data['PublicIpAddress'])"
+        },
+        {
+            "rule": "tops-ec2-003",
+            "name": "EC2 Default VPC in Use",
+            "service": "ec2",
+            "method": "describeVpcs",
+            "description": "Default VPCs should not be used in production environments",
+            "severity": "low",
+            "condition": "isset($data['Vpcs']) && count(array_filter($data['Vpcs'] ?? [], function($vpc) { return ($vpc['IsDefault'] ?? false) == true; })) > 0"
+        },
+        {
+            "rule": "tops-ec2-004",
+            "name": "Subnet Default Public IP",
+            "service": "ec2",
+            "method": "describeSubnets",
+            "description": "EC2 Subnets should not have Public IP enabled by default",
+            "severity": "medium",
+            "condition": "($data['Subnets'][0]['MapPublicIpOnLaunch'] ?? false) == true"
+        },
+        {
+            "rule": "tops-ec2-005",
+            "name": "EC2 Instance Without Termination Protection",
+            "service": "ec2",
+            "method": "describeInstances",
+            "description": "EC2 Instances should have termination protection enabled for production workloads",
+            "severity": "low",
+            "condition": "isset($data['DisableApiTermination']) && ($data['DisableApiTermination'] ?? false) == false"
+        },
+        {
+            "rule": "tops-rds-001",
+            "name": "RDS Instance Publicly Accessible",
+            "service": "rds",
+            "method": "describeDBInstances",
+            "description": "RDS Instances should not be publicly accessible",
+            "severity": "high",
+            "condition": "($data['PubliclyAccessible'] ?? false) == true"
+        },
+        {
+            "rule": "tops-rds-002",
+            "name": "RDS Instance Without Encryption",
+            "service": "rds",
+            "method": "describeDBInstances",
+            "description": "RDS Instances should have encryption enabled",
+            "severity": "high",
+            "condition": "($data['StorageEncrypted'] ?? false) == false"
+        },
+        {
+            "rule": "tops-rds-003",
+            "name": "RDS Instance Without Multi-AZ",
+            "service": "rds",
+            "method": "describeDBInstances",
+            "description": "RDS Instances should have Multi-AZ enabled for production workloads",
+            "severity": "medium",
+            "condition": "($data['MultiAZ'] ?? false) == false"
+        },
+        {
+            "rule": "tops-rds-004",
+            "name": "RDS Instance Without Backup Retention",
+            "service": "rds",
+            "method": "describeDBInstances",
+            "description": "RDS Instances should have automated backups enabled with appropriate retention period",
+            "severity": "medium",
+            "condition": "($data['BackupRetentionPeriod'] ?? 0) < 7"
+        },
+        {
+            "rule": "tops-rds-005",
+            "name": "RDS Cluster Without Encryption",
+            "service": "rds",
+            "method": "describeDBClusters",
+            "description": "RDS Clusters should have encryption enabled",
+            "severity": "high",
+            "condition": "($data['StorageEncrypted'] ?? false) == false"
+        },
+        {
+            "rule": "tops-rds-006",
+            "name": "RDS Cluster Without Backup Retention",
+            "service": "rds",
+            "method": "describeDBClusters",
+            "description": "RDS Clusters should have automated backups enabled with appropriate retention period",
+            "severity": "medium",
+            "condition": "($data['BackupRetentionPeriod'] ?? 0) < 7"
+        }
+    ]
+}
