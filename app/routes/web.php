@@ -41,6 +41,15 @@ Route::middleware('auth')->group(function () {
     Route::get('/aws-accounts', function () {
         return Inertia::render('AwsAccounts/Index');
     })->name('aws-accounts.index');
+    
+    // Scans
+    Route::get('/scans', function () {
+        return Inertia::render('Scans/Index');
+    })->name('scans.index');
+    
+    Route::get('/scans/{scanId}', function (string $scanId) {
+        return Inertia::render('Scans/Show', ['scanId' => $scanId]);
+    })->name('scans.show');
 });
 
 require __DIR__.'/auth.php';

@@ -6,7 +6,7 @@ import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import { Head, Link, useForm, router } from '@inertiajs/vue3';
-import { signInWithOAuth, getIdToken } from '@/composables/useFirebase';
+import { signInWithOAuth, createUserWithEmailPassword, getIdToken } from '@/composables/useFirebase';
 import { ref } from 'vue';
 
 defineProps<{
@@ -24,12 +24,64 @@ const form = useForm({
 const oauthLoading = ref<string | null>(null);
 const oauthError = ref<string | null>(null);
 
-const submit = () => {
-    form.post(route('register'), {
-        onFinish: () => {
-            form.reset('password', 'password_confirmation');
-        },
-    });
+const submit = async () => {
+    form.clearErrors();
+    
+    // Validate password confirmation on frontend
+    if (form.password !== form.password_confirmation) {
+        form.setError('password_confirmation', 'The passwords do not match.');
+        return;
+    }
+    
+    // Validate password length
+    if (form.password.length < 8) {
+        form.setError('password', 'Password must be at least 8 characters.');
+        return;
+    }
+    
+    // Validate terms acceptance
+    if (!form.terms) {
+        form.setError('terms', 'You must agree to the Terms of Service and Privacy Policy.');
+        return;
+    }
+    
+    try {
+        // Create user with Firebase using email/password
+        const user = await createUserWithEmailPassword(form.email, form.password, form.name);
+        
+        // Get the ID token
+        const token = await getIdToken();
+        
+        if (!token) {
+            throw new Error('Failed to get authentication token');
+        }
+
+        // Send token and name to backend to create Laravel user record
+        router.post(route('firebase.register'), { 
+            token,
+            name: form.name,
+        }, {
+            onSuccess: () => {
+                // Redirect handled by backend
+            },
+            onError: (errors) => {
+                form.setError('email', errors.firebase || errors.message || 'Registration failed');
+                form.reset('password', 'password_confirmation');
+            },
+        });
+    } catch (error: any) {
+        // Handle Firebase errors
+        if (error.message.includes('email-already-in-use')) {
+            form.setError('email', 'An account with this email address already exists.');
+        } else if (error.message.includes('weak-password')) {
+            form.setError('password', 'Password is too weak. Please choose a stronger password.');
+        } else if (error.message.includes('invalid-email')) {
+            form.setError('email', 'Invalid email address.');
+        } else {
+            form.setError('email', error.message || 'Registration failed. Please try again.');
+        }
+        form.reset('password', 'password_confirmation');
+    }
 };
 
 const handleOAuth = async (provider: 'google' | 'github' | 'microsoft') => {

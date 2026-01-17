@@ -4,6 +4,7 @@ import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import { Link, useForm, usePage } from '@inertiajs/vue3';
+import { updateFirebaseProfile } from '@/composables/useFirebase';
 
 defineProps<{
     mustVerifyEmail?: Boolean;
@@ -16,6 +17,28 @@ const form = useForm({
     name: user.name,
     email: user.email,
 });
+
+const submit = async () => {
+    const originalName = user.name;
+    const nameChanged = form.name !== originalName;
+    
+    // If name changed, update Firebase first (before Laravel update)
+    if (nameChanged && form.name) {
+        try {
+            await updateFirebaseProfile({
+                displayName: form.name,
+            });
+        } catch (error: any) {
+            // If Firebase update fails, show error but still allow Laravel update
+            // This way user can update their name in Laravel even if Firebase is having issues
+            console.warn('Failed to update Firebase profile:', error);
+            // Continue with Laravel update anyway
+        }
+    }
+    
+    // Update in Laravel (this is our source of truth)
+    form.patch(route('profile.update'));
+};
 </script>
 
 <template>
@@ -31,7 +54,7 @@ const form = useForm({
         </header>
 
         <form
-            @submit.prevent="form.patch(route('profile.update'))"
+            @submit.prevent="submit"
             class="mt-6 space-y-6"
         >
             <div>

@@ -5,6 +5,8 @@ import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
+import { sendPasswordReset } from '@/composables/useFirebase';
+import { ref } from 'vue';
 
 defineProps<{
     status?: string;
@@ -14,8 +16,22 @@ const form = useForm({
     email: '',
 });
 
-const submit = () => {
-    form.post(route('password.email'));
+const successMessage = ref<string | null>(null);
+const errorMessage = ref<string | null>(null);
+
+const submit = async () => {
+    form.clearErrors();
+    successMessage.value = null;
+    errorMessage.value = null;
+    
+    try {
+        await sendPasswordReset(form.email);
+        successMessage.value = 'Password reset email sent! Please check your inbox and follow the instructions to reset your password.';
+        form.reset('email');
+    } catch (error: any) {
+        errorMessage.value = error.message || 'Failed to send password reset email. Please try again.';
+        form.setError('email', error.message || 'Failed to send password reset email.');
+    }
 };
 </script>
 
@@ -29,6 +45,14 @@ const submit = () => {
 
         <div v-if="status" class="mb-4 text-sm font-medium text-green-600 dark:text-green-400">
             {{ status }}
+        </div>
+
+        <div v-if="successMessage" class="mb-4 text-sm font-medium text-green-600 dark:text-green-400">
+            {{ successMessage }}
+        </div>
+
+        <div v-if="errorMessage" class="mb-4 text-sm font-medium text-red-600 dark:text-red-400">
+            {{ errorMessage }}
         </div>
 
         <form @submit.prevent="submit" class="space-y-6">

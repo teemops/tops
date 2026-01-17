@@ -1,0 +1,81 @@
+#!/bin/bash
+#This file is used to setup the TOPS APP once the package of files has been deployed
+
+############################################
+# This is to be run from /home/ubuntu/files/init/tops
+# e.g. sh ./setup.sh
+############################################
+
+##########INSTALL DEPENDENCIES#############
+#install awscli
+echo "Check aws cli"
+#check if awscli is installed
+if ! [ -x "$(command -v aws)" ]; then
+  echo 'awscli is not installed.' >&2
+  sudo apt-get update && sudo apt-get install -y awscli
+fi
+#install php8.3
+
+echo "Check php"
+#check if php is installed
+if ! [ -x "$(command -v php)" ]; then
+  echo 'php is not installed.' >&2
+  sudo apt-get install -y php8.3
+fi
+#install node
+echo "Check nodejs"
+#check if nodejs is installed
+if ! [ -x "$(command -v node)" ]; then
+  echo 'nodejs is not installed.' >&2
+  curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - &&\
+  sudo apt-get install -y nodejs
+fi
+#install nginx
+echo "Check nginx"
+#check if nginx is installed
+if ! [ -x "$(command -v nginx)" ]; then
+  echo 'nginx is not installed.' >&2
+  sudo apt-get install -y nginx
+fi
+#configure nginx
+#copy nginx config file to /etc/nginx folders
+sudo cp /home/ubuntu/files/nginx/nginx.conf /etc/nginx/nginx.conf
+sudo cp /home/ubuntu/files/nginx/default /etc/nginx/sites-available/default
+sudo cp /home/ubuntu/files/nginx/index.html /usr/share/nginx/html/index.html
+sudo systemctl restart nginx
+
+#install unzip
+echo "Installing Unzip"
+#check if unzip is installed
+if ! [ -x "$(command -v unzip)" ]; then
+  echo 'unzip is not installed.' >&2
+  sudo apt-get install unzip
+fi
+#install supervisor
+echo "Installing Supervisor"
+#check if supervisor is installed
+if ! [ -x "$(command -v supervisorctl)" ]; then
+  echo 'supervisor is not installed.' >&2
+  sudo apt-get install supervisor
+fi
+
+echo "updating supervisor configuration"
+
+sudo cp -r /home/ubuntu/files/supervisor/* /etc/supervisor/conf.d/
+sudo supervisorctl reload
+
+#setup apps directory
+
+echo "Setup apps and scripts folders"
+mkdir -p /srv/apps/tops
+mkdir /srv/scripts > /dev/null 2>&1
+
+#copy scripts to /srv/scripts from files directory
+cp -r /home/ubuntu/files/scripts/* /srv/scripts/
+#chmod all files in scripts directory to be executable
+chmod +x /srv/scripts/*
+
+#CRON setup
+echo "Setting up cron jobs"
+#copy cron file to /etc/cron.d
+cp /home/ubuntu/files/cron/tops /etc/cron.d/tops

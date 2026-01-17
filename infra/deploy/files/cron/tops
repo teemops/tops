@@ -1,0 +1,2 @@
+#run cron every 5 minutes to check for pricing data in AWS
+00 5 * * * root bash -c /srv/scripts/tops-pricing.sh >> /var/log/tops-pricing.log 2>&1

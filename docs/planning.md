@@ -2,8 +2,8 @@
 
 ## Overview
 A cloud security scanning application with:
-- **Frontend**: Nuxt 3
-- **Backend**: NestJS API (Node.js/TypeScript)
+- **Frontend**: Vue 3 with Inertia.js
+- **Backend**: Laravel 12 (PHP 8.2+)
 - **Deployment**: Single EC2 instance
 - **Authentication**: Firebase Authentication
 - **Initial Support**: AWS
@@ -31,22 +31,35 @@ All new features should:
 
 ### High-Level Architecture
 ```
-┌─────────────────┐
-│   Nuxt Frontend │  (User Interface - AWS Hosted)
-└────────┬────────┘
-         │ HTTP/REST API
-         │
-┌────────▼────────────────────────┐
-│  NestJS API (EC2 Instance)      │
-│  ┌──────────────────────────┐   │
-│  │  Auth Module            │   │
-│  │  Organizations Module   │   │
-│  │  AWS Accounts Module    │   │
-│  │  Scans Module           │   │
-│  │  Results Module         │   │
-│  │  Users Module           │   │
-│  └──────────────────────────┘   │
-└────────┬────────────────────────┘
+┌─────────────────────────────────────────────────┐
+│  Laravel Application (EC2 Instance)             │
+│  ┌───────────────────────────────────────────┐  │
+│  │  Vue 3 + Inertia.js Frontend              │  │
+│  │  (SSR with TypeScript, Tailwind CSS)      │  │
+│  └───────────────────────────────────────────┘  │
+│  ┌───────────────────────────────────────────┐  │
+│  │  Laravel 12 Backend (PHP 8.2+)            │  │
+│  │  ┌─────────────────────────────────────┐  │  │
+│  │  │  Controllers (API + Web)            │  │  │
+│  │  │  - OrganizationsController          │  │  │
+│  │  │  - AwsAccountsController            │  │  │
+│  │  │  - ScansController                  │  │  │
+│  │  │  - Auth Controllers (Firebase)      │  │  │
+│  │  └─────────────────────────────────────┘  │  │
+│  │  ┌─────────────────────────────────────┐  │  │
+│  │  │  Services                           │  │  │
+│  │  │  - AwsSecurityScanner               │  │  │
+│  │  │  - RulesEngine                      │  │  │
+│  │  │  - Scanners (S3, IAM, EC2, RDS)     │  │  │
+│  │  └─────────────────────────────────────┘  │  │
+│  │  ┌─────────────────────────────────────┐  │  │
+│  │  │  Jobs (Queue Workers)               │  │  │
+│  │  │  - ProcessScanJob                   │  │  │
+│  │  │  - ProcessRegionScanJob             │  │  │
+│  │  │  - ProcessAuditScanJob              │  │  │
+│  │  └─────────────────────────────────────┘  │  │
+│  └───────────────────────────────────────────┘  │
+└────────┬────────────────────────────────────────┘
          │
     ┌────┴────┐
     │         │
@@ -58,26 +71,37 @@ All new features should:
 
 ### Technology Stack
 
-#### Frontend (Nuxt 3)
-- **Framework**: Nuxt 3 (Vue 3)
-- **UI Library**: PrimeVue (Material Design)
-- **State Management**: Pinia
-- **HTTP Client**: $fetch (built-in) or Axios
-- **Authentication**: Firebase Authentication (OAuth preferred, email/password supported)
-- **Firebase SDK**: Firebase JS SDK v9+
+#### Frontend (Vue 3 + Inertia.js)
+- **Framework**: Vue 3 with Inertia.js (SSR-capable SPA)
+- **Build Tool**: Vite 7
+- **Language**: TypeScript
+- **Styling**: Tailwind CSS with @tailwindcss/forms
+- **HTTP Client**: Axios
+- **Authentication**: Firebase JS SDK v12+
+- **State/Composables**: Vue 3 Composables (`useFirebase`, `useOrganizations`, `useAwsAccounts`, `useScans`)
+- **Testing**: Playwright (E2E)
 
-#### Backend (NestJS API)
-- **Runtime**: Node.js 18+ / TypeScript
-- **Framework**: NestJS
+#### Backend (Laravel 12)
+- **Runtime**: PHP 8.2+
+- **Framework**: Laravel 12
 - **Deployment**: Single EC2 instance
-- **Process Manager**: PM2 or systemd
+- **Process Manager**: Supervisor or systemd (for queue workers)
 - **Database**: MySQL (AWS RDS)
-- **ORM**: Prisma
-- **AWS SDK**: AWS SDK v3 for JavaScript
-- **Authentication**: Firebase Admin SDK (for token verification)
-- **Validation**: class-validator, class-transformer (NestJS built-in)
-- **HTTP**: Express (via NestJS)
-- **API Documentation**: Swagger/OpenAPI
+- **ORM**: Eloquent (Laravel built-in)
+- **AWS SDK**: AWS SDK for PHP v3.369+
+- **Authentication**: Firebase PHP SDK (kreait/firebase-php v8.0) for token verification
+- **Frontend Integration**: Inertia.js Laravel adapter
+- **Validation**: Laravel Form Requests
+- **Queue**: Laravel Queue (database/SQS driver)
+- **Testing**: PHPUnit 11
+
+#### Key Laravel Packages
+- `inertiajs/inertia-laravel` - Vue/Laravel integration
+- `kreait/firebase-php` - Firebase Admin SDK
+- `aws/aws-sdk-php` - AWS service integration
+- `laravel/sanctum` - API token authentication
+- `laravel/breeze` - Authentication scaffolding
+- `tightenco/ziggy` - Laravel routes in JavaScript
 
 #### Infrastructure
 - **Deployment**: AWS (EC2, RDS)
@@ -91,61 +115,132 @@ All new features should:
 ## Project Structure
 
 ```
-tops/
-├── frontend/              # Nuxt 3 application
-│   ├── components/
-│   ├── pages/
-│   ├── composables/
-│   ├── stores/           # Pinia stores
-│   ├── plugins/          # Firebase plugin
-│   ├── utils/
-│   └── nuxt.config.ts
+saas/
+├── app/                          # Laravel Application
+│   ├── app/
+│   │   ├── Console/
+│   │   │   └── Commands/
+│   │   │       └── ProcessSqsMessages.php    # SQS polling command
+│   │   ├── Http/
+│   │   │   ├── Controllers/
+│   │   │   │   ├── Api/                      # API Controllers
+│   │   │   │   │   ├── AwsAccountsController.php
+│   │   │   │   │   ├── OrganizationsController.php
+│   │   │   │   │   └── ScansController.php
+│   │   │   │   ├── Auth/                     # Auth Controllers
+│   │   │   │   │   ├── FirebaseAuthController.php
+│   │   │   │   │   ├── OAuthController.php
+│   │   │   │   │   └── RegisteredUserController.php
+│   │   │   │   └── ProfileController.php
+│   │   │   ├── Middleware/
+│   │   │   │   ├── SetOrganizationContext.php
+│   │   │   │   └── VerifyFirebaseToken.php
+│   │   │   └── Requests/                     # Form Requests (Validation)
+│   │   │       ├── InitAwsAccountRequest.php
+│   │   │       ├── StoreAwsAccountRequest.php
+│   │   │       ├── StoreOrganizationRequest.php
+│   │   │       ├── StoreScanRequest.php
+│   │   │       └── UpdateOrganizationRequest.php
+│   │   ├── Jobs/                             # Queue Jobs
+│   │   │   ├── ProcessAuditScanJob.php       # Individual audit scan
+│   │   │   ├── ProcessRegionScanJob.php      # Per-region scanning
+│   │   │   └── ProcessScanJob.php            # Main scan orchestrator
+│   │   ├── Models/                           # Eloquent Models
+│   │   │   ├── AwsAccount.php
+│   │   │   ├── Organization.php
+│   │   │   ├── Scan.php
+│   │   │   ├── ScanDetail.php
+│   │   │   ├── ScanResult.php
+│   │   │   └── User.php
+│   │   ├── Providers/
+│   │   │   └── AppServiceProvider.php
+│   │   └── Services/                         # Business Logic
+│   │       ├── AwsSecurityScanner.php        # Main scanner service
+│   │       ├── RulesEngine/                  # Rules evaluation
+│   │       │   ├── ConditionEvaluator.php
+│   │       │   ├── FindingsEngine.php
+│   │       │   └── RulesEngine.php
+│   │       ├── Scanners/                     # Service-specific scanners
+│   │       │   ├── Ec2Scanner.php
+│   │       │   ├── IamScanner.php
+│   │       │   ├── RdsScanner.php
+│   │       │   └── S3Scanner.php
+│   │       ├── ScanTypesService.php
+│   │       └── SnsSignatureVerifier.php
+│   ├── config/                               # Laravel Configuration
+│   ├── database/
+│   │   ├── factories/
+│   │   ├── migrations/
+│   │   └── seeders/
+│   ├── resources/
+│   │   ├── css/
+│   │   │   └── app.css                       # Tailwind CSS
+│   │   └── js/
+│   │       ├── app.ts                        # Vue app entry
+│   │       ├── Components/                   # Reusable Vue components
+│   │       │   ├── OrganizationSelector.vue
+│   │       │   ├── Notification.vue
+│   │       │   └── ...
+│   │       ├── composables/                  # Vue 3 Composables
+│   │       │   ├── useAwsAccounts.ts
+│   │       │   ├── useFirebase.ts
+│   │       │   ├── useNotifications.ts
+│   │       │   ├── useOrganizations.ts
+│   │       │   └── useScans.ts
+│   │       ├── Layouts/                      # Page layouts
+│   │       │   ├── AuthenticatedLayout.vue
+│   │       │   ├── GuestLayout.vue
+│   │       │   └── SidebarAppLayout.vue
+│   │       ├── Pages/                        # Inertia pages
+│   │       │   ├── Auth/
+│   │       │   │   ├── Login.vue
+│   │       │   │   ├── Register.vue
+│   │       │   │   └── ...
+│   │       │   ├── AwsAccounts/
+│   │       │   │   └── Index.vue
+│   │       │   ├── Dashboard.vue
+│   │       │   ├── Organizations/
+│   │       │   │   ├── Index.vue
+│   │       │   │   └── Settings.vue
+│   │       │   ├── Profile/
+│   │       │   │   └── Edit.vue
+│   │       │   └── Scans/
+│   │       │       ├── Index.vue
+│   │       │       └── Show.vue
+│   │       └── types/                        # TypeScript types
+│   ├── routes/
+│   │   ├── api.php                           # API routes
+│   │   ├── auth.php                          # Auth routes
+│   │   └── web.php                           # Web routes
+│   ├── rules/                                # Security Rules
+│   │   ├── rulesets/
+│   │   │   ├── basic.json                    # Basic security rules
+│   │   │   ├── cis.json                      # CIS benchmark rules
+│   │   │   └── pci.json                      # PCI-DSS rules
+│   │   └── tasks/                            # Scanner task definitions
+│   │       ├── ec2/tasks.json
+│   │       ├── iam/tasks.json
+│   │       ├── rds/tasks.json
+│   │       └── s3/tasks.json
+│   ├── tests/
+│   │   ├── e2e/                              # Playwright E2E tests
+│   │   ├── Feature/                          # Laravel feature tests
+│   │   └── Unit/                             # PHPUnit unit tests
+│   ├── composer.json
+│   ├── package.json
+│   ├── tailwind.config.js
+│   ├── tsconfig.json
+│   └── vite.config.js
 │
-├── backend/              # NestJS API
-│   ├── src/
-│   │   ├── auth/         # Authentication module
-│   │   │   ├── auth.controller.ts
-│   │   │   ├── auth.service.ts
-│   │   │   ├── auth.guard.ts
-│   │   │   └── firebase.strategy.ts
-│   │   ├── organizations/  # Organizations module
-│   │   │   ├── organizations.controller.ts
-│   │   │   ├── organizations.service.ts
-│   │   │   └── organizations.module.ts
-│   │   ├── aws-accounts/   # AWS Accounts module
-│   │   │   ├── aws-accounts.controller.ts
-│   │   │   ├── aws-accounts.service.ts
-│   │   │   └── aws-accounts.module.ts
-│   │   ├── scans/         # Scans module
-│   │   │   ├── scans.controller.ts
-│   │   │   ├── scans.service.ts
-│   │   │   └── scans.module.ts
-│   │   ├── results/       # Results module
-│   │   │   ├── results.controller.ts
-│   │   │   ├── results.service.ts
-│   │   │   └── results.module.ts
-│   │   ├── users/         # Users module
-│   │   │   ├── users.controller.ts
-│   │   │   ├── users.service.ts
-│   │   │   └── users.module.ts
-│   │   ├── common/        # Shared utilities
-│   │   │   ├── guards/
-│   │   │   ├── interceptors/
-│   │   │   ├── filters/
-│   │   │   └── decorators/
-│   │   ├── prisma/        # Prisma service
-│   │   │   └── prisma.service.ts
-│   │   └── main.ts        # Application entry point
-│   ├── prisma/           # Prisma schema and migrations
-│   ├── test/
-│   ├── nest-cli.json
-│   └── package.json
-│
-├── shared/               # Shared types/interfaces
-│   └── types/
+├── docs/                         # Documentation
+├── design/                       # UI/UX designs
+├── references/                   # Reference implementations
+├── templates/                    # CloudFormation templates
+│   ├── iam.role.audit.account.cfn.yaml
+│   └── iam.role.child.account.cfn.yaml
 │
 ├── .github/
-│   └── workflows/        # GitHub Actions CI/CD
+│   └── workflows/                # GitHub Actions CI/CD
 │
 └── README.md
 ```
@@ -198,58 +293,58 @@ tops/
 
 ## First Steps
 
-### Step 1: Project Initialization
-1. Create monorepo structure
-2. Initialize Nuxt 3 frontend
-3. Initialize NestJS backend
-4. Set up NestJS project configuration
+### Step 1: Project Initialization ✅ COMPLETED
+1. Create Laravel application structure
+2. Initialize Vue 3 frontend with Inertia.js
+3. Set up Laravel Breeze for authentication scaffolding
+4. Configure Vite for frontend bundling
 5. Set up basic project configuration
 
-### Step 2: Development Environment Setup
-1. Configure TypeScript for both projects
-2. Set up ESLint/Prettier
-3. Configure environment variables
+### Step 2: Development Environment Setup ✅ COMPLETED
+1. Configure TypeScript for Vue frontend
+2. Set up Laravel Pint for PHP code style
+3. Configure environment variables (.env)
 4. Set up Firebase project and configuration
-5. Set up Prisma with MySQL
+5. Configure MySQL database connection
 
-### Step 3: Backend Foundation
-1. Set up NestJS project structure
-2. Configure NestJS modules and controllers
-3. Set up Prisma service for database access
-4. Configure database connection (Prisma + MySQL)
-5. Set up Firebase Admin SDK for token verification
-6. Create authentication guard and strategy
-7. Create user and organization modules
-8. Set up multi-tenancy support
-9. Create API response interceptors and DTOs
-10. Set up Swagger/OpenAPI documentation
+### Step 3: Backend Foundation ✅ COMPLETED
+1. Set up Laravel project structure
+2. Create API controllers (Organizations, AwsAccounts, Scans)
+3. Set up Eloquent models and relationships
+4. Configure database migrations
+5. Set up Firebase PHP SDK for token verification
+6. Create VerifyFirebaseToken middleware
+7. Create user and organization models
+8. Set up SetOrganizationContext middleware for multi-tenancy
+9. Create Form Request classes for validation
+10. Set up API routes with middleware groups
 
-### Step 4: Frontend Foundation
-1. Set up Nuxt 3 project structure
-2. Install and configure PrimeVue
-3. Configure Firebase Authentication
-4. Set up routing with authentication guards
-5. Set up Pinia stores (auth, organizations, scans)
+### Step 4: Frontend Foundation ✅ COMPLETED
+1. Set up Vue 3 with Inertia.js
+2. Install and configure Tailwind CSS
+3. Configure Firebase Authentication (JS SDK)
+4. Set up routing with Laravel/Inertia
+5. Create Vue composables (useFirebase, useOrganizations, useAwsAccounts, useScans)
 6. Create authentication pages (login/register)
-7. Set up API client/service layer
-8. Create Firebase Auth composables
+7. Set up Axios for API requests
+8. Create reusable Vue components
 
-### Step 5: AWS Integration
-1. Create AWS module in NestJS
+### Step 5: AWS Integration ✅ COMPLETED
+1. Create AwsSecurityScanner service
 2. Implement AWS credential management (IAM Role storage, encrypted)
 3. Build CloudFormation link generation for cross-account roles
-4. Implement AWS scanning service (S3, IAM, EC2, RDS checks)
-5. Create scan results storage in MySQL
-6. Build API endpoints for scans (NestJS controllers)
-7. Set up AWS SDK v3 integration
-8. Create SNS webhook handler for account registration
+4. Implement scanning services (S3Scanner, IamScanner, Ec2Scanner, RdsScanner)
+5. Create RulesEngine for findings evaluation
+6. Create scan results storage (ScanResult, ScanDetail models)
+7. Build API endpoints for scans (ScansController)
+8. Set up AWS SDK PHP integration
+9. Create SNS webhook handler with signature verification
 
-### Step 6: Frontend Integration
-1. Create AWS account management UI (with CloudFormation link workflow)
-2. Build scan execution interface
-3. Create results dashboard with PrimeVue components
-4. Implement reporting features (export PDF, CSV, JSON)
-5. Create organization/team management UI
+### Step 6: Frontend Integration ✅ COMPLETED
+1. Create AWS account management UI (Index.vue, AddAwsAccountModal.vue)
+2. Build scan execution interface (Scans/Index.vue, NewScanModal.vue)
+3. Create results dashboard (Scans/Show.vue)
+4. Create organization/team management UI (Organizations/Index.vue, Settings.vue)
 
 ### Step 7: EC2 Deployment
 1. Set up EC2 instance:
@@ -261,8 +356,8 @@ tops/
    - Configure ACM certificate for api.teemops.com
    - Set up target group pointing to EC2 instance
    - Configure health checks
-3. Configure Node.js and PM2 process manager
-4. Set up Nginx reverse proxy (optional, for static assets)
+3. Configure PHP-FPM and Nginx
+4. Set up Supervisor for Laravel queue workers
 5. Configure environment variables (use AWS Systems Manager Parameter Store)
 6. Set up RDS connection and connection pooling
 7. Configure IAM roles and permissions for EC2:
@@ -355,105 +450,114 @@ tops/
 ### Confirmed Tech Stack:
 
 1. **Database**: MySQL (AWS RDS)
-2. **ORM**: Prisma (modern, type-safe, great DX)
-3. **UI Framework**: PrimeVue (Material Design)
-4. **State Management**: Pinia (official Vue 3 state management)
+2. **ORM**: Eloquent (Laravel built-in)
+3. **UI Framework**: Tailwind CSS with custom Vue components
+4. **State Management**: Vue 3 Composables
 5. **Authentication**: Firebase Authentication (OAuth preferred, email/password supported)
-6. **Backend Deployment**: NestJS API on EC2 instance
-7. **AWS Scanning**: AWS SDK v3 + custom checks (S3, IAM, EC2, RDS)
+6. **Backend Deployment**: Laravel on EC2 instance
+7. **AWS Scanning**: AWS SDK PHP v3 + custom checks (S3, IAM, EC2, RDS)
 8. **Monorepo**: Yes, single repository for the project
 9. **CI/CD**: GitHub Actions
 10. **Multi-tenancy**: Organizations/Teams (Firebase Auth + MySQL)
 
-### NestJS API Considerations:
+### Laravel Application Considerations:
 
-- **Modular Architecture**: NestJS modules for each feature (organizations, aws-accounts, scans, etc.)
-- **Stateless Design**: Application is stateless to support horizontal scaling
-- **Database Connections**: Use Prisma connection pooling for MySQL (RDS Proxy recommended for multiple instances)
-- **Environment Variables**: Store in AWS Systems Manager Parameter Store or Secrets Manager
-- **CORS**: Configure CORS middleware for frontend access (api.teemops.com)
-- **Rate Limiting**: Implement rate limiting middleware (per IP/user)
-- **Process Management**: Use PM2 for process management and auto-restart
+- **Service-Based Architecture**: Services for business logic (AwsSecurityScanner, RulesEngine, individual Scanners)
+- **Stateless API**: API routes are stateless for horizontal scaling
+- **Session-Based Web**: Web routes use Laravel sessions for Inertia.js
+- **Database Connections**: Eloquent with connection pooling (RDS Proxy recommended for multiple instances)
+- **Environment Variables**: Store in `.env` or AWS Systems Manager Parameter Store
+- **CORS**: Laravel CORS middleware configured for API access
+- **Rate Limiting**: Laravel rate limiting middleware (per IP/user)
+- **Process Management**: Supervisor for queue workers, systemd for PHP-FPM
 - **Health Checks**: Implement health check endpoints for ALB monitoring
-- **Logging**: Use Winston or Pino for structured logging to CloudWatch
-- **Session Management**: No server-side sessions (stateless, uses Firebase tokens)
+- **Logging**: Laravel logging to CloudWatch via log channels
+- **Queue Processing**: Laravel Queue with database/SQS driver for async scans
 - **Horizontal Scaling**: Ready for Auto Scaling Group with multiple instances behind ALB
 
 ---
 
-## NestJS API Integration
+## Laravel API Integration
 
-### NestJS Application Setup
+### Laravel Application Setup
 
-The backend uses NestJS framework for a structured, scalable API with TypeScript support.
+The backend uses Laravel 12 framework for a structured, scalable API with PHP 8.2+.
 
 #### Key Components:
 
-1. **NestJS Module Structure**
-   ```typescript
-   // src/organizations/organizations.controller.ts
-   import { Controller, Get, Post, Put, Delete, Param, Body, UseGuards } from '@nestjs/common';
-   import { AuthGuard } from '../auth/auth.guard';
-   import { OrganizationsService } from './organizations.service';
+1. **Laravel Controller Structure**
+   ```php
+   // app/Http/Controllers/Api/OrganizationsController.php
+   namespace App\Http\Controllers\Api;
 
-   @Controller('organizations')
-   @UseGuards(AuthGuard)
-   export class OrganizationsController {
-     constructor(private readonly organizationsService: OrganizationsService) {}
+   use App\Http\Controllers\Controller;
+   use App\Http\Requests\StoreOrganizationRequest;
+   use App\Models\Organization;
+   use Illuminate\Http\Request;
 
-     @Get()
-     async getOrganizations(@CurrentUser() user) {
-       return this.organizationsService.findAll(user.id);
-     }
+   class OrganizationsController extends Controller
+   {
+       public function index(Request $request)
+       {
+           $organizations = $request->user()->organizations;
+           return response()->json(['success' => true, 'data' => $organizations]);
+       }
 
-     @Post()
-     async createOrganization(@CurrentUser() user, @Body() createDto: CreateOrganizationDto) {
-       return this.organizationsService.create(user.id, createDto);
-     }
+       public function store(StoreOrganizationRequest $request)
+       {
+           $organization = $request->user()->organizations()->create($request->validated());
+           return response()->json(['success' => true, 'data' => $organization], 201);
+       }
    }
    ```
 
-2. **NestJS Configuration**
-   - Modular architecture with feature modules
-   - Dependency injection for services
-   - Guards for authentication and authorization
-   - Interceptors for response transformation
-   - Exception filters for error handling
-   - DTOs for request/response validation
+2. **Laravel Architecture Patterns**
+   - Controllers for HTTP request handling
+   - Form Requests for validation
+   - Middleware for authentication and authorization
+   - Services for business logic
+   - Jobs for async processing (queue workers)
+   - Eloquent models for database access
 
-3. **Module Organization**
-   - Separate modules per feature (organizations, aws-accounts, scans, etc.)
-   - Shared common module for utilities
-   - Prisma service for database access
-   - Auth module for Firebase token verification
+3. **Code Organization**
+   - API Controllers in `app/Http/Controllers/Api/`
+   - Services in `app/Services/` (AwsSecurityScanner, RulesEngine, Scanners)
+   - Queue Jobs in `app/Jobs/`
+   - Middleware in `app/Http/Middleware/`
+   - Form Requests in `app/Http/Requests/`
 
 ### Firebase Authentication Integration
 
-#### Frontend (Nuxt 3):
-- Install Firebase JS SDK
-- Create Firebase plugin for Nuxt
-- Set up authentication composables
+#### Frontend (Vue 3 + Inertia.js):
+- Firebase JS SDK installed via npm (`firebase` package)
+- `useFirebase.ts` composable for authentication state
 - Handle OAuth flows (Google, Apple, Microsoft)
-- Store Firebase tokens in Pinia store
-- Send tokens in API requests (Authorization header)
+- Firebase tokens sent in API requests (Authorization header)
+- Session-based auth for web routes, token-based for API routes
 
-#### Backend (NestJS API):
-- Install Firebase Admin SDK
-- Create authentication guard to verify Firebase tokens
-- Create custom decorator to extract user information
-- Map Firebase UID to database user records
-- Support multi-tenant organization context
-- Use NestJS guards and interceptors
+#### Backend (Laravel):
+- Firebase PHP SDK (`kreait/firebase-php` package)
+- `VerifyFirebaseToken` middleware for API authentication
+- `FirebaseAuthController` for auth endpoints
+- Map Firebase UID to database user records via `firebase_uid` column
+- `SetOrganizationContext` middleware for multi-tenant context
 
 #### Authentication Flow:
 ```
 1. User authenticates via Firebase (OAuth or email/password)
 2. Firebase returns ID token
-3. Frontend sends token in Authorization header
-4. Backend verifies token with Firebase Admin SDK
-5. Backend extracts user info and organization context
+3. Frontend sends token in Authorization header (API routes)
+   OR uses Laravel session auth (web routes via Inertia)
+4. Laravel middleware verifies token with Firebase PHP SDK
+5. Middleware extracts user info and sets organization context
 6. Request proceeds with authenticated user context
 ```
+
+#### Key Files:
+- `app/Http/Middleware/VerifyFirebaseToken.php` - Token verification
+- `app/Http/Middleware/SetOrganizationContext.php` - Multi-tenancy
+- `app/Http/Controllers/Auth/FirebaseAuthController.php` - Auth endpoints
+- `resources/js/composables/useFirebase.ts` - Frontend auth composable
 
 ### Multi-Tenancy Architecture
 
@@ -582,16 +686,16 @@ aws_accounts:
        │ 1. Clicks "Add AWS Account"
        ▼
 ┌─────────────────────────────────┐
-│  Frontend (Nuxt)                │
+│  Frontend (Vue/Inertia)         │
 │  - Gets current OrgId           │
 │  - Calls API to init account    │
 └──────┬──────────────────────────┘
        │ 2. POST /organizations/{orgId}/aws-accounts/init
        ▼
 ┌─────────────────────────────────┐
-│  Backend Lambda                 │
-│  - Generates UniqueId (UUID)   │
-│  - Generates ExternalId (UUID)   │
+│  Backend (Laravel)              │
+│  - Generates UniqueId (UUID)    │
+│  - Generates ExternalId (UUID)  │
 │  - Creates pending record       │
 │  - Returns CloudFormation URL   │
 └──────┬──────────────────────────┘
@@ -600,7 +704,7 @@ aws_accounts:
 ┌─────────────────────────────────┐
 │  Frontend                       │
 │  - Opens CloudFormation URL     │
-│  - New window/tab              │
+│  - New window/tab               │
 └──────┬──────────────────────────┘
        │ 4. User completes CF stack
        ▼
@@ -615,13 +719,14 @@ aws_accounts:
 ┌─────────────────────────────────┐
 │  Parent Account SNS Topic       │
 │  - Receives notification        │
-│  - Triggers Lambda subscriber   │
+│  - Sends to Laravel endpoint    │
 └──────┬──────────────────────────┘
-       │ 6. Lambda processes notification
+       │ 6. Laravel processes notification
        ▼
 ┌─────────────────────────────────┐
-│  Backend Lambda (SNS Handler)   │
-│  - Extracts: RoleArn, ExternalId,│
+│  Backend (Laravel SNS Handler)  │
+│  - Verifies SNS signature       │
+│  - Extracts: RoleArn, ExternalId│
 │    UniqueId, OrgId              │
 │  - Matches by UniqueId          │
 │  - Stores encrypted RoleArn     │
@@ -653,27 +758,55 @@ aws_accounts:
 
 ### Environment Variables Needed
 
-#### Backend (NestJS on EC2):
+#### Laravel Application (.env):
 ```
+# Application
+APP_NAME=TeemOps
+APP_ENV=production
+APP_KEY=base64:your-app-key
+APP_DEBUG=false
+APP_URL=https://app.teemops.com
+
+# Database
+DB_CONNECTION=mysql
+DB_HOST=rds-endpoint.region.rds.amazonaws.com
+DB_PORT=3306
+DB_DATABASE=teemops
+DB_USERNAME=teemops
+DB_PASSWORD=your-db-password
+
+# Firebase Authentication
 FIREBASE_PROJECT_ID=your-project-id
-FIREBASE_PRIVATE_KEY=your-private-key
-FIREBASE_CLIENT_EMAIL=your-client-email
-DATABASE_URL=mysql://user:pass@rds-endpoint:3306/dbname
+FIREBASE_CREDENTIALS=/path/to/firebase-credentials.json
+
+# AWS Configuration
 AWS_REGION=us-west-2
 AWS_PARENT_ACCOUNT_ID=123456789012
-ENCRYPTION_KEY=your-encryption-key-for-iam-roles
-PORT=3000
-NODE_ENV=production
+AWS_ACCESS_KEY_ID=your-access-key  # Or use EC2 instance role
+AWS_SECRET_ACCESS_KEY=your-secret-key
+
+# SNS Configuration
 SNS_TOPIC_ARN=arn:aws:sns:us-west-2:account-id:teemops-sns
+
+# CloudFormation Template
 CLOUDFORMATION_TEMPLATE_URL=https://s3.amazonaws.com/storage.auditaws.com/iam.role.child.account.cfn.yaml
+
+# Queue Configuration
+QUEUE_CONNECTION=database  # Or 'sqs' for AWS SQS
+
+# Session/Cache
+SESSION_DRIVER=database
+CACHE_STORE=database
 ```
 
-#### Frontend:
+#### Frontend (Vite environment variables):
 ```
-NUXT_PUBLIC_FIREBASE_API_KEY=your-api-key
-NUXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
-NUXT_PUBLIC_FIREBASE_PROJECT_ID=your-project-id
-NUXT_PUBLIC_API_BASE_URL=https://api.teemops.com
+VITE_FIREBASE_API_KEY=your-api-key
+VITE_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=your-project-id
+VITE_FIREBASE_STORAGE_BUCKET=your-project.appspot.com
+VITE_FIREBASE_MESSAGING_SENDER_ID=your-sender-id
+VITE_FIREBASE_APP_ID=your-app-id
 ```
 
 ---
@@ -685,6 +818,12 @@ NUXT_PUBLIC_API_BASE_URL=https://api.teemops.com
 - **Operating System**: Ubuntu 22.04 LTS
 - **Storage**: 100GB EBS Volume (gp3)
 - **Region**: us-west-2
+- **Software Stack**:
+  - PHP 8.2+ with PHP-FPM
+  - Nginx web server
+  - Composer (PHP package manager)
+  - Node.js 18+ (for Vite build)
+  - Supervisor (for queue workers)
 - **Security Groups**:
   - HTTP (80) from ALB
   - HTTPS (443) from ALB
@@ -692,17 +831,18 @@ NUXT_PUBLIC_API_BASE_URL=https://api.teemops.com
 
 ### Application Load Balancer (Day 1)
 - **Type**: Application Load Balancer
-- **Domain**: api.teemops.com
+- **Domain**: app.teemops.com
 - **SSL/TLS**: ACM certificate
-- **Health Checks**: Configured for NestJS health endpoint
-- **Target Group**: EC2 instance(s) on port 3000
+- **Health Checks**: Configured for Laravel health endpoint (`/up` or custom)
+- **Target Group**: EC2 instance(s) on port 80 (Nginx)
 - **Region**: us-west-2
 
 ### SNS Configuration
 - **Topic Name**: teemops-sns (created via CloudFormation)
 - **Region**: us-west-2
 - **Purpose**: Receive notifications from customer CloudFormation stacks
-- **Subscriber**: NestJS webhook endpoint `/api/aws-accounts/sns-callback`
+- **Subscriber**: Laravel webhook endpoint `/api/aws-accounts/sns-callback`
+- **Signature Verification**: `SnsSignatureVerifier.php` service validates SNS message authenticity
 
 ### CloudFormation Template
 - **S3 URL**: Configurable via environment variable `CLOUDFORMATION_TEMPLATE_URL`
@@ -714,32 +854,40 @@ NUXT_PUBLIC_API_BASE_URL=https://api.teemops.com
 
 ### Monitoring & Logging
 - **CloudWatch Logs**: Application logs with 7-day retention (configurable)
+- **Laravel Logging**: Configured via `config/logging.php` with CloudWatch channel
 - **CloudWatch Metrics**: 
   - EC2 instance metrics (CPU, memory, network)
   - Application metrics (request count, latency, errors)
   - Database connection pool metrics
+  - Queue worker metrics (jobs processed, failed)
 - **Log Groups**:
-  - `/aws/ec2/teemops-api` - Application logs
-  - `/aws/ec2/teemops-api/errors` - Error logs
+  - `/aws/ec2/teemops/laravel` - Laravel application logs
+  - `/aws/ec2/teemops/nginx` - Nginx access/error logs
+  - `/aws/ec2/teemops/queue` - Queue worker logs
 
 ### Scaling Strategy
 - **Initial Load**: 20 users
-- **Architecture**: Stateless application (horizontal scaling ready)
+- **Architecture**: Stateless API, session-based web (horizontal scaling ready with sticky sessions)
 - **Day 1**: Application Load Balancer with single EC2 instance
+- **Queue Workers**: Supervisor managing Laravel queue workers for async scan processing
 - **Future Scaling**: 
   - Auto Scaling Group behind ALB
+  - Sticky sessions for web routes (Inertia.js)
   - Scale based on CPU utilization or request count
   - Minimum: 1 instance, Maximum: 10 instances (configurable)
   - Target: 70% CPU utilization
+  - Separate queue worker instances for heavy scanning loads
 
 ### IAM Roles & Permissions
 EC2 instance role requires:
 - **RDS Access**: Connect to MySQL database
-- **SNS Access**: Publish/subscribe to SNS topic
+- **SNS Access**: Subscribe to SNS topic for CloudFormation notifications
+- **SQS Access**: Send/receive messages (if using SQS queue driver)
 - **Systems Manager**: Read Parameter Store values
 - **Secrets Manager**: Read secrets (if used)
 - **CloudWatch**: Write logs and metrics
-- **STS AssumeRole**: Assume roles in customer AWS accounts
+- **STS AssumeRole**: Assume roles in customer AWS accounts for scanning
+- **S3 Access**: Read CloudFormation templates (if self-hosted)
 
 ---
 
@@ -1319,6 +1467,44 @@ Response: {
 - The feature flag should be checked at runtime to determine which authentication provider to use
 - Both authentication methods should maintain the same user experience and API contracts
 
+#### Secure Custom Rulesets Protection for Conditions
+**Feature**: Implement security measures to prevent arbitrary code execution in custom ruleset conditions
+
+**Description**:
+- Currently, the `ConditionEvaluator` uses PHP `eval()` to evaluate condition expressions from rulesets (e.g., `basic.json`, `cis.json`, `pci.json`)
+- The current implementation is safe because we control all ruleset files
+- In the future, we may allow customers to create and upload their own custom rulesets
+- Without proper security measures, malicious conditions could execute arbitrary PHP code, leading to:
+  - Remote code execution (RCE)
+  - Data exfiltration
+  - System compromise
+  - Privilege escalation
+
+**Security Requirements**:
+- Prevent execution of arbitrary PHP code in condition expressions
+- Allow only safe, whitelisted PHP functions and operations
+- Validate and sanitize all condition expressions before evaluation
+- Implement sandboxing or restricted execution environment
+- Log all condition evaluations for security auditing
+
+**Potential Implementation Approaches**:
+1. **AST-based Parser**: Parse PHP expressions into an Abstract Syntax Tree (AST) and validate against a whitelist of allowed operations
+2. **Expression Language Library**: Use a dedicated expression evaluator library (e.g., Symfony ExpressionLanguage) that provides built-in security
+3. **Sandboxed Execution**: Run condition evaluation in an isolated environment with restricted capabilities
+4. **Whitelist Validation**: Pre-validate conditions against a strict whitelist of allowed functions, operators, and patterns
+5. **Template-based Approach**: Provide a template system where customers can only use predefined condition templates
+
+**Implementation Notes**:
+- This is a critical security feature that must be implemented before allowing customer-uploaded rulesets
+- Consider implementing this as a separate "secure" mode that can be enabled when custom rulesets are allowed
+- Maintain backward compatibility with existing rulesets (basic.json, cis.json, pci.json)
+- Document allowed condition patterns and provide validation feedback to customers
+- Consider rate limiting condition evaluations to prevent resource exhaustion attacks
+
+**Related Files**:
+- `app/app/Services/RulesEngine/ConditionEvaluator.php` - Current implementation using `eval()`
+- `app/rules/rulesets/*.json` - Ruleset files containing condition expressions (basic.json, cis.json, pci.json)
+
 ---
 
 ## Next Actions
@@ -1331,4 +1517,623 @@ Once you provide answers to the questions above, I can:
 5. Create the initial UI
 
 Would you like me to proceed with the recommended defaults, or do you have specific preferences for any of the questions above?
+
+---
+
+## AWS Security Scanning Feature Roadmap
+
+### Research Summary
+
+This roadmap is based on comprehensive research of:
+- Top 20 AWS services requiring security auditing
+- Top 100 AWS security misconfigurations and vulnerabilities
+- CIS AWS Foundations Benchmark v5.0.0 (40 controls)
+- AWS Security Hub CSPM controls (500+ controls)
+- Prowler security checks (584+ checks across 85 AWS services)
+- Industry best practices from 2025-2026
+
+### Current Implementation Status
+
+**Currently Implemented Services:**
+- ✅ S3 (4 checks)
+- ✅ IAM (10 checks)
+- ✅ EC2/VPC (5 checks)
+- ✅ RDS (6 checks)
+
+**Total Current Checks:** ~25 rules
+
+---
+
+### Top 20 AWS Services Requiring Security Auditing
+
+Prioritized by enterprise adoption and security impact:
+
+| Priority | Service | Description | Current Status |
+|----------|---------|-------------|----------------|
+| 1 | **IAM** | Identity and Access Management | ✅ Partial |
+| 2 | **S3** | Object Storage | ✅ Partial |
+| 3 | **EC2** | Compute Instances | ✅ Partial |
+| 4 | **VPC** | Network Security | ✅ Partial |
+| 5 | **RDS** | Relational Databases | ✅ Partial |
+| 6 | **CloudTrail** | Audit Logging | ❌ Not Implemented |
+| 7 | **Lambda** | Serverless Functions | ❌ Not Implemented |
+| 8 | **KMS** | Key Management | ❌ Not Implemented |
+| 9 | **Secrets Manager** | Secrets Storage | ❌ Not Implemented |
+| 10 | **CloudWatch** | Monitoring & Logging | ❌ Not Implemented |
+| 11 | **EKS/ECS** | Container Services | ❌ Not Implemented |
+| 12 | **SNS/SQS** | Messaging Services | ❌ Not Implemented |
+| 13 | **API Gateway** | API Management | ❌ Not Implemented |
+| 14 | **CloudFront** | CDN & Edge Security | ❌ Not Implemented |
+| 15 | **ELB/ALB** | Load Balancers | ❌ Not Implemented |
+| 16 | **DynamoDB** | NoSQL Database | ❌ Not Implemented |
+| 17 | **Route 53** | DNS Security | ❌ Not Implemented |
+| 18 | **ACM** | Certificate Management | ❌ Not Implemented |
+| 19 | **Config** | Configuration Compliance | ❌ Not Implemented |
+| 20 | **GuardDuty** | Threat Detection | ❌ Not Implemented |
+
+---
+
+### Top 100 AWS Security Issues by Category
+
+#### Category 1: Identity & Access Management (IAM) - 20 Issues
+
+**HIGH SEVERITY:**
+1. Root account without MFA enabled
+2. Root account access keys exist
+3. IAM users without MFA
+4. IAM policies with wildcard (*:*) permissions
+5. IAM users with AdministratorAccess policy
+6. IAM users with console access but no MFA
+7. Inactive IAM users (90+ days)
+8. Access keys not rotated (90+ days)
+9. IAM password policy not compliant
+10. Cross-account IAM role trust relationships too permissive
+
+**MEDIUM SEVERITY:**
+11. IAM users with inline policies
+12. IAM groups with inline policies
+13. IAM roles with inline policies
+14. IAM users not in groups
+15. IAM policies attached directly to users
+16. IAM users with multiple access keys
+17. Console passwords not rotated (90+ days)
+18. IAM roles with excessive permissions
+19. Service-linked roles with overly permissive policies
+20. IAM Access Analyzer not enabled
+
+#### Category 2: Storage Security (S3, EBS, EFS) - 15 Issues
+
+**HIGH SEVERITY:**
+21. S3 buckets publicly accessible
+22. S3 buckets without encryption at rest
+23. S3 bucket policies allowing public access
+24. S3 buckets with ACL allowing AllUsers
+25. EBS volumes unencrypted
+26. EBS snapshots shared publicly
+
+**MEDIUM SEVERITY:**
+27. S3 buckets without versioning
+28. S3 buckets without logging enabled
+29. S3 buckets without lifecycle policies
+30. S3 Object Lock not enabled for compliance data
+31. EFS file systems unencrypted
+32. EFS without backup policy
+33. S3 buckets without MFA delete enabled
+34. S3 cross-region replication not enabled for DR
+35. S3 bucket keys not enabled for cost optimization
+
+#### Category 3: Network Security (VPC, Security Groups, NACLs) - 15 Issues
+
+**HIGH SEVERITY:**
+36. Security groups allowing 0.0.0.0/0 on SSH (22)
+37. Security groups allowing 0.0.0.0/0 on RDP (3389)
+38. Security groups allowing 0.0.0.0/0 on all ports
+39. Default VPC in use
+40. VPC flow logs not enabled
+41. Network ACLs allowing unrestricted inbound traffic
+
+**MEDIUM SEVERITY:**
+42. Security groups with unrestricted outbound rules
+43. Subnets auto-assign public IP enabled
+44. Missing NAT Gateway for private subnet internet access
+45. VPC endpoints not configured for AWS services
+46. Unused security groups
+47. Unused Elastic IP addresses
+48. VPC peering without proper route table configuration
+49. Transit Gateway attachments without encryption
+50. Network firewall not configured
+
+#### Category 4: Compute Security (EC2, Lambda, ECS/EKS) - 15 Issues
+
+**HIGH SEVERITY:**
+51. EC2 instances with public IP addresses
+52. EC2 instances with IMDSv1 enabled (SSRF vulnerable)
+53. Lambda functions with wildcard IAM permissions
+54. Lambda functions in public subnet
+55. EKS cluster endpoint publicly accessible
+56. ECS tasks running as root
+
+**MEDIUM SEVERITY:**
+57. EC2 instances without termination protection
+58. EC2 instances using default security group
+59. Lambda functions without VPC configuration
+60. Lambda environment variables with secrets in plaintext
+61. ECS tasks without logging enabled
+62. EKS cluster logging not enabled
+63. EC2 instances without detailed monitoring
+64. Auto Scaling groups without health checks
+65. Lambda functions with deprecated runtimes
+
+#### Category 5: Database Security (RDS, DynamoDB, ElastiCache) - 12 Issues
+
+**HIGH SEVERITY:**
+66. RDS instances publicly accessible
+67. RDS instances without encryption
+68. RDS snapshots shared publicly
+69. DynamoDB tables without encryption
+70. ElastiCache clusters without encryption in transit
+
+**MEDIUM SEVERITY:**
+71. RDS instances without Multi-AZ
+72. RDS automated backups disabled
+73. RDS instances with default parameter groups
+74. DynamoDB tables without point-in-time recovery
+75. ElastiCache without automatic failover
+76. RDS instances without enhanced monitoring
+77. Aurora clusters without deletion protection
+
+#### Category 6: Logging & Monitoring (CloudTrail, CloudWatch, Config) - 10 Issues
+
+**HIGH SEVERITY:**
+78. CloudTrail not enabled in all regions
+79. CloudTrail logs not encrypted
+80. CloudTrail log file validation disabled
+81. CloudWatch Log Groups without retention policy
+
+**MEDIUM SEVERITY:**
+82. CloudTrail not integrated with CloudWatch
+83. AWS Config not enabled
+84. GuardDuty not enabled
+85. Security Hub not enabled
+86. CloudWatch alarms not configured for root login
+87. VPC flow logs not sent to CloudWatch
+
+#### Category 7: Encryption & Key Management (KMS, ACM, Secrets Manager) - 8 Issues
+
+**HIGH SEVERITY:**
+88. KMS keys without rotation enabled
+89. KMS keys scheduled for deletion
+90. Secrets Manager secrets without rotation
+91. ACM certificates expiring soon (<30 days)
+
+**MEDIUM SEVERITY:**
+92. KMS keys with overly permissive policies
+93. Secrets Manager without VPC endpoint
+94. ACM certificates using RSA-1024
+95. Customer managed keys not used for sensitive data
+
+#### Category 8: Application Security (API Gateway, CloudFront, ELB) - 5 Issues
+
+**HIGH SEVERITY:**
+96. API Gateway without authentication
+97. CloudFront without WAF
+98. ALB without HTTPS listener
+99. ALB using outdated TLS policy
+
+**MEDIUM SEVERITY:**
+100. CloudFront without access logging
+
+---
+
+### Prioritized Feature Roadmap
+
+Features are prioritized by:
+1. **Security Impact** - How critical is this for AWS account security
+2. **Implementation Simplicity** - How easy is it to implement
+
+#### Stage 1: Foundation Security (HIGH Impact, SIMPLE Implementation)
+*Timeline: Sprint 1-2*
+
+**1.1 CloudTrail Security Scanner** ⭐ HIGHEST PRIORITY
+- [ ] Check CloudTrail enabled in all regions
+- [ ] Check CloudTrail log encryption enabled
+- [ ] Check CloudTrail log file validation enabled
+- [ ] Check CloudTrail integrated with CloudWatch
+- [ ] Check CloudTrail S3 bucket not publicly accessible
+- [ ] Check CloudTrail logging for global services
+
+*Impact: Critical for audit compliance and incident response*
+*Complexity: Low - Simple API calls*
+
+**1.2 Enhanced IAM Scanner**
+- [ ] Root account MFA check
+- [ ] Root account access keys check
+- [ ] IAM password policy compliance
+- [ ] Access key rotation check (90+ days)
+- [ ] Inactive user detection (90+ days)
+- [ ] Console password rotation check
+- [ ] IAM Access Analyzer enabled check
+- [ ] Support policy analysis for wildcards
+
+*Impact: Prevents account compromise*
+*Complexity: Low - Extends existing scanner*
+
+**1.3 Enhanced S3 Scanner**
+- [ ] S3 bucket logging enabled check
+- [ ] S3 bucket lifecycle policy check
+- [ ] S3 MFA delete enabled check
+- [ ] S3 object lock check for compliance data
+- [ ] S3 cross-region replication check
+
+*Impact: Data protection and compliance*
+*Complexity: Low - Extends existing scanner*
+
+**1.4 EBS Volume Scanner**
+- [ ] EBS volume encryption check
+- [ ] EBS snapshot encryption check
+- [ ] EBS snapshot public sharing check
+- [ ] Unused EBS volumes detection
+
+*Impact: Data protection*
+*Complexity: Low - Simple API calls*
+
+#### Stage 2: Network & Compute Security (HIGH Impact, MEDIUM Implementation)
+*Timeline: Sprint 3-4*
+
+**2.1 Enhanced VPC/Network Scanner**
+- [ ] VPC flow logs enabled check
+- [ ] Security group SSH/RDP from 0.0.0.0/0 check
+- [ ] Security group all ports from 0.0.0.0/0 check
+- [ ] Network ACL unrestricted access check
+- [ ] Unused security groups detection
+- [ ] Unused Elastic IPs detection
+- [ ] VPC endpoint configuration check
+- [ ] NAT Gateway configuration check
+
+*Impact: Prevents unauthorized access*
+*Complexity: Medium - Multiple related checks*
+
+**2.2 EC2 Security Scanner Enhancements**
+- [ ] IMDSv2 enforcement check
+- [ ] EC2 detailed monitoring check
+- [ ] EC2 using default security group check
+- [ ] Auto Scaling health check configuration
+
+*Impact: Prevents SSRF and improves visibility*
+*Complexity: Medium - Requires instance metadata checks*
+
+**2.3 Lambda Security Scanner** ⭐ NEW SERVICE
+- [ ] Lambda IAM role permissions check
+- [ ] Lambda VPC configuration check
+- [ ] Lambda environment variable secrets check
+- [ ] Lambda deprecated runtime check
+- [ ] Lambda public URL check
+- [ ] Lambda reserved concurrency check
+
+*Impact: Serverless security*
+*Complexity: Medium - New scanner implementation*
+
+**2.4 RDS/Database Scanner Enhancements**
+- [ ] RDS enhanced monitoring check
+- [ ] RDS deletion protection check
+- [ ] RDS using default parameter group check
+- [ ] RDS Performance Insights check
+- [ ] RDS minor version auto-upgrade check
+
+*Impact: Database reliability and security*
+*Complexity: Low - Extends existing scanner*
+
+#### Stage 3: Encryption & Secrets (HIGH Impact, MEDIUM Implementation)
+*Timeline: Sprint 5-6*
+
+**3.1 KMS Security Scanner** ⭐ NEW SERVICE
+- [ ] KMS key rotation enabled check
+- [ ] KMS key deletion scheduled check
+- [ ] KMS key policy permissions check
+- [ ] Customer managed keys usage check
+- [ ] KMS key cross-account access check
+
+*Impact: Encryption key management*
+*Complexity: Medium - New scanner implementation*
+
+**3.2 Secrets Manager Scanner** ⭐ NEW SERVICE
+- [ ] Secrets rotation enabled check
+- [ ] Secrets rotation schedule check
+- [ ] Secrets without recent access check
+- [ ] Secrets with overly permissive policies
+- [ ] VPC endpoint for Secrets Manager check
+
+*Impact: Credentials security*
+*Complexity: Medium - New scanner implementation*
+
+**3.3 ACM Certificate Scanner** ⭐ NEW SERVICE
+- [ ] Certificate expiration check (<30, <7 days)
+- [ ] Certificate validation method check
+- [ ] Certificate key algorithm check (RSA-2048+)
+- [ ] Unused certificates detection
+- [ ] Certificate transparency logging check
+
+*Impact: TLS/SSL security*
+*Complexity: Low - Simple API calls*
+
+#### Stage 4: Security Services Integration (MEDIUM Impact, MEDIUM Implementation)
+*Timeline: Sprint 7-8*
+
+**4.1 GuardDuty Scanner** ⭐ NEW SERVICE
+- [ ] GuardDuty enabled in all regions check
+- [ ] GuardDuty findings severity check
+- [ ] GuardDuty S3 protection enabled check
+- [ ] GuardDuty EKS protection enabled check
+- [ ] GuardDuty malware protection enabled check
+
+*Impact: Threat detection coverage*
+*Complexity: Medium - New scanner implementation*
+
+**4.2 AWS Config Scanner** ⭐ NEW SERVICE
+- [ ] Config enabled in all regions check
+- [ ] Config recording all resource types check
+- [ ] Config delivery channel configured check
+- [ ] Config rules compliance status check
+
+*Impact: Configuration compliance*
+*Complexity: Medium - New scanner implementation*
+
+**4.3 Security Hub Scanner** ⭐ NEW SERVICE
+- [ ] Security Hub enabled check
+- [ ] Security Hub standards enabled check
+- [ ] Security Hub findings integration check
+- [ ] Security Hub cross-region aggregation check
+
+*Impact: Centralized security view*
+*Complexity: Medium - New scanner implementation*
+
+**4.4 CloudWatch Security Scanner** ⭐ NEW SERVICE
+- [ ] CloudWatch log groups retention check
+- [ ] CloudWatch log groups encryption check
+- [ ] Root login alarm configured check
+- [ ] Unauthorized API call alarm check
+- [ ] IAM policy change alarm check
+- [ ] Security group change alarm check
+
+*Impact: Monitoring and alerting*
+*Complexity: Medium - New scanner implementation*
+
+#### Stage 5: Application & Container Security (MEDIUM Impact, HIGH Implementation)
+*Timeline: Sprint 9-12*
+
+**5.1 API Gateway Scanner** ⭐ NEW SERVICE
+- [ ] API Gateway authentication check
+- [ ] API Gateway authorization check
+- [ ] API Gateway WAF integration check
+- [ ] API Gateway logging enabled check
+- [ ] API Gateway throttling configured check
+- [ ] API Gateway TLS version check
+
+*Impact: API security*
+*Complexity: High - Complex API structure*
+
+**5.2 CloudFront Scanner** ⭐ NEW SERVICE
+- [ ] CloudFront HTTPS enforcement check
+- [ ] CloudFront TLS version check
+- [ ] CloudFront WAF integration check
+- [ ] CloudFront access logging check
+- [ ] CloudFront origin access control check
+- [ ] CloudFront geo-restriction check
+
+*Impact: CDN and edge security*
+*Complexity: High - Multiple configuration points*
+
+**5.3 ELB/ALB Scanner** ⭐ NEW SERVICE
+- [ ] ALB HTTPS listener check
+- [ ] ALB TLS security policy check
+- [ ] ALB access logging check
+- [ ] ALB deletion protection check
+- [ ] ALB WAF integration check
+- [ ] NLB cross-zone load balancing check
+
+*Impact: Load balancer security*
+*Complexity: Medium - Multiple load balancer types*
+
+**5.4 EKS Security Scanner** ⭐ NEW SERVICE
+- [ ] EKS cluster endpoint private check
+- [ ] EKS cluster logging enabled check
+- [ ] EKS cluster secrets encryption check
+- [ ] EKS node group configuration check
+- [ ] EKS pod security policy check
+
+*Impact: Kubernetes security*
+*Complexity: Very High - Complex K8s integration*
+
+**5.5 ECS Security Scanner** ⭐ NEW SERVICE
+- [ ] ECS task definition secrets check
+- [ ] ECS task execution role check
+- [ ] ECS cluster Container Insights check
+- [ ] ECS service network configuration check
+- [ ] Fargate platform version check
+
+*Impact: Container security*
+*Complexity: High - Multiple ECS configurations*
+
+#### Stage 6: Messaging & Data Services (MEDIUM Impact, MEDIUM Implementation)
+*Timeline: Sprint 13-14*
+
+**6.1 SNS Security Scanner** ⭐ NEW SERVICE
+- [ ] SNS topic encryption check
+- [ ] SNS topic policy cross-account check
+- [ ] SNS topic HTTPS delivery check
+- [ ] SNS subscription protocol check
+
+*Impact: Messaging security*
+*Complexity: Medium - New scanner implementation*
+
+**6.2 SQS Security Scanner** ⭐ NEW SERVICE
+- [ ] SQS queue encryption check
+- [ ] SQS queue policy cross-account check
+- [ ] SQS dead letter queue configured check
+- [ ] SQS VPC endpoint check
+
+*Impact: Queue security*
+*Complexity: Medium - New scanner implementation*
+
+**6.3 DynamoDB Scanner** ⭐ NEW SERVICE
+- [ ] DynamoDB encryption check
+- [ ] DynamoDB point-in-time recovery check
+- [ ] DynamoDB deletion protection check
+- [ ] DynamoDB auto-scaling check
+- [ ] DynamoDB stream encryption check
+
+*Impact: NoSQL database security*
+*Complexity: Medium - New scanner implementation*
+
+**6.4 ElastiCache Scanner** ⭐ NEW SERVICE
+- [ ] ElastiCache encryption at rest check
+- [ ] ElastiCache encryption in transit check
+- [ ] ElastiCache automatic failover check
+- [ ] ElastiCache auth token check (Redis)
+- [ ] ElastiCache automatic backup check
+
+*Impact: Cache security*
+*Complexity: Medium - New scanner implementation*
+
+#### Stage 7: Advanced Features (MEDIUM Impact, HIGH Implementation)
+*Timeline: Sprint 15-18*
+
+**7.1 EFS Security Scanner** ⭐ NEW SERVICE
+- [ ] EFS encryption at rest check
+- [ ] EFS encryption in transit check
+- [ ] EFS backup policy check
+- [ ] EFS lifecycle policy check
+- [ ] EFS access point configuration check
+
+*Impact: File storage security*
+*Complexity: Medium - New scanner implementation*
+
+**7.2 ECR Security Scanner** ⭐ NEW SERVICE
+- [ ] ECR image scanning enabled check
+- [ ] ECR encryption check
+- [ ] ECR lifecycle policy check
+- [ ] ECR repository policy check
+- [ ] ECR immutable tags check
+
+*Impact: Container image security*
+*Complexity: Medium - New scanner implementation*
+
+**7.3 Route 53 Scanner** ⭐ NEW SERVICE
+- [ ] Route 53 DNSSEC enabled check
+- [ ] Route 53 health check configuration
+- [ ] Route 53 query logging check
+- [ ] Route 53 Resolver DNSSEC validation check
+
+*Impact: DNS security*
+*Complexity: High - DNS configuration complexity*
+
+**7.4 Cognito Scanner** ⭐ NEW SERVICE
+- [ ] Cognito MFA configuration check
+- [ ] Cognito password policy check
+- [ ] Cognito advanced security check
+- [ ] Cognito unauthenticated identities check
+- [ ] Cognito WAF integration check
+
+*Impact: Authentication security*
+*Complexity: High - Multiple Cognito features*
+
+**7.5 Redshift Scanner** ⭐ NEW SERVICE
+- [ ] Redshift encryption check
+- [ ] Redshift public accessibility check
+- [ ] Redshift SSL enforcement check
+- [ ] Redshift audit logging check
+- [ ] Redshift automated snapshot check
+
+*Impact: Data warehouse security*
+*Complexity: Medium - Similar to RDS*
+
+---
+
+### CIS AWS Foundations Benchmark v5.0 Alignment
+
+The roadmap aligns with CIS AWS Foundations Benchmark v5.0.0 sections:
+
+| CIS Section | Coverage | Implementation Stage |
+|-------------|----------|---------------------|
+| 1. IAM | Partial → Full | Stage 1 |
+| 2. Storage | Partial → Full | Stage 1 |
+| 3. Logging | Not Started | Stage 1 |
+| 4. Monitoring | Not Started | Stage 4 |
+| 5. Networking | Partial → Full | Stage 2 |
+
+---
+
+### Implementation Summary
+
+| Stage | New Services | New Checks | Estimated Sprints |
+|-------|--------------|------------|-------------------|
+| Stage 1 | 1 (CloudTrail) | ~25 | 2 |
+| Stage 2 | 1 (Lambda) | ~25 | 2 |
+| Stage 3 | 3 (KMS, Secrets, ACM) | ~20 | 2 |
+| Stage 4 | 4 (GuardDuty, Config, Security Hub, CloudWatch) | ~25 | 2 |
+| Stage 5 | 5 (API GW, CloudFront, ELB, EKS, ECS) | ~30 | 4 |
+| Stage 6 | 4 (SNS, SQS, DynamoDB, ElastiCache) | ~20 | 2 |
+| Stage 7 | 5 (EFS, ECR, Route53, Cognito, Redshift) | ~25 | 4 |
+
+**Total New Checks:** ~170 additional security checks
+**Total Services:** 24 AWS services (from current 4)
+**Total Timeline:** ~18 sprints
+
+---
+
+### Quick Wins (Can be implemented immediately)
+
+These checks can be added to existing scanners with minimal effort:
+
+1. **IAM Scanner Additions** (1-2 days each):
+   - Root account MFA check
+   - Password policy check
+   - Access key age check
+   - Inactive user check
+
+2. **S3 Scanner Additions** (1 day each):
+   - Bucket logging check
+   - Lifecycle policy check
+
+3. **EC2 Scanner Additions** (1 day each):
+   - IMDSv2 check
+   - Detailed monitoring check
+
+4. **RDS Scanner Additions** (1 day each):
+   - Deletion protection check
+   - Enhanced monitoring check
+
+---
+
+### Architecture Considerations
+
+For the new scanners, follow the existing Laravel pattern:
+
+1. **Create Scanner Class**: `app/app/Services/Scanners/{Service}Scanner.php`
+2. **Create Tasks File**: `app/rules/tasks/{service}/tasks.json`
+3. **Add Rules**: `app/rules/rulesets/basic.json` (and `cis.json`, `pci.json` as needed)
+4. **Register Scanner**: Update `app/app/Services/ScanTypesService.php`
+
+Each new scanner should:
+- Extend the base scanner pattern (see `S3Scanner.php`, `IamScanner.php`)
+- Use AWS SDK PHP v3 (`aws/aws-sdk-php`)
+- Follow the existing task/action pattern defined in tasks.json
+- Support regional and global resources appropriately
+- Include proper error handling for missing IAM permissions
+- Return data in format compatible with RulesEngine/FindingsEngine
+
+#### Scanner Architecture:
+```
+ProcessScanJob (main orchestrator)
+    └── ProcessRegionScanJob (per-region)
+            └── ProcessAuditScanJob (individual scan tasks)
+                    └── AwsSecurityScanner
+                            ├── S3Scanner
+                            ├── IamScanner
+                            ├── Ec2Scanner
+                            └── RdsScanner
+                                    └── RulesEngine
+                                            ├── ConditionEvaluator
+                                            └── FindingsEngine
+```
 
