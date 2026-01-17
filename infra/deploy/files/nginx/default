@@ -6,18 +6,31 @@ server {
         server_name localhost;
 
         root /usr/share/nginx/html;
-        index index.html index.htm;
+        index index.php index.html index.htm;
+
+        # Laravel-specific configuration (fix for pretty URLs, handle front controller)
+        location / {
+                try_files $uri $uri/ /index.php?$query_string;
+        }
+
+        location ~ \.php$ {
+                include snippets/fastcgi-php.conf;
+                fastcgi_pass unix:/run/php/php-fpm.sock;
+
+                # Laravel: Increase timeout for long requests (queues, artisan, etc.)
+                fastcgi_read_timeout 300;
+
+                # Laravel: Prevent access to .env and other sensitive files
+                location ~ /\.(env|env\.example|git|ht|svn|user\.ini) {
+                        deny all;
+                }
+        }
 
         location / {
                 try_files $uri $uri/ =404;
         }
 
-        location /api {
-          proxy_set_header X-Forwarded-Host $host;
-          proxy_set_header X-Forwarded-Server $host;
-          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-          proxy_pass   http://localhost:8080/api;
-        }
+        // (Removed location /api block as it is not required for php-fpm)
 
         location /rc- {
                 try_files $uri $uri/ =404;
