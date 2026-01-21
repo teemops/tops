@@ -18,6 +18,7 @@ chown -R www-data:www-data /srv/apps/tops
 #composer install
 cd /srv/apps/tops/app
 sudo -u www-data composer install --optimize-autoloader --no-dev
+sudo -u www-data composer update
 
 #npm install
 cd /srv/apps/tops/app
