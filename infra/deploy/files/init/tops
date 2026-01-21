@@ -7,6 +7,13 @@
 ############################################
 
 ##########INSTALL DEPENDENCIES#############
+#install zip
+echo "Installing Zip"
+#check if zip is installed
+if ! [ -x "$(command -v zip)" ]; then
+  echo 'zip is not installed.' >&2
+  sudo apt-get install zip
+fi
 #install awscli
 echo "Check aws cli"
 #check if awscli is installed
@@ -29,7 +36,8 @@ echo "Check php"
 #check if php is installed
 if ! [ -x "$(command -v php)" ]; then
   echo 'php is not installed.' >&2
-  sudo apt-get install -y php8.3 php8.3-cli php8.3-common php8.3-mysql php8.3-zip php8.3-gd php8.3-mbstring php8.3-curl php8.3-xml php8.3-bcmath
+  sudo apt-get install -y php8.3 php8.3-cli php8.3-common php8.3-mysql php8.3-zip php8.3-gd php8.3-mbstring php8.3-xml php8.3-bcmath
+  sudo apt-get install -y php8.3-curl
 fi
 #install node
 echo "Check nodejs"
@@ -97,6 +105,9 @@ mkdir /srv/scripts > /dev/null 2>&1
 cp -r /home/ubuntu/files/scripts/* /srv/scripts/
 #chmod all files in scripts directory to be executable
 chmod +x /srv/scripts/*
+
+#chown all files in /srv/apps/tops to be owned by www-data
+chown -R www-data:www-data /srv/apps/tops
 
 #CRON setup
 echo "Setting up cron jobs"

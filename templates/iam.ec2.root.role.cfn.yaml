@@ -1,0 +1,104 @@
+Resources:
+  TeemOpsGroup:
+    Type: "AWS::IAM::Group"
+    Properties:
+      GroupName: "teemops-root-users"
+      Path: "/"
+  TeemOpsRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName: "teemops-root"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "ec2.amazonaws.com"
+                - "cloudformation.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+          - Effect: "Allow"
+            Principal:
+              AWS:
+                - !Sub "arn:aws:iam::${AWS::AccountId}:root"
+            Action:
+              - "sts:AssumeRole"
+  TeemOpsInstanceProfile:
+    Type: "AWS::IAM::InstanceProfile"
+    Properties:
+      Roles:
+        - !Ref TeemOpsRole
+      InstanceProfileName: "TeemopsInstanceProfile"
+  TeemOpsPolicy:
+    Type: "AWS::IAM::Policy"
+    Properties:
+      PolicyName: "TeemopsSTSAssume"
+      Roles:
+        - !Ref TeemOpsRole
+      Groups:
+        - !Ref TeemOpsGroup
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Action:
+              - "sts:AssumeRole"
+            Resource: "*"
+  TeemOpsAppPolicy:
+    Type: "AWS::IAM::Policy"
+    Properties:
+      PolicyName: "TopsAppTasks"
+      Roles:
+        - !Ref TeemOpsRole
+      Groups:
+        - !Ref TeemOpsGroup
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Action:
+              - "sns:*"
+              - "cloudformation:*"
+              - "sqs:*"
+              - "events:*"
+              - "cloudwatch:*"
+              - "ssm:*"
+              - "pricing:*"
+            Resource: "*"
+  TeemOpsS3Policy:
+    Type: "AWS::IAM::Policy"
+    Properties:
+      PolicyName: "TeemopsS3Policy"
+      Roles:
+        - !Ref TeemOpsRole
+      Groups:
+        - !Ref TeemOpsGroup
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Action:
+              - "s3:CreateBucket"
+              - "s3:PutObject"
+              - "s3:PutObjectAcl"
+              - "s3:PutBucketPolicy"
+              - "s3:PutBucketAcl"
+              - "s3:GetObject"
+              - "s3:GetObjectAcl"
+              - "s3:GetBucketPolicy"
+              - "s3:GetBucketAcl"
+              - "s3:ListBucket"
+              - "s3:ListAllMyBuckets"
+            Resource: "*"
+  TeemOpsEventBusPolicy:
+    Type: AWS::Events::EventBusPolicy
+    Properties:
+      Action: "events:PutEvents"
+      Principal: "*"
+      StatementId: "TopsAllowCrossAccountEvents"
+Outputs:
+  InstanceProfile:
+    Value: !GetAtt
+      - TeemOpsInstanceProfile
+      - Arn
