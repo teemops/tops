@@ -39,6 +39,13 @@ if ! [ -x "$(command -v php)" ]; then
   sudo apt-get install -y php8.3 php8.3-cli php8.3-common php8.3-mysql php8.3-zip php8.3-gd php8.3-mbstring php8.3-xml php8.3-bcmath
   sudo apt-get install -y php8.3-curl
 fi
+# ensure PHP curl extension exists even if PHP was preinstalled
+if ! php -m | grep -qi curl; then
+  echo 'php curl extension missing. Installing and enabling php8.3-curl.'
+  sudo apt-get install -y php8.3-curl
+  sudo phpenmod curl
+  sudo systemctl restart php8.3-fpm
+fi
 #install node
 echo "Check nodejs"
 #check if nodejs is installed
@@ -108,7 +115,10 @@ chmod +x /srv/scripts/*
 
 #chown all files in /srv/apps/tops to be owned by www-data
 chown -R www-data:www-data /srv/apps/tops
-
+mkdir -p /var/www/.cache/
+chown -R www-data:www-data /var/www/.cache/
+mkdir -p /var/www/.npm/_logs
+chown -R www-data:www-data /var/www/.npm/_logs
 #CRON setup
 echo "Setting up cron jobs"
 #copy cron file to /etc/cron.d
