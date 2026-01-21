@@ -12,18 +12,27 @@ aws s3 cp s3://$ENV-tops-deploy/app/app.env /srv/apps/tops/app/.env
 echo "PATH=$PATH" > /etc/environment
 cat /srv/apps/tops/app/.env >> /etc/environment
 
+#chown all files in /srv/apps/tops to be owned by www-data
+chown -R www-data:www-data /srv/apps/tops
+
+#composer install
+cd /srv/apps/tops/app
+sudo -u www-data composer install --optimize-autoloader --no-dev
+
 #npm install
 cd /srv/apps/tops/app
-npm install
+sudo -u www-data npm install --legacy-peer-deps
+#build front-end assets for production
+sudo -u www-data npm run build
 
 #migrate database
-npx prisma migrate deploy
+sudo -u www-data php artisan migrate
 
 #kill all running node processes
 pkill -f node
 
-supervisorctl restart tops-account-q
-supervisorctl restart tops-queue
-supervisorctl restart tops-scan-queue
-supervisorctl restart tops-scan-region-q
+#restart nginx
+systemctl restart nginx
+#restart supervisor
+supervisorctl reload
 #rm -f /tmp/app.zip

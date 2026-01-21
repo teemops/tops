@@ -5,8 +5,16 @@ server {
         listen [::]:80 default_server ipv6only=on;
         server_name localhost;
 
-        root /usr/share/nginx/html;
+        # Set root to Laravel's public directory
+        # Update this path to match your actual Laravel deployment location
+        # Example: /var/www/app/public or /home/ubuntu/app/public
+        root /srv/apps/tops/app/public;
         index index.php index.html index.htm;
+
+        # Laravel: Prevent access to .env and other sensitive files
+        location ~ /\.(env|env\.example|git|ht|svn|user\.ini) {
+                deny all;
+        }
 
         # Laravel-specific configuration (fix for pretty URLs, handle front controller)
         location / {
@@ -19,18 +27,7 @@ server {
 
                 # Laravel: Increase timeout for long requests (queues, artisan, etc.)
                 fastcgi_read_timeout 300;
-
-                # Laravel: Prevent access to .env and other sensitive files
-                location ~ /\.(env|env\.example|git|ht|svn|user\.ini) {
-                        deny all;
-                }
         }
-
-        location / {
-                try_files $uri $uri/ =404;
-        }
-
-        // (Removed location /api block as it is not required for php-fpm)
 
         location /rc- {
                 try_files $uri $uri/ =404;
