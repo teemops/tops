@@ -14,6 +14,7 @@ cat /srv/apps/tops/app/.env >> /etc/environment
 
 #chown all files in /srv/apps/tops to be owned by www-data
 chown -R www-data:www-data /srv/apps/tops
+chown -R www-data:www-data /var/www/.npm
 
 #composer install
 cd /srv/apps/tops/app
@@ -24,7 +25,15 @@ sudo -u www-data composer update
 cd /srv/apps/tops/app
 sudo -u www-data npm install --legacy-peer-deps
 #build front-end assets for production
+export APP_URL=https://app.teem.nz
+export ZIGGY_URL=https://app.teem.nz
+export ASSET_URL=https://app.teem.nz
 sudo -u www-data npm run build
+
+#remove vite specific files
+rm -f public/hot
+php artisan optimize:clear
+php artisan config:cache
 
 #migrate database
 sudo -u www-data php artisan migrate

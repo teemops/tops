@@ -91,6 +91,36 @@ Resources:
               - "s3:ListBucket"
               - "s3:ListAllMyBuckets"
             Resource: "*"
+  TeemOpsSecretsManagerPolicy:
+    Type: "AWS::IAM::Policy"
+    Properties:
+      PolicyName: "TeemopsSecretsManagerPolicy"
+      Roles:
+        - !Ref TeemOpsRole
+      Groups:
+        - !Ref TeemOpsGroup
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Action:
+              - "secretsmanager:GetSecretValue"
+            Resource: "arn:aws:secretsmanager:*:*:secret:*tops*"
+  TeemOpsSSMParameterPolicy:
+    Type: "AWS::IAM::Policy"
+    Properties:
+      PolicyName: "TeemopsSSMParameterPolicy"
+      Roles:
+        - !Ref TeemOpsRole
+      Groups:
+        - !Ref TeemOpsGroup
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Action:
+              - "ssm:GetParameter"
+            Resource: "arn:aws:ssm:*:*:parameter/*tops*"
   TeemOpsEventBusPolicy:
     Type: AWS::Events::EventBusPolicy
     Properties:
