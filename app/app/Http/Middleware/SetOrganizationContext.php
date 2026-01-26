@@ -58,6 +58,7 @@ class SetOrganizationContext
 
             // Attach organization to request
             $request->merge(['organization' => $organization]);
+            $request->attributes->set('organization', $organization); // Also set in attributes for easier access
             
             // Attach user's role to request for permission checks
             $permissionService = app(\App\Services\OrganizationPermission::class);
@@ -117,6 +118,7 @@ class SetOrganizationContext
 
             if ($organization) {
                 $request->merge(['organization' => $organization]);
+                $request->attributes->set('organization', $organization); // Also set in attributes for easier access
                 
                 // Attach user's role to request
                 $permissionService = app(\App\Services\OrganizationPermission::class);

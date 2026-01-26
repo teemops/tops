@@ -13,7 +13,7 @@ const props = defineProps<{
     orgId: string;
 }>();
 
-const { members, invitations, loading, fetchMembers, fetchInvitations, updateMemberRole, removeMember, cancelInvitation } = useOrganizationMembers();
+const { members, invitations, loading, error, fetchMembers, fetchInvitations, updateMemberRole, removeMember, cancelInvitation } = useOrganizationMembers();
 const { canManageMembers, canInviteMembers, canListMembers } = useOrganizationPermissions();
 const { currentOrganization } = useOrganizations();
 const page = usePage();
@@ -109,6 +109,23 @@ const formatExpiresAt = (expiresAt: string) => {
 
 <template>
     <div class="space-y-6">
+        <!-- Error Message -->
+        <div v-if="error" class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                    </svg>
+                </div>
+                <div class="ml-3">
+                    <h3 class="text-sm font-medium text-red-800 dark:text-red-200">Error loading team data</h3>
+                    <div class="mt-2 text-sm text-red-700 dark:text-red-300">
+                        <p>{{ error }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Invite Member Section -->
         <div v-if="canInviteMembers" class="bg-white dark:bg-gray-800 shadow rounded-lg border border-gray-200 dark:border-gray-700">
             <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
@@ -141,12 +158,12 @@ const formatExpiresAt = (expiresAt: string) => {
                     </thead>
                     <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                         <tr v-if="loading && members.length === 0">
-                            <td colspan="4" class="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                            <td :colspan="canManageMembers ? 4 : 3" class="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
                                 Loading members...
                             </td>
                         </tr>
                         <tr v-else-if="members.length === 0">
-                            <td colspan="4" class="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                            <td :colspan="canManageMembers ? 4 : 3" class="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
                                 No members found
                             </td>
                         </tr>
