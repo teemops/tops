@@ -16,7 +16,7 @@ const props = defineProps<{
 }>();
 
 const { organizations, currentOrganization, loading, fetchOrganizations, updateOrganization, deleteOrganization } = useOrganizations();
-const { canManageSettings, canManageMembers, getUserRole } = useOrganizationPermissions();
+const { canManageSettings, canManageMembers, canListMembers, canInviteMembers, getUserRole } = useOrganizationPermissions();
 const { showSuccess, showError } = useNotifications();
 const page = usePage();
 

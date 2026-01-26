@@ -11,7 +11,7 @@ use App\Models\OrganizationInvitation;
 use App\Models\OrganizationMember;
 use App\Models\User;
 use App\Notifications\MemberJoinedNotification;
-use App\Notifications\OrganizationInvitation as OrganizationInvitationNotification;
+use App\Notifications\InviteMemberNotification;
 use App\Services\OrganizationPermission;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -150,8 +150,18 @@ class OrganizationMembersController extends Controller
 
         // Send invitation email
         // Note: Since we're sending to an email address (not a User), we use Notification::route
-        Notification::route('mail', $email)
-            ->notify(new OrganizationInvitationNotification($invitation));
+        try {
+            Notification::route('mail', $email)
+                ->notify(new InviteMemberNotification($invitation));
+        } catch (\Exception $e) {
+            // Log the error but don't fail the request - invitation is already created
+            \Log::error('Failed to send invitation email', [
+                'invitation_id' => $invitation->id,
+                'email' => $email,
+                'error' => $e->getMessage(),
+            ]);
+            // Continue - invitation is created, email sending failure shouldn't block the response
+        }
 
         return response()->json([
             'id' => $invitation->id,
