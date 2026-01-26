@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\OrganizationsController;
+use App\Http\Controllers\Api\OrganizationMembersController;
 use App\Http\Controllers\Api\AwsAccountsController;
 use App\Http\Controllers\Api\ScansController;
 use App\Http\Controllers\Test\E2ETestController;
@@ -27,6 +28,15 @@ Route::middleware(['api', 'firebase.auth', 'organization.context'])->group(funct
     Route::delete('/organizations/{orgId}', [OrganizationsController::class, 'destroy']);
     Route::get('/organizations/current', [OrganizationsController::class, 'current']);
 
+    // Organization Members & Team Management
+    Route::get('/organizations/{orgId}/members', [OrganizationMembersController::class, 'index']);
+    Route::post('/organizations/{orgId}/members/invite', [OrganizationMembersController::class, 'invite']);
+    Route::put('/organizations/{orgId}/members/{memberId}', [OrganizationMembersController::class, 'update']);
+    Route::delete('/organizations/{orgId}/members/{memberId}', [OrganizationMembersController::class, 'destroy']);
+    Route::get('/organizations/{orgId}/invitations', [OrganizationMembersController::class, 'listInvitations']);
+    Route::delete('/organizations/{orgId}/invitations/{invitationId}', [OrganizationMembersController::class, 'cancelInvitation']);
+    Route::post('/organizations/{orgId}/transfer-ownership', [OrganizationMembersController::class, 'transferOwnership']);
+
     // AWS Accounts
     Route::get('/organizations/{orgId}/aws-accounts', [AwsAccountsController::class, 'index']);
     Route::post('/organizations/{orgId}/aws-accounts/init', [AwsAccountsController::class, 'init']);
@@ -43,6 +53,11 @@ Route::middleware(['api', 'firebase.auth', 'organization.context'])->group(funct
     Route::get('/scans/{scanId}', [ScansController::class, 'show']);
     Route::get('/scans/{scanId}/results', [ScansController::class, 'results']);
     Route::post('/scans/{scanId}/cancel', [ScansController::class, 'cancel']);
+});
+
+// Accept invitation (requires auth but not organization context)
+Route::middleware(['api', 'firebase.auth'])->group(function () {
+    Route::post('/organizations/invitations/{token}/accept', [OrganizationMembersController::class, 'acceptInvitation']);
 });
 
 // SNS callback (no auth required, uses signature verification)

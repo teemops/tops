@@ -3,24 +3,29 @@ import { ref, onMounted, computed } from 'vue';
 import { Head, router, usePage } from '@inertiajs/vue3';
 import SidebarAppLayout from '@/Layouts/SidebarAppLayout.vue';
 import { useOrganizations } from '@/composables/useOrganizations';
+import { useOrganizationPermissions } from '@/composables/useOrganizationPermissions';
 import { useNotifications } from '@/composables/useNotifications';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import TextInput from '@/Components/TextInput.vue';
+import TeamManagement from './Components/TeamManagement.vue';
 
 const props = defineProps<{
     orgId: string;
 }>();
 
 const { organizations, currentOrganization, loading, fetchOrganizations, updateOrganization, deleteOrganization } = useOrganizations();
+const { canManageSettings, canManageMembers, getUserRole } = useOrganizationPermissions();
 const { showSuccess, showError } = useNotifications();
+const page = usePage();
 
 const name = ref('');
 const errors = ref<{ name?: string[] }>({});
 const saving = ref(false);
 const showDeleteModal = ref(false);
 const deleting = ref(false);
+const activeTab = ref<'general' | 'team'>('general');
 
 const organization = computed(() => {
     return organizations.value.find(org => org.org_id === props.orgId);
@@ -90,7 +95,39 @@ const confirmDelete = async () => {
                 <!-- Page Header -->
                 <div class="mb-8">
                     <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Organization Settings</h1>
-                    <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">Manage your organization details</p>
+                    <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">Manage your organization details and team</p>
+                    <!-- Debug: Remove in production -->
+                    <p class="mt-2 text-xs text-gray-500 dark:text-gray-500">
+                        Debug: Role = {{ getUserRole() }}, Can Manage = {{ canManageSettings }}
+                    </p>
+                </div>
+
+                <!-- Tabs -->
+                <div v-if="organization && canManageSettings" class="mb-6 border-b border-gray-200 dark:border-gray-700">
+                    <nav class="-mb-px flex space-x-8">
+                        <button
+                            @click="activeTab = 'general'"
+                            :class="[
+                                'whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm',
+                                activeTab === 'general'
+                                    ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
+                            ]"
+                        >
+                            General
+                        </button>
+                        <button
+                            @click="activeTab = 'team'"
+                            :class="[
+                                'whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm',
+                                activeTab === 'team'
+                                    ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
+                            ]"
+                        >
+                            Team
+                        </button>
+                    </nav>
                 </div>
 
                 <!-- Loading State -->
@@ -102,8 +139,10 @@ const confirmDelete = async () => {
                     <p class="mt-4 text-sm text-gray-500 dark:text-gray-400">Loading organization...</p>
                 </div>
 
-                <!-- Settings Form -->
-                <div v-else-if="organization" class="bg-white dark:bg-gray-800 shadow rounded-lg border border-gray-200 dark:border-gray-700">
+                <!-- General Tab -->
+                <div v-if="activeTab === 'general' && organization" class="space-y-6">
+                    <!-- Settings Form -->
+                    <div class="bg-white dark:bg-gray-800 shadow rounded-lg border border-gray-200 dark:border-gray-700">
                     <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                         <h2 class="text-lg font-semibold text-gray-900 dark:text-white">General</h2>
                     </div>
@@ -133,9 +172,9 @@ const confirmDelete = async () => {
                             </PrimaryButton>
                         </div>
                     </form>
-                </div>
+                    </div>
 
-                <!-- Danger Zone -->
+                    <!-- Danger Zone -->
                 <div
                     v-if="organization && canDelete"
                     class="mt-8 bg-white dark:bg-gray-800 shadow rounded-lg border border-red-200 dark:border-red-800"
@@ -184,6 +223,31 @@ const confirmDelete = async () => {
                                 <p v-else-if="(organization.aws_accounts_count || 0) > 0">
                                     This organization has {{ organization.aws_accounts_count }} AWS account(s). Please remove all AWS accounts before deleting this organization.
                                 </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                </div>
+
+                <!-- Team Tab -->
+                <div v-if="activeTab === 'team' && organization && canListMembers">
+                    <TeamManagement :org-id="orgId" />
+                </div>
+
+                <!-- No Access Message -->
+                <div v-if="organization && !canManageSettings" class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+                    <div class="flex">
+                        <div class="flex-shrink-0">
+                            <svg class="h-5 w-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                            </svg>
+                        </div>
+                        <div class="ml-3">
+                            <h3 class="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                                Access Denied
+                            </h3>
+                            <div class="mt-2 text-sm text-yellow-700 dark:text-yellow-300">
+                                <p>You don't have permission to manage organization settings.</p>
                             </div>
                         </div>
                     </div>
