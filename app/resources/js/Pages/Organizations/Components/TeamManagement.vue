@@ -6,6 +6,7 @@ import { useOrganizations } from '@/composables/useOrganizations';
 import { usePage } from '@inertiajs/vue3';
 import type { OrganizationMember, OrganizationInvitation } from '@/types/organization';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
+import Dropdown from '@/Components/Dropdown.vue';
 import InviteMemberModal from './InviteMemberModal.vue';
 import TransferOwnershipModal from './TransferOwnershipModal.vue';
 
@@ -20,7 +21,9 @@ const page = usePage();
 
 const showInviteModal = ref(false);
 const showTransferModal = ref(false);
-const editingRole = ref<string | null>(null);
+const showRoleModal = ref(false);
+const selectedMemberForRole = ref<OrganizationMember | null>(null);
+const selectedRole = ref<string>('auditor');
 const removingMemberId = ref<string | null>(null);
 
 const currentUserId = computed(() => (page.props as any).auth?.user?.id || '');
@@ -54,15 +57,25 @@ const getRoleBadgeClass = (role: string | null) => {
     return classes[role] || classes.viewer;
 };
 
-const handleRoleChange = async (member: OrganizationMember, newRole: string) => {
-    if (!member.id) {
-        // Owner - cannot change role
+const openRoleModal = (member: OrganizationMember) => {
+    if (!member.id || member.role === 'owner') {
+        return;
+    }
+    selectedMemberForRole.value = member;
+    selectedRole.value = member.role || 'auditor'; // Default to auditor if no role
+    showRoleModal.value = true;
+};
+
+const handleRoleChange = async () => {
+    if (!selectedMemberForRole.value?.id || !selectedRole.value) {
         return;
     }
 
     try {
-        await updateMemberRole(props.orgId, member.id, newRole);
-        editingRole.value = null;
+        await updateMemberRole(props.orgId, selectedMemberForRole.value.id, selectedRole.value);
+        showRoleModal.value = false;
+        selectedMemberForRole.value = null;
+        selectedRole.value = 'auditor';
     } catch (err) {
         // Error handled by composable
     }
@@ -146,7 +159,7 @@ const formatExpiresAt = (expiresAt: string) => {
             <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                 <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Team Members</h3>
             </div>
-            <div class="overflow-x-auto">
+            <div class="overflow-x-auto overflow-y-visible">
                 <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                     <thead class="bg-gray-50 dark:bg-gray-900">
                         <tr>
@@ -198,63 +211,54 @@ const formatExpiresAt = (expiresAt: string) => {
                                     No role assigned
                                 </span>
                             </td>
-                            <td v-if="canManageMembers" class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                <div class="flex items-center justify-end space-x-2">
-                                    <!-- Role Change Dropdown (only for non-owners) -->
-                                    <div v-if="member.role !== 'owner' && member.id" class="relative">
-                                        <select
-                                            v-if="editingRole === member.id"
-                                            v-model="member.role"
-                                            @change="handleRoleChange(member, member.role || '')"
-                                            @blur="editingRole = null"
-                                            class="text-xs rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-                                            autofocus
-                                        >
-                                            <option value="administrator">Administrator</option>
-                                            <option value="auditor">Auditor</option>
-                                            <option value="viewer">Viewer</option>
-                                        </select>
-                                        <button
-                                            v-else
-                                            @click="editingRole = member.id"
-                                            class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
-                                        >
-                                            Change Role
-                                        </button>
-                                    </div>
-                                    
-                                    <!-- Assign Role (for members with no role) -->
-                                    <div v-if="member.role === null && member.id" class="relative">
-                                        <select
-                                            v-if="editingRole === member.id"
-                                            v-model="member.role"
-                                            @change="handleRoleChange(member, member.role || '')"
-                                            @blur="editingRole = null"
-                                            class="text-xs rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-                                            autofocus
-                                        >
-                                            <option value="">-- Select role --</option>
-                                            <option value="administrator">Administrator</option>
-                                            <option value="auditor">Auditor</option>
-                                            <option value="viewer">Viewer</option>
-                                        </select>
-                                        <button
-                                            v-else
-                                            @click="editingRole = member.id"
-                                            class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
-                                        >
-                                            Assign Role
-                                        </button>
-                                    </div>
-                                    
-                                    <!-- Remove Member (only for non-owners) -->
-                                    <button
-                                        v-if="member.role !== 'owner' && member.id && member.user_id !== currentUserId"
-                                        @click="handleRemoveMember(member)"
-                                        class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
-                                    >
-                                        Remove
-                                    </button>
+                            <td v-if="canManageMembers" class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium relative z-10">
+                                <div v-if="member.role !== 'owner' && member.id" class="flex items-center justify-end">
+                                    <Dropdown align="right" width="48">
+                                        <template #trigger>
+                                            <button
+                                                type="button"
+                                                class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                            >
+                                                Actions
+                                                <svg
+                                                    class="ml-2 -mr-1 h-4 w-4 text-gray-400"
+                                                    fill="none"
+                                                    stroke="currentColor"
+                                                    viewBox="0 0 24 24"
+                                                >
+                                                    <path
+                                                        stroke-linecap="round"
+                                                        stroke-linejoin="round"
+                                                        stroke-width="2"
+                                                        d="M19 9l-7 7-7-7"
+                                                    />
+                                                </svg>
+                                            </button>
+                                        </template>
+                                        <template #content>
+                                            <button
+                                                v-if="member.role === null"
+                                                @click="openRoleModal(member)"
+                                                class="block w-full px-4 py-2 text-start text-sm leading-5 text-gray-700 transition duration-150 ease-in-out hover:bg-gray-100 focus:bg-gray-100 focus:outline-none dark:text-gray-300 dark:hover:bg-gray-800 dark:focus:bg-gray-800"
+                                            >
+                                                Assign Role
+                                            </button>
+                                            <button
+                                                v-else
+                                                @click="openRoleModal(member)"
+                                                class="block w-full px-4 py-2 text-start text-sm leading-5 text-gray-700 transition duration-150 ease-in-out hover:bg-gray-100 focus:bg-gray-100 focus:outline-none dark:text-gray-300 dark:hover:bg-gray-800 dark:focus:bg-gray-800"
+                                            >
+                                                Change Role
+                                            </button>
+                                            <button
+                                                v-if="member.user_id !== currentUserId"
+                                                @click="handleRemoveMember(member)"
+                                                class="block w-full px-4 py-2 text-start text-sm leading-5 text-red-600 transition duration-150 ease-in-out hover:bg-gray-100 focus:bg-gray-100 focus:outline-none dark:text-red-400 dark:hover:bg-gray-800 dark:focus:bg-gray-800"
+                                            >
+                                                Remove
+                                            </button>
+                                        </template>
+                                    </Dropdown>
                                 </div>
                             </td>
                         </tr>
@@ -268,7 +272,7 @@ const formatExpiresAt = (expiresAt: string) => {
             <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                 <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Pending Invitations</h3>
             </div>
-            <div class="overflow-x-auto">
+            <div class="overflow-x-auto overflow-y-visible">
                 <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                     <thead class="bg-gray-50 dark:bg-gray-900">
                         <tr>
@@ -354,5 +358,64 @@ const formatExpiresAt = (expiresAt: string) => {
             :current-user-id="currentUserId"
             @transferred="loadData"
         />
+
+        <!-- Role Selection Modal -->
+        <div
+            v-if="showRoleModal && selectedMemberForRole"
+            class="fixed z-10 inset-0 overflow-y-auto"
+            @click.self="showRoleModal = false"
+        >
+            <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"></div>
+                <div class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                    <form @submit.prevent="handleRoleChange">
+                        <div class="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                            <div class="sm:flex sm:items-start">
+                                <div class="mt-3 text-center sm:mt-0 sm:text-left w-full">
+                                    <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white mb-4">
+                                        {{ selectedMemberForRole.role === null ? 'Assign Role' : 'Change Role' }}
+                                    </h3>
+                                    <div class="mt-4">
+                                        <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                                            {{ selectedMemberForRole.role === null 
+                                                ? `Assign a role to ${selectedMemberForRole.user.name}` 
+                                                : `Change role for ${selectedMemberForRole.user.name}` }}
+                                        </p>
+                                        <label for="role" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                            Role
+                                        </label>
+                                        <select
+                                            id="role"
+                                            v-model="selectedRole"
+                                            class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:text-white sm:text-sm"
+                                            required
+                                        >
+                                            <option value="administrator">Administrator</option>
+                                            <option value="auditor">Auditor</option>
+                                            <option value="viewer">Viewer</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                            <PrimaryButton
+                                type="submit"
+                                class="sm:ml-3 sm:w-auto sm:text-sm"
+                            >
+                                {{ selectedMemberForRole.role === null ? 'Assign Role' : 'Update Role' }}
+                            </PrimaryButton>
+                            <button
+                                type="button"
+                                @click="showRoleModal = false; selectedMemberForRole = null; selectedRole = 'auditor'"
+                                class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-800 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
     </div>
 </template>
