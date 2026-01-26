@@ -2,16 +2,18 @@
 
 use App\Http\Controllers\ProfileController;
 use Illuminate\Foundation\Application;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
 Route::get('/', function () {
-    return Inertia::render('Welcome', [
-        'canLogin' => Route::has('login'),
-        'canRegister' => Route::has('register'),
-        'laravelVersion' => Application::VERSION,
-        'phpVersion' => PHP_VERSION,
-    ]);
+    // If user is authenticated, redirect to dashboard
+    if (Auth::check()) {
+        return redirect()->route('dashboard');
+    }
+    
+    // If not authenticated, redirect to login page
+    return redirect()->route('login');
 });
 
 Route::get('/dashboard', function () {
@@ -28,6 +30,14 @@ Route::middleware('auth')->group(function () {
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
     
+    // Accept organization invitation (no org context needed)
+    Route::get('/organizations/invitations/{token}/accept', function (string $token) {
+        return Inertia::render('Organizations/AcceptInvitation', ['token' => $token]);
+    })->name('organizations.invitations.accept');
+});
+
+// Routes that require organization context
+Route::middleware(['auth', 'organization.context'])->group(function () {
     // Organizations
     Route::get('/organizations', function () {
         return Inertia::render('Organizations/Index');

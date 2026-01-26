@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\Organization;
+use App\Models\OrganizationInvitation;
+use App\Models\OrganizationMember;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -95,13 +97,29 @@ class FirebaseAuthController extends Controller
                 $user->update($updates);
             }
 
-            // Create default organization if user is new
+            // Create default organization if user is new and not invited
             if ($user->wasRecentlyCreated) {
-                Organization::create([
-                    'user_id' => $user->id,
-                    'name' => $user->name . "'s Organization",
-                    'is_default' => true,
-                ]);
+                // Check if user has any pending invitations
+                $hasInvitations = OrganizationInvitation::where('email', $email)
+                    ->whereNull('accepted_at')
+                    ->where('expires_at', '>', now())
+                    ->exists();
+
+                // Only create default organization if user was NOT invited
+                if (!$hasInvitations) {
+                    $organization = Organization::create([
+                        'user_id' => $user->id,
+                        'name' => $user->name . "'s Organization",
+                        'is_default' => true,
+                    ]);
+
+                    // Create owner member record
+                    OrganizationMember::create([
+                        'organization_id' => $organization->id,
+                        'user_id' => $user->id,
+                        'role' => 'owner',
+                    ]);
+                }
             }
 
             // Log the user in
@@ -177,12 +195,27 @@ class FirebaseAuthController extends Controller
                 // No password field - authentication is handled by Firebase
             ]);
 
-            // Create default organization for new user
-            Organization::create([
-                'user_id' => $user->id,
-                'name' => $user->name . "'s Organization",
-                'is_default' => true,
-            ]);
+            // Check if user has any pending invitations
+            $hasInvitations = OrganizationInvitation::where('email', $email)
+                ->whereNull('accepted_at')
+                ->where('expires_at', '>', now())
+                ->exists();
+
+            // Only create default organization if user was NOT invited
+            if (!$hasInvitations) {
+                $organization = Organization::create([
+                    'user_id' => $user->id,
+                    'name' => $user->name . "'s Organization",
+                    'is_default' => true,
+                ]);
+
+                // Create owner member record
+                OrganizationMember::create([
+                    'organization_id' => $organization->id,
+                    'user_id' => $user->id,
+                    'role' => 'owner',
+                ]);
+            }
 
             // Log the user in
             Auth::login($user, true);

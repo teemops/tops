@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -49,10 +50,32 @@ class User extends Authenticatable implements MustVerifyEmail
     }
 
     /**
-     * Get the organizations for the user
+     * Get the organizations owned by the user
      */
-    public function organizations(): HasMany
+    public function ownedOrganizations(): HasMany
     {
         return $this->hasMany(Organization::class);
+    }
+
+    /**
+     * Get the organizations the user is a member of (via organization_members)
+     */
+    public function memberOrganizations(): BelongsToMany
+    {
+        return $this->belongsToMany(Organization::class, 'organization_members')
+            ->withPivot('role')
+            ->withTimestamps();
+    }
+
+    /**
+     * Get all organizations (owned + member of)
+     */
+    public function organizations()
+    {
+        $owned = $this->ownedOrganizations()->get();
+        $memberOf = $this->memberOrganizations()->get();
+        
+        // Merge and deduplicate by ID
+        return $owned->merge($memberOf)->unique('id')->values();
     }
 }

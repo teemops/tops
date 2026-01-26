@@ -27,6 +27,29 @@ const oauthError = ref<string | null>(null);
 const submit = async () => {
     form.clearErrors();
     
+    // Trim and validate email and name
+    const trimmedEmail = form.email?.trim() || '';
+    const trimmedName = form.name?.trim() || '';
+    
+    // Validate email is not empty
+    if (!trimmedEmail) {
+        form.setError('email', 'Email address is required.');
+        return;
+    }
+    
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(trimmedEmail)) {
+        form.setError('email', 'Please enter a valid email address.');
+        return;
+    }
+    
+    // Validate name is not empty
+    if (!trimmedName) {
+        form.setError('name', 'Full name is required.');
+        return;
+    }
+    
     // Validate password confirmation on frontend
     if (form.password !== form.password_confirmation) {
         form.setError('password_confirmation', 'The passwords do not match.');
@@ -46,8 +69,8 @@ const submit = async () => {
     }
     
     try {
-        // Create user with Firebase using email/password
-        const user = await createUserWithEmailPassword(form.email, form.password, form.name);
+        // Create user with Firebase using email/password (use trimmed values)
+        const user = await createUserWithEmailPassword(trimmedEmail, form.password, trimmedName);
         
         // Get the ID token
         const token = await getIdToken();
@@ -59,7 +82,7 @@ const submit = async () => {
         // Send token and name to backend to create Laravel user record
         router.post(route('firebase.register'), { 
             token,
-            name: form.name,
+            name: trimmedName,
         }, {
             onSuccess: () => {
                 // Redirect handled by backend
@@ -71,14 +94,16 @@ const submit = async () => {
         });
     } catch (error: any) {
         // Handle Firebase errors
-        if (error.message.includes('email-already-in-use')) {
+        if (error.message?.includes('email-already-in-use') || error.code === 'auth/email-already-in-use') {
             form.setError('email', 'An account with this email address already exists.');
-        } else if (error.message.includes('weak-password')) {
+        } else if (error.message?.includes('weak-password') || error.code === 'auth/weak-password') {
             form.setError('password', 'Password is too weak. Please choose a stronger password.');
-        } else if (error.message.includes('invalid-email')) {
+        } else if (error.message?.includes('invalid-email') || error.code === 'auth/invalid-email') {
             form.setError('email', 'Invalid email address.');
+        } else if (error.message?.includes('MISSING_EMAIL') || error.code?.includes('MISSING_EMAIL')) {
+            form.setError('email', 'Email address is required. Please enter a valid email.');
         } else {
-            form.setError('email', error.message || 'Registration failed. Please try again.');
+            form.setError('email', error.message || error.code || 'Registration failed. Please try again.');
         }
         form.reset('password', 'password_confirmation');
     }

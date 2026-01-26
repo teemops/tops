@@ -1,6 +1,20 @@
 import axios from 'axios';
 import { getIdToken, auth, waitForAuthState } from './composables/useFirebase';
 
+// Initialize dark mode before app renders to prevent flash
+(function initDarkMode() {
+    const stored = localStorage.getItem('darkMode');
+    const isDark = stored !== null 
+        ? stored === 'true' 
+        : window.matchMedia('(prefers-color-scheme: dark)').matches;
+    
+    if (isDark) {
+        document.documentElement.classList.add('dark');
+    } else {
+        document.documentElement.classList.remove('dark');
+    }
+})();
+
 window.axios = axios;
 
 window.axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';

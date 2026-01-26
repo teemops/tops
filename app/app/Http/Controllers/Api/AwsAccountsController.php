@@ -7,6 +7,7 @@ use App\Http\Requests\InitAwsAccountRequest;
 use App\Http\Requests\StoreAwsAccountRequest;
 use App\Models\AwsAccount;
 use App\Models\Organization;
+use App\Services\OrganizationPermission;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -14,17 +15,29 @@ use Illuminate\Support\Str;
 
 class AwsAccountsController extends Controller
 {
+    protected OrganizationPermission $permission;
+
+    public function __construct(OrganizationPermission $permission)
+    {
+        $this->permission = $permission;
+    }
+
     /**
      * Initialize AWS account addition (Step 1: CloudFormation setup)
      */
     public function init(Request $request, string $orgId): JsonResponse
     {
         $user = auth()->user();
-        
-        // Verify organization access
-        $organization = Organization::where('org_id', $orgId)
-            ->where('user_id', $user->id)
-            ->firstOrFail();
+        $organization = $request->get('organization');
+
+        if (!$organization) {
+            return response()->json(['error' => 'Organization not found'], 404);
+        }
+
+        // Check permission - only administrators and owner can add AWS accounts
+        if (!$this->permission->canAddAwsAccounts($user, $organization)) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
 
         // Derive UniqueId from organization's orgId (does not change once org is created)
         $uniqueId = $organization->org_id;
@@ -64,10 +77,13 @@ class AwsAccountsController extends Controller
     public function index(Request $request, string $orgId): JsonResponse
     {
         $user = auth()->user();
-        
-        $organization = Organization::where('org_id', $orgId)
-            ->where('user_id', $user->id)
-            ->firstOrFail();
+        $organization = $request->get('organization');
+
+        if (!$organization) {
+            return response()->json(['error' => 'Organization not found'], 404);
+        }
+
+        // All members can view AWS accounts (view permission)
 
         $accounts = $organization->awsAccounts()
             ->select('id', 'name', 'aws_account_id', 'status', 'last_scan_at', 'created_at')
@@ -93,12 +109,15 @@ class AwsAccountsController extends Controller
     public function show(Request $request, string $accountId): JsonResponse
     {
         $user = auth()->user();
-        
-        $account = AwsAccount::with('organization')
-            ->whereHas('organization', function ($query) use ($user) {
-                $query->where('user_id', $user->id);
-            })
-            ->findOrFail($accountId);
+        $organization = $request->get('organization');
+
+        if (!$organization) {
+            return response()->json(['error' => 'Organization not found'], 404);
+        }
+
+        $account = AwsAccount::where('id', $accountId)
+            ->where('organization_id', $organization->id)
+            ->firstOrFail();
 
         return response()->json([
             'id' => $account->id,
@@ -117,10 +136,16 @@ class AwsAccountsController extends Controller
     public function store(StoreAwsAccountRequest $request, string $orgId): JsonResponse
     {
         $user = auth()->user();
-        
-        $organization = Organization::where('org_id', $orgId)
-            ->where('user_id', $user->id)
-            ->firstOrFail();
+        $organization = $request->get('organization');
+
+        if (!$organization) {
+            return response()->json(['error' => 'Organization not found'], 404);
+        }
+
+        // Check permission - only administrators and owner can add AWS accounts
+        if (!$this->permission->canAddAwsAccounts($user, $organization)) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
 
         $validated = $request->validated();
 
@@ -151,12 +176,20 @@ class AwsAccountsController extends Controller
     public function update(Request $request, string $accountId): JsonResponse
     {
         $user = auth()->user();
-        
-        $account = AwsAccount::with('organization')
-            ->whereHas('organization', function ($query) use ($user) {
-                $query->where('user_id', $user->id);
-            })
-            ->findOrFail($accountId);
+        $organization = $request->get('organization');
+
+        if (!$organization) {
+            return response()->json(['error' => 'Organization not found'], 404);
+        }
+
+        // Check permission - only administrators and owner can update AWS accounts
+        if (!$this->permission->canAddAwsAccounts($user, $organization)) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $account = AwsAccount::where('id', $accountId)
+            ->where('organization_id', $organization->id)
+            ->firstOrFail();
 
         $validated = $request->validate([
             'name' => ['sometimes', 'string', 'min:2', 'max:255'],
@@ -179,12 +212,20 @@ class AwsAccountsController extends Controller
     public function destroy(Request $request, string $accountId): JsonResponse
     {
         $user = auth()->user();
-        
-        $account = AwsAccount::with('organization')
-            ->whereHas('organization', function ($query) use ($user) {
-                $query->where('user_id', $user->id);
-            })
-            ->findOrFail($accountId);
+        $organization = $request->get('organization');
+
+        if (!$organization) {
+            return response()->json(['error' => 'Organization not found'], 404);
+        }
+
+        // Check permission - only administrators and owner can delete AWS accounts
+        if (!$this->permission->canAddAwsAccounts($user, $organization)) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $account = AwsAccount::where('id', $accountId)
+            ->where('organization_id', $organization->id)
+            ->firstOrFail();
 
         // Validate AWS account ID if provided (for confirmation)
         $validated = $request->validate([
@@ -212,12 +253,16 @@ class AwsAccountsController extends Controller
     public function getCloudFormationUrl(Request $request, string $accountId): JsonResponse
     {
         $user = auth()->user();
-        
-        $account = AwsAccount::with('organization')
-            ->whereHas('organization', function ($query) use ($user) {
-                $query->where('user_id', $user->id);
-            })
-            ->findOrFail($accountId);
+        $organization = $request->get('organization');
+
+        if (!$organization) {
+            return response()->json(['error' => 'Organization not found'], 404);
+        }
+
+        // All members can view CloudFormation URL
+        $account = AwsAccount::where('id', $accountId)
+            ->where('organization_id', $organization->id)
+            ->firstOrFail();
 
         // Get region from config or default to us-east-1
         $region = config('services.aws.region', config('services.ses.region', 'us-east-1'));
