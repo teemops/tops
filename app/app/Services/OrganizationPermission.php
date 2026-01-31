@@ -102,8 +102,7 @@ class OrganizationPermission
      */
     public function canManageMembers(User $user, Organization $org): bool
     {
-        // Only owner can manage members
-        return $this->getUserRole($user, $org) === 'owner';
+        return in_array($this->getUserRole($user, $org), ['owner', 'administrator']);
     }
 
     /**
@@ -116,7 +115,16 @@ class OrganizationPermission
     }
 
     /**
-     * Check if user can add AWS accounts
+     * Check if user can view AWS accounts (Viewer: hide)
+     */
+    public function canViewAwsAccounts(User $user, Organization $org): bool
+    {
+        $role = $this->getUserRole($user, $org);
+        return $role !== null && $role !== 'viewer';
+    }
+
+    /**
+     * Check if user can add/edit AWS accounts
      */
     public function canAddAwsAccounts(User $user, Organization $org): bool
     {
@@ -125,11 +133,29 @@ class OrganizationPermission
     }
 
     /**
-     * Check if user can view reports
+     * Check if user can delete AWS accounts
      */
-    public function canViewReports(User $user, Organization $org): bool
+    public function canDeleteAwsAccounts(User $user, Organization $org): bool
     {
-        // All roles can view reports
+        $role = $this->getUserRole($user, $org);
+        return in_array($role, ['owner', 'administrator']);
+    }
+
+    /**
+     * Check if user can view scans (Viewer: hide)
+     */
+    public function canViewScans(User $user, Organization $org): bool
+    {
+        $role = $this->getUserRole($user, $org);
+        return $role !== null && $role !== 'viewer';
+    }
+
+    /**
+     * Check if user can view findings
+     */
+    public function canViewFindings(User $user, Organization $org): bool
+    {
+        // All roles can view findings
         return $this->hasRole($user, $org);
     }
 

@@ -83,7 +83,9 @@ class AwsAccountsController extends Controller
             return response()->json(['error' => 'Organization not found'], 404);
         }
 
-        // All members can view AWS accounts (view permission)
+        if (!$this->permission->canViewAwsAccounts($user, $organization)) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
 
         $accounts = $organization->awsAccounts()
             ->select('id', 'name', 'aws_account_id', 'status', 'last_scan_at', 'created_at')
@@ -113,6 +115,10 @@ class AwsAccountsController extends Controller
 
         if (!$organization) {
             return response()->json(['error' => 'Organization not found'], 404);
+        }
+
+        if (!$this->permission->canViewAwsAccounts($user, $organization)) {
+            return response()->json(['error' => 'Unauthorized'], 403);
         }
 
         $account = AwsAccount::where('id', $accountId)
@@ -218,8 +224,7 @@ class AwsAccountsController extends Controller
             return response()->json(['error' => 'Organization not found'], 404);
         }
 
-        // Check permission - only administrators and owner can delete AWS accounts
-        if (!$this->permission->canAddAwsAccounts($user, $organization)) {
+        if (!$this->permission->canDeleteAwsAccounts($user, $organization)) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
@@ -259,7 +264,10 @@ class AwsAccountsController extends Controller
             return response()->json(['error' => 'Organization not found'], 404);
         }
 
-        // All members can view CloudFormation URL
+        if (!$this->permission->canViewAwsAccounts($user, $organization)) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
         $account = AwsAccount::where('id', $accountId)
             ->where('organization_id', $organization->id)
             ->firstOrFail();

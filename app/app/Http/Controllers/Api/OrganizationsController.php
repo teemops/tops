@@ -40,12 +40,13 @@ class OrganizationsController extends Controller
         // Merge and deduplicate
         $allOrganizations = $owned->merge($memberOf)->unique('id');
         
-        // Sort and map
+        // Sort and map (include user's role per organization for permission gating)
         $organizations = $allOrganizations
             ->sortByDesc('is_default')
             ->sortBy('created_at')
             ->values()
-            ->map(function ($org) {
+            ->map(function ($org) use ($user) {
+                $role = $this->permission->getUserRole($user, $org);
                 return [
                     'id' => $org->id,
                     'org_id' => $org->org_id,
@@ -53,6 +54,7 @@ class OrganizationsController extends Controller
                     'is_default' => $org->is_default,
                     'aws_accounts_count' => $org->awsAccounts()->count(),
                     'created_at' => $org->created_at->toISOString(),
+                    'role' => $role,
                 ];
             });
 

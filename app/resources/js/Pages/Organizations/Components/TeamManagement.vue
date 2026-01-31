@@ -159,7 +159,7 @@ const formatExpiresAt = (expiresAt: string) => {
             <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                 <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Team Members</h3>
             </div>
-            <div class="overflow-x-auto overflow-y-visible">
+            <div >
                 <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                     <thead class="bg-gray-50 dark:bg-gray-900">
                         <tr>

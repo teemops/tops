@@ -148,7 +148,7 @@ As an organization owner or administrator I want to be able to manage users who 
   - `canManageMembers(User $user, Organization $org)`: Only administrators
   - `canRunScans(User $user, Organization $org)`: Administrators and auditors
   - `canAddAwsAccounts(User $user, Organization $org)`: Only administrators
-  - `canViewReports(User $user, Organization $org)`: All roles
+  - `canViewFindings(User $user, Organization $org)`: All roles
   - `canViewInsights(User $user, Organization $org)`: All roles
   - `getUserRole(User $user, Organization $org)`: Returns role string ('owner', 'administrator', 'auditor', 'viewer', or null)
   - `hasRole(User $user, Organization $org)`: Returns true if user has any role (including owner)

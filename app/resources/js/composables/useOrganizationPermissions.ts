@@ -1,17 +1,15 @@
 import { computed } from 'vue';
 import { usePage } from '@inertiajs/vue3';
-import { useOrganizations } from './useOrganizations';
 
 export type OrganizationRole = 'owner' | 'administrator' | 'auditor' | 'viewer' | null;
 
 export function useOrganizationPermissions() {
     const page = usePage();
-    const { currentOrganization } = useOrganizations();
 
-    // Get user's role in current organization from request context
+    // User's role in current organization (from backend; set from cookie so sidebar is correct on every page)
     const getUserRole = (): OrganizationRole => {
         const role = (page.props as any).organization_role;
-        return role || null;
+        return role ?? null;
     };
 
     const canManageSettings = computed(() => {
@@ -26,7 +24,22 @@ export function useOrganizationPermissions() {
 
     const canManageMembers = computed(() => {
         const role = getUserRole();
-        return role === 'owner';
+        return role === 'owner' || role === 'administrator';
+    });
+
+    const canViewAwsAccounts = computed(() => {
+        const role = getUserRole();
+        return role !== null && role !== 'viewer';
+    });
+
+    const canViewScans = computed(() => {
+        const role = getUserRole();
+        return role !== null && role !== 'viewer';
+    });
+
+    const canDeleteAwsAccounts = computed(() => {
+        const role = getUserRole();
+        return role === 'owner' || role === 'administrator';
     });
 
     const canRunScans = computed(() => {
@@ -39,9 +52,9 @@ export function useOrganizationPermissions() {
         return role === 'owner' || role === 'administrator';
     });
 
-    const canViewReports = computed(() => {
+    const canViewFindings = computed(() => {
         const role = getUserRole();
-        return role !== null; // All roles can view reports
+        return role !== null; // All roles can view findings
     });
 
     const canViewInsights = computed(() => {
@@ -69,9 +82,12 @@ export function useOrganizationPermissions() {
         canManageSettings,
         canInviteMembers,
         canManageMembers,
+        canViewAwsAccounts,
+        canViewScans,
+        canDeleteAwsAccounts,
         canRunScans,
         canAddAwsAccounts,
-        canViewReports,
+        canViewFindings,
         canViewInsights,
         canTransferOwnership,
         canDeleteOrganization,

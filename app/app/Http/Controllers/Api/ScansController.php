@@ -44,7 +44,9 @@ class ScansController extends Controller
             return response()->json(['error' => 'Organization not found'], 404);
         }
 
-        // All members can view scans
+        if (!$this->permission->canViewScans($user, $organization)) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
 
         $query = Scan::with('awsAccount')
             ->where('scans.organization_id', $organization->id);
@@ -196,7 +198,10 @@ class ScansController extends Controller
             return response()->json(['error' => 'Organization not found'], 404);
         }
 
-        // All members can view scan details
+        if (!$this->permission->canViewScans($user, $organization)) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
         $scan = Scan::with('awsAccount')
             ->where('id', $scanId)
             ->where('organization_id', $organization->id)
@@ -273,7 +278,10 @@ class ScansController extends Controller
             return response()->json(['error' => 'Organization not found'], 404);
         }
 
-        // All members can view scan results
+        if (!$this->permission->canViewScans($user, $organization)) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
         $scan = Scan::where('id', $scanId)
             ->where('organization_id', $organization->id)
             ->firstOrFail();
