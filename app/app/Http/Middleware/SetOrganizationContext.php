@@ -17,15 +17,17 @@ class SetOrganizationContext
         $user = auth()->user();
 
         if (!$user) {
-            // Handle API vs web routes differently
+            // Allow unauthenticated web requests through (e.g. login page); API gets 401
             if ($request->expectsJson() || $request->is('api/*')) {
                 return response()->json(['error' => 'Unauthorized'], 401);
             }
-            return redirect()->route('login');
+            return $next($request);
         }
 
-        // Get organization from request (header, query param, or route param)
-        $orgId = $request->header('X-Organization-Id') 
+        // Get organization from request: cookie (selected org, sent with every request), then header, query, route
+        // Cookie ensures sidebar/permissions use the correct org on all pages (dashboard, aws-accounts, etc.)
+        $orgId = $request->cookie('current_organization_id')
+            ?? $request->header('X-Organization-Id')
             ?? $request->query('org_id')
             ?? $request->route('orgId')
             ?? $request->input('organization_id');
