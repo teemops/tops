@@ -22,3 +22,9 @@ mysql-data/
 outputs
 vendor
 references/*/vendor
+
+#no .env file
+/infra/scripts/prod/app.env
+/infra/scripts/test/app.env
+
+/.topsbuild

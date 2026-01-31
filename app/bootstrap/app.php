@@ -12,10 +12,15 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Run SetOrganizationContext before HandleInertiaRequests so shared props get organization_role from cookie
         $middleware->web(append: [
+            \App\Http\Middleware\SetOrganizationContext::class,
             \App\Http\Middleware\HandleInertiaRequests::class,
             \Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets::class,
         ]);
+
+        // Cookie set by frontend (current org) must be readable as plain text
+        $middleware->encryptCookies(except: ['current_organization_id']);
 
         // Register API middleware aliases
         $middleware->alias([

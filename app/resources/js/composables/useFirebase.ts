@@ -197,8 +197,19 @@ export async function createUserWithEmailPassword(email: string, password: strin
         throw new Error('Firebase is not configured. Please add VITE_FIREBASE_* variables to your .env file and restart the dev server.');
     }
 
+    // Validate email is not empty
+    const trimmedEmail = email?.trim() || '';
+    if (!trimmedEmail) {
+        throw new Error('Email address is required.');
+    }
+
+    // Validate password is not empty
+    if (!password || password.trim().length === 0) {
+        throw new Error('Password is required.');
+    }
+
     try {
-        const result = await createUserWithEmailAndPassword(auth, email, password);
+        const result = await createUserWithEmailAndPassword(auth, trimmedEmail, password);
         const user = result.user;
         
         // Update the user's display name if provided

@@ -12,6 +12,8 @@ export interface Organization {
     aws_accounts_count?: number;
     created_at: string;
     updated_at?: string;
+    /** User's role in this organization (owner | administrator | auditor | viewer) */
+    role?: string | null;
 }
 
 const organizations = ref<Organization[]>([]);
@@ -35,24 +37,26 @@ export function useOrganizations() {
                 if (!orgExists) {
                     localStorage.removeItem('current_organization_id');
                     delete axios.defaults.headers.common['X-Organization-Id'];
+                    document.cookie = 'current_organization_id=; path=/; max-age=0';
                 }
             }
-            
+
             // Set current organization to default if not set
             if (!currentOrganization.value && organizations.value.length > 0) {
                 const defaultOrg = organizations.value.find(org => org.is_default);
                 currentOrganization.value = defaultOrg || organizations.value[0];
-                
-                // Store in localStorage
+
                 if (currentOrganization.value) {
-                    localStorage.setItem('current_organization_id', currentOrganization.value.org_id);
-                    axios.defaults.headers.common['X-Organization-Id'] = currentOrganization.value.org_id;
+                    const orgId = currentOrganization.value.org_id;
+                    localStorage.setItem('current_organization_id', orgId);
+                    axios.defaults.headers.common['X-Organization-Id'] = orgId;
+                    document.cookie = `current_organization_id=${encodeURIComponent(orgId)}; path=/; max-age=31536000; SameSite=Lax`;
                 }
             } else if (organizations.value.length === 0) {
-                // No organizations exist - clear current organization
                 currentOrganization.value = null;
                 localStorage.removeItem('current_organization_id');
                 delete axios.defaults.headers.common['X-Organization-Id'];
+                document.cookie = 'current_organization_id=; path=/; max-age=0';
             }
         } catch (err: any) {
             error.value = err.response?.data?.message || err.response?.data?.error || 'Failed to load organizations';
@@ -64,15 +68,15 @@ export function useOrganizations() {
                 currentOrganization.value = null;
                 localStorage.removeItem('current_organization_id');
                 delete axios.defaults.headers.common['X-Organization-Id'];
+                document.cookie = 'current_organization_id=; path=/; max-age=0';
             }
-            
-            // If we get 401, clear everything and let user re-authenticate
+
             if (err.response?.status === 401) {
                 organizations.value = [];
                 currentOrganization.value = null;
                 localStorage.removeItem('current_organization_id');
                 delete axios.defaults.headers.common['X-Organization-Id'];
-                // Don't throw - let the page render so user can see the error
+                document.cookie = 'current_organization_id=; path=/; max-age=0';
             }
         } finally {
             loading.value = false;
@@ -97,7 +101,10 @@ export function useOrganizations() {
             const newOrg = response.data;
             organizations.value.push(newOrg);
             currentOrganization.value = newOrg;
-            localStorage.setItem('current_organization_id', newOrg.org_id);
+            const orgId = newOrg.org_id;
+            localStorage.setItem('current_organization_id', orgId);
+            axios.defaults.headers.common['X-Organization-Id'] = orgId;
+            document.cookie = `current_organization_id=${encodeURIComponent(orgId)}; path=/; max-age=31536000; SameSite=Lax`;
             return newOrg;
         } catch (err: any) {
             error.value = err.response?.data?.message || 'Failed to create organization';
@@ -160,25 +167,26 @@ export function useOrganizations() {
         }
     };
 
+    const setCurrentOrganizationCookie = (orgId: string) => {
+        document.cookie = `current_organization_id=${encodeURIComponent(orgId)}; path=/; max-age=31536000; SameSite=Lax`;
+    };
+
     const switchOrganization = async (orgId: string) => {
         const org = organizations.value.find(o => o.org_id === orgId);
         if (!org) {
             error.value = 'Organization not found';
             return;
         }
-        
-        // Store in localStorage for persistence
+
         localStorage.setItem('current_organization_id', orgId);
         currentOrganization.value = org;
-        
-        // Update axios default header for future API calls
         axios.defaults.headers.common['X-Organization-Id'] = orgId;
-        
-        // Reload the page to update context
+        setCurrentOrganizationCookie(orgId);
+
         router.reload();
     };
 
-    // Initialize current organization from localStorage
+    // Initialize current organization from localStorage and sync cookie so backend has context on every page
     const initCurrentOrganization = () => {
         const storedOrgId = localStorage.getItem('current_organization_id');
         if (storedOrgId && organizations.value.length > 0) {
@@ -186,14 +194,16 @@ export function useOrganizations() {
             if (org) {
                 currentOrganization.value = org;
                 axios.defaults.headers.common['X-Organization-Id'] = storedOrgId;
+                setCurrentOrganizationCookie(storedOrgId);
             }
         } else if (organizations.value.length > 0) {
-            // Set default organization
             const defaultOrg = organizations.value.find(org => org.is_default);
             if (defaultOrg) {
                 currentOrganization.value = defaultOrg;
-                localStorage.setItem('current_organization_id', defaultOrg.org_id);
-                axios.defaults.headers.common['X-Organization-Id'] = defaultOrg.org_id;
+                const orgId = defaultOrg.org_id;
+                localStorage.setItem('current_organization_id', orgId);
+                axios.defaults.headers.common['X-Organization-Id'] = orgId;
+                setCurrentOrganizationCookie(orgId);
             }
         }
     };

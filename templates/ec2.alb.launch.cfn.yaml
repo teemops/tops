@@ -1,0 +1,220 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Teemops EC2 Initial Launch Template
+Parameters:
+  VPC:
+    Description: VPC
+    Type: AWS::EC2::VPC::Id
+  SSLCertificateArn:
+    Description: SSL Certificate ARN
+    Type: String
+  TopsEc2InstanceProfile:
+    Description: Teemops EC2 Instance Profile Name (NOT ARN)
+    Type: String
+  AMI:
+    Description: EC2 AMI
+    Type: AWS::EC2::Image::Id
+  InstanceType:
+    Description: Amazon EC2 instance type
+    Type: String
+  RootVolumeSize:
+    Description: Root EBS Volume Size in GB
+    Type: Number
+  AppId:
+    Description: Teemops App ID
+    Type: String
+  AppName:
+    Description: Teemops App Name
+    Type: String
+  CustomerId:
+    Description: Teemops Customer ID
+    Type: String
+  KeyPair:
+    Description: EC2 KeyPair
+    Type: AWS::EC2::KeyPair::KeyName
+  Subnet:
+    Description: Subnet
+    Type: List<AWS::EC2::Subnet::Id>
+  ALBSubnet1:
+    Description: ALB Subnet 1
+    Type: AWS::EC2::Subnet::Id
+  ALBSubnet2:
+    Description: ALB Subnet 2
+    Type: AWS::EC2::Subnet::Id
+  HasPublicIp:
+    Description: ASG instances have Public IP
+    Type: String
+    AllowedValues: ["true", "false"]
+  HasElasticIp:
+    Description: EC2 instance has Elastic IP
+    Type: String
+    AllowedValues: ["true", "false"]
+Conditions:
+  ConditionPublicIp: !Equals [!Ref HasPublicIp, "true"]
+  ConditionElasticIp: !Equals [!Ref HasElasticIp, "true"]
+Resources:
+  TopsElasticIp:
+    Type: AWS::EC2::EIP
+    Condition: ConditionElasticIp
+    DependsOn: TopsEc2
+    Properties:
+      InstanceId: !Ref TopsEc2
+      Tags:
+        - Key: Name
+          Value: !Ref AppName
+        - Key: topsid
+          Value: !Ref AppId
+  TopsEc2:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref AMI
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyPair
+      IamInstanceProfile: !Ref TopsEc2InstanceProfile
+      NetworkInterfaces: 
+        - AssociatePublicIpAddress: !Ref HasPublicIp
+          DeviceIndex: "0"
+          GroupSet: 
+            - !Ref TopsAppSecurityGroup
+          SubnetId: !Select [0, !Ref Subnet]
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeType: gp2
+            VolumeSize: !Ref RootVolumeSize
+      Tags:
+        - Key: Name
+          Value: !Ref AppName
+        - Key: topsid
+          Value: !Ref AppId
+        - Key: topscustomerid
+          Value: !Ref CustomerId
+  TopsAppSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for EC2 App Instance
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId: !Ref TopsLbSecurityGroup
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          FromPort: 0
+          ToPort: 65535
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub '${AppName}-app-sg'
+        - Key: topsid
+          Value: !Ref AppId
+        - Key: topscustomerid
+          Value: !Ref CustomerId
+
+  TopsLbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for Load Balancer
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          FromPort: 0
+          ToPort: 65535
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub '${AppName}-lb-sg'
+        - Key: topsid
+          Value: !Ref AppId
+        - Key: topscustomerid
+          Value: !Ref CustomerId
+  TopsAlb:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    DependsOn: TopsAlbTargetGroup
+    Properties:
+      Name: !Sub '${AppName}-alb'
+      Subnets:
+      #we need to use 2 subnets labelled private
+        - !Ref ALBSubnet1
+        - !Ref ALBSubnet2
+      SecurityGroups:
+        - !Ref TopsLbSecurityGroup
+      Scheme: internet-facing
+      Type: application
+      Tags:
+        - Key: Name
+          Value: !Sub '${AppName}-alb'
+        - Key: topsid
+          Value: !Ref AppId
+        - Key: topscustomerid
+          Value: !Ref CustomerId
+
+  TopsAlbTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    DependsOn: TopsEc2
+    Properties:
+      Name: !Sub '${AppName}-tg'
+      VpcId: !Ref VPC
+      TargetType: instance
+      Port: 80
+      Protocol: HTTP
+      HealthCheckEnabled: true
+      HealthCheckPath: /
+      HealthCheckPort: "80"
+      Targets:
+        - Id: !Ref TopsEc2
+      Tags:
+        - Key: Name
+          Value: !Sub '${AppName}-tg'
+        - Key: topsid
+          Value: !Ref AppId
+        - Key: topscustomerid
+          Value: !Ref CustomerId
+
+  TopsAlbListenerHTTP:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref TopsAlb
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TopsAlbTargetGroup
+
+  TopsAlbListenerHTTPS:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref TopsAlb
+      Port: 443
+      Protocol: HTTPS
+      Certificates:
+        - CertificateArn: !Ref SSLCertificateArn
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TopsAlbTargetGroup
+Outputs:
+  InstanceId:
+    Description: EC2 InstanceId
+    Value: !Ref TopsEc2
+  PrivateIp:
+    Description: EC2 Private IP
+    Value:
+      Fn::GetAtt:
+        - TopsEc2
+        - PrivateIp
+  PublicIp:
+    Condition: ConditionPublicIp
+    Description: EC2 Public IP
+    Value:
+      Fn::GetAtt:
+        - TopsEc2
+        - PublicIp

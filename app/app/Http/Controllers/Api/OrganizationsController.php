@@ -6,12 +6,20 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreOrganizationRequest;
 use App\Http\Requests\UpdateOrganizationRequest;
 use App\Models\Organization;
+use App\Services\OrganizationPermission;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
 class OrganizationsController extends Controller
 {
+    protected OrganizationPermission $permission;
+
+    public function __construct(OrganizationPermission $permission)
+    {
+        $this->permission = $permission;
+    }
+
     /**
      * List all organizations for the authenticated user
      */
@@ -19,12 +27,26 @@ class OrganizationsController extends Controller
     {
         $user = auth()->user();
         
-        $organizations = $user->organizations()
+        // Get owned organizations
+        $owned = $user->ownedOrganizations()
             ->select('id', 'org_id', 'name', 'is_default', 'created_at')
-            ->orderBy('is_default', 'desc')
-            ->orderBy('created_at', 'asc')
-            ->get()
-            ->map(function ($org) {
+            ->get();
+        
+        // Get member organizations
+        $memberOf = $user->memberOrganizations()
+            ->select('organizations.id', 'organizations.org_id', 'organizations.name', 'organizations.is_default', 'organizations.created_at')
+            ->get();
+        
+        // Merge and deduplicate
+        $allOrganizations = $owned->merge($memberOf)->unique('id');
+        
+        // Sort and map (include user's role per organization for permission gating)
+        $organizations = $allOrganizations
+            ->sortByDesc('is_default')
+            ->sortBy('created_at')
+            ->values()
+            ->map(function ($org) use ($user) {
+                $role = $this->permission->getUserRole($user, $org);
                 return [
                     'id' => $org->id,
                     'org_id' => $org->org_id,
@@ -32,6 +54,7 @@ class OrganizationsController extends Controller
                     'is_default' => $org->is_default,
                     'aws_accounts_count' => $org->awsAccounts()->count(),
                     'created_at' => $org->created_at->toISOString(),
+                    'role' => $role,
                 ];
             });
 
@@ -64,10 +87,19 @@ class OrganizationsController extends Controller
     public function show(Request $request, string $orgId): JsonResponse
     {
         $user = auth()->user();
-        
-        $organization = Organization::where('org_id', $orgId)
-            ->where('user_id', $user->id)
-            ->firstOrFail();
+        $organization = $request->get('organization');
+
+        if (!$organization) {
+            return response()->json(['error' => 'Organization not found'], 404);
+        }
+
+        // Verify user has access (owner or member)
+        $isOwner = $organization->user_id === $user->id;
+        $isMember = $organization->members()->where('user_id', $user->id)->exists();
+
+        if (!$isOwner && !$isMember) {
+            return response()->json(['error' => 'Access denied'], 403);
+        }
 
         return response()->json([
             'id' => $organization->id,
@@ -96,6 +128,13 @@ class OrganizationsController extends Controller
             'is_default' => $isDefault,
         ]);
 
+        // Create owner member record
+        \App\Models\OrganizationMember::create([
+            'organization_id' => $organization->id,
+            'user_id' => $user->id,
+            'role' => 'owner',
+        ]);
+
         return response()->json([
             'id' => $organization->id,
             'name' => $organization->name,
@@ -111,10 +150,16 @@ class OrganizationsController extends Controller
     public function update(UpdateOrganizationRequest $request, string $orgId): JsonResponse
     {
         $user = auth()->user();
-        
-        $organization = Organization::where('org_id', $orgId)
-            ->where('user_id', $user->id)
-            ->firstOrFail();
+        $organization = $request->get('organization');
+
+        if (!$organization) {
+            return response()->json(['error' => 'Organization not found'], 404);
+        }
+
+        // Check permission - only administrators and owner can update organization
+        if (!$this->permission->canManageSettings($user, $organization)) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
 
         $organization->update($request->validated());
 
@@ -133,13 +178,20 @@ class OrganizationsController extends Controller
     public function destroy(Request $request, string $orgId): JsonResponse
     {
         $user = auth()->user();
-        
-        $organization = Organization::where('org_id', $orgId)
-            ->where('user_id', $user->id)
-            ->firstOrFail();
+        $organization = $request->get('organization');
+
+        if (!$organization) {
+            return response()->json(['error' => 'Organization not found'], 404);
+        }
+
+        // Check permission - only owner can delete organization
+        if (!$this->permission->canDeleteOrganization($user, $organization)) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
 
         // Business rules: Cannot delete if it's the only organization
-        if ($user->organizations()->count() === 1) {
+        $totalOrgs = $user->ownedOrganizations()->count() + $user->memberOrganizations()->count();
+        if ($totalOrgs === 1) {
             return response()->json([
                 'error' => 'Cannot delete the last organization'
             ], 422);

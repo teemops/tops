@@ -5,18 +5,35 @@ server {
         listen [::]:80 default_server ipv6only=on;
         server_name localhost;
 
-        root /usr/share/nginx/html;
-        index index.html index.htm;
+        # Set root to Laravel's public directory
+        # Update this path to match your actual Laravel deployment location
+        # Example: /var/www/app/public or /home/ubuntu/app/public
+        root /srv/apps/tops/app/public;
+        index index.php index.html index.htm;
 
-        location / {
-                try_files $uri $uri/ =404;
+        # Laravel: Prevent access to .env and other sensitive files
+        location ~ /\.(env|env\.example|git|ht|svn|user\.ini) {
+                deny all;
         }
 
-        location /api {
-          proxy_set_header X-Forwarded-Host $host;
-          proxy_set_header X-Forwarded-Server $host;
-          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-          proxy_pass   http://localhost:8080/api;
+        # Laravel-specific configuration (fix for pretty URLs, handle front controller)
+        location / {
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_set_header X-Forwarded-Port 443;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                try_files $uri $uri/ /index.php?$query_string;
+        }
+
+        location ~ \.php$ {
+                include snippets/fastcgi-php.conf;
+                fastcgi_pass unix:/run/php/php-fpm.sock;
+                fastcgi_param  HTTPS              on;
+                fastcgi_param  HTTP_X_FORWARDED_PROTO $http_x_forwarded_proto;
+                fastcgi_param  HTTP_X_FORWARDED_PORT  $http_x_forwarded_port;
+
+
+                # Laravel: Increase timeout for long requests (queues, artisan, etc.)
+                fastcgi_read_timeout 300;
         }
 
         location /rc- {
