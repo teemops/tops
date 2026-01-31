@@ -61,4 +61,80 @@ class Organization extends Model
     {
         return $this->hasMany(Scan::class);
     }
+
+    /**
+     * Get the members of the organization
+     */
+    public function members(): HasMany
+    {
+        return $this->hasMany(OrganizationMember::class);
+    }
+
+    /**
+     * Get the invitations for the organization
+     */
+    public function invitations(): HasMany
+    {
+        return $this->hasMany(OrganizationInvitation::class);
+    }
+
+    /**
+     * Get the owner of the organization
+     */
+    public function owner(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'user_id');
+    }
+
+    /**
+     * Check if user is the owner
+     */
+    public function isOwner(User $user): bool
+    {
+        return $this->user_id === $user->id;
+    }
+
+    /**
+     * Get user's role in organization
+     */
+    public function getMemberRole(User $user): ?string
+    {
+        if ($this->isOwner($user)) {
+            return 'owner';
+        }
+
+        $member = $this->members()->where('user_id', $user->id)->first();
+        return $member?->role;
+    }
+
+    /**
+     * Transfer ownership to another user
+     */
+    public function transferOwnership(User $newOwner): void
+    {
+        $oldOwner = $this->owner;
+        
+        // Update organization owner
+        $this->update(['user_id' => $newOwner->id]);
+
+        // Update or create member record for new owner
+        $newOwnerMember = $this->members()->where('user_id', $newOwner->id)->first();
+        if ($newOwnerMember) {
+            $newOwnerMember->update(['role' => 'owner']);
+        } else {
+            $this->members()->create([
+                'user_id' => $newOwner->id,
+                'role' => 'owner',
+            ]);
+        }
+
+        // Update old owner's member record (remove owner role or remove member record)
+        if ($oldOwner) {
+            $oldOwnerMember = $this->members()->where('user_id', $oldOwner->id)->first();
+            if ($oldOwnerMember) {
+                // Remove owner role - they'll need to be assigned a new role
+                $oldOwnerMember->update(['role' => null]);
+            }
+        }
+    }
 }

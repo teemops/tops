@@ -1,16 +1,34 @@
 import axios from 'axios';
 import { getIdToken, auth, waitForAuthState } from './composables/useFirebase';
 
+// Initialize dark mode before app renders to prevent flash
+(function initDarkMode() {
+    const stored = localStorage.getItem('darkMode');
+    const isDark = stored !== null 
+        ? stored === 'true' 
+        : window.matchMedia('(prefers-color-scheme: dark)').matches;
+    
+    if (isDark) {
+        document.documentElement.classList.add('dark');
+    } else {
+        document.documentElement.classList.remove('dark');
+    }
+})();
+
 window.axios = axios;
 
 window.axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
 // Ensure cookies are sent with requests (for session authentication)
 window.axios.defaults.withCredentials = true;
 
-// Initialize organization context from localStorage if available
+// Initialize organization context from localStorage and sync to cookie so backend has it on every request
 const storedOrgId = localStorage.getItem('current_organization_id');
 if (storedOrgId) {
     window.axios.defaults.headers.common['X-Organization-Id'] = storedOrgId;
+    // Cookie is sent with every request (including Inertia page loads) so sidebar permissions use correct org
+    document.cookie = `current_organization_id=${encodeURIComponent(storedOrgId)}; path=/; max-age=31536000; SameSite=Lax`;
+} else {
+    document.cookie = 'current_organization_id=; path=/; max-age=0';
 }
 
 // Cache for Firebase token to avoid repeated async calls

@@ -3,25 +3,46 @@
 #e.g. sh ./update.sh dev
 ENV=$1
 #copy zip file from S3
-aws s3 cp s3://$ENV-tops-deploy/.topsbuild/api.zip /tmp/api.zip
+aws s3 cp s3://$ENV-tops-deploy/.topsbuild/app.zip /tmp/app.zip
 #unzip file
-unzip -o /tmp/api.zip -d /srv/apps/tops
+unzip -o /tmp/app.zip -d /srv/apps/tops
 #copy env file for dev down from S3
-aws s3 cp s3://$ENV-tops-deploy/api/app.env /srv/apps/tops/api/.env
+aws s3 cp s3://$ENV-tops-deploy/app/app.env /srv/apps/tops/app/.env
 #load environment vars from environment and combine with above from S3
 echo "PATH=$PATH" > /etc/environment
-cat /srv/apps/tops/api/.env >> /etc/environment
+cat /srv/apps/tops/app/.env >> /etc/environment
+
+#chown all files in /srv/apps/tops to be owned by www-data
+chown -R www-data:www-data /srv/apps/tops
+chown -R www-data:www-data /var/www/.npm
+
+#composer install
+cd /srv/apps/tops/app
+sudo -u www-data composer install --optimize-autoloader --no-dev
+sudo -u www-data composer update
 
 #npm install
-cd /srv/apps/tops/api
-npm install
+cd /srv/apps/tops/app
+sudo -u www-data npm install --legacy-peer-deps
+#build front-end assets for production
+export APP_URL=https://app.teem.nz
+export ZIGGY_URL=https://app.teem.nz
+export ASSET_URL=https://app.teem.nz
+sudo -u www-data npm run build
+
+#remove vite specific files
+rm -f public/hot
+php artisan optimize:clear
+php artisan config:cache
 
 #migrate database
-npx prisma migrate deploy
+sudo -u www-data php artisan migrate
 
 #kill all running node processes
 pkill -f node
 
-supervisorctl restart tops-api
-supervisorctl restart tops-status
-#rm -f /tmp/api.zip
+#restart nginx
+systemctl restart nginx
+#restart supervisor
+supervisorctl reload
+#rm -f /tmp/app.zip

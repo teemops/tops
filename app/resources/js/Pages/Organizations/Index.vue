@@ -11,7 +11,6 @@ import CreateOrganizationModal from './CreateOrganizationModal.vue';
 
 const { organizations, currentOrganization, loading, error, fetchOrganizations, switchOrganization, deleteOrganization } = useOrganizations();
 const { showSuccess, showError } = useNotifications();
-
 const showCreateModal = ref(false);
 const showDeleteModal = ref(false);
 const organizationToDelete = ref<Organization | null>(null);
@@ -22,7 +21,6 @@ onMounted(async () => {
         await fetchOrganizations();
     } catch (error) {
         console.error('Failed to fetch organizations:', error);
-        // Error will be displayed in the error message div
     }
 });
 
@@ -42,7 +40,7 @@ const handleDelete = (org: Organization) => {
 
 const confirmDelete = async () => {
     if (!organizationToDelete.value) return;
-    
+
     deleting.value = true;
     try {
         await deleteOrganization(organizationToDelete.value.org_id);
@@ -68,7 +66,6 @@ const formatDate = (dateString: string) => {
 <template>
     <SidebarAppLayout>
         <Head title="Organizations" />
-
         <div class="py-6">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
                 <!-- Page Header -->
@@ -100,7 +97,7 @@ const formatDate = (dateString: string) => {
                 </div>
 
                 <!-- Empty State -->
-                <div v-else-if="!loading && organizations.length === 0" class="text-center py-12">
+                    <div v-else-if="!loading && organizations.length === 0" class="text-center py-12">
                     <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
                     </svg>

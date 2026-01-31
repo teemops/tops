@@ -8,12 +8,20 @@ use App\Models\AwsAccount;
 use App\Models\Organization;
 use App\Models\Scan;
 use App\Models\ScanResult;
+use App\Services\OrganizationPermission;
 use App\Services\ScanTypesService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class ScansController extends Controller
 {
+    protected OrganizationPermission $permission;
+
+    public function __construct(OrganizationPermission $permission)
+    {
+        $this->permission = $permission;
+    }
+
     /**
      * Get available scan types
      */
@@ -30,10 +38,15 @@ class ScansController extends Controller
     public function index(Request $request, string $orgId): JsonResponse
     {
         $user = auth()->user();
-        
-        $organization = Organization::where('org_id', $orgId)
-            ->where('user_id', $user->id)
-            ->firstOrFail();
+        $organization = $request->get('organization');
+
+        if (!$organization) {
+            return response()->json(['error' => 'Organization not found'], 404);
+        }
+
+        if (!$this->permission->canViewScans($user, $organization)) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
 
         $query = Scan::with('awsAccount')
             ->where('scans.organization_id', $organization->id);
@@ -179,12 +192,20 @@ class ScansController extends Controller
     public function show(Request $request, string $scanId): JsonResponse
     {
         $user = auth()->user();
-        
-        $scan = Scan::with(['awsAccount', 'organization'])
-            ->whereHas('organization', function ($query) use ($user) {
-                $query->where('user_id', $user->id);
-            })
-            ->findOrFail($scanId);
+        $organization = $request->get('organization');
+
+        if (!$organization) {
+            return response()->json(['error' => 'Organization not found'], 404);
+        }
+
+        if (!$this->permission->canViewScans($user, $organization)) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $scan = Scan::with('awsAccount')
+            ->where('id', $scanId)
+            ->where('organization_id', $organization->id)
+            ->firstOrFail();
 
         return response()->json([
             'id' => $scan->id,
@@ -205,10 +226,16 @@ class ScansController extends Controller
     public function store(StoreScanRequest $request, string $orgId): JsonResponse
     {
         $user = auth()->user();
-        
-        $organization = Organization::where('org_id', $orgId)
-            ->where('user_id', $user->id)
-            ->firstOrFail();
+        $organization = $request->get('organization');
+
+        if (!$organization) {
+            return response()->json(['error' => 'Organization not found'], 404);
+        }
+
+        // Check permission - administrators, owner, and auditors can run scans
+        if (!$this->permission->canRunScans($user, $organization)) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
 
         $validated = $request->validated();
 
@@ -245,12 +272,19 @@ class ScansController extends Controller
     public function results(Request $request, string $scanId): JsonResponse
     {
         $user = auth()->user();
-        
-        $scan = Scan::with('organization')
-            ->whereHas('organization', function ($query) use ($user) {
-                $query->where('user_id', $user->id);
-            })
-            ->findOrFail($scanId);
+        $organization = $request->get('organization');
+
+        if (!$organization) {
+            return response()->json(['error' => 'Organization not found'], 404);
+        }
+
+        if (!$this->permission->canViewScans($user, $organization)) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $scan = Scan::where('id', $scanId)
+            ->where('organization_id', $organization->id)
+            ->firstOrFail();
 
         $query = ScanResult::where('scan_id', $scan->id);
 
@@ -319,12 +353,20 @@ class ScansController extends Controller
     public function cancel(Request $request, string $scanId): JsonResponse
     {
         $user = auth()->user();
-        
-        $scan = Scan::with('organization')
-            ->whereHas('organization', function ($query) use ($user) {
-                $query->where('user_id', $user->id);
-            })
-            ->findOrFail($scanId);
+        $organization = $request->get('organization');
+
+        if (!$organization) {
+            return response()->json(['error' => 'Organization not found'], 404);
+        }
+
+        // Administrators, owner, and auditors can cancel scans
+        if (!$this->permission->canRunScans($user, $organization)) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $scan = Scan::where('id', $scanId)
+            ->where('organization_id', $organization->id)
+            ->firstOrFail();
 
         // Only allow cancellation if scan is pending or running
         if (!in_array($scan->status, ['pending', 'running'])) {

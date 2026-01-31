@@ -5,10 +5,15 @@ import Dropdown from '@/Components/Dropdown.vue';
 import DropdownLink from '@/Components/DropdownLink.vue';
 import NotificationContainer from '@/Components/NotificationContainer.vue';
 import OrganizationSelector from '@/Components/OrganizationSelector.vue';
+import DarkModeToggle from '@/Components/DarkModeToggle.vue';
 import { useOrganizations } from '@/composables/useOrganizations';
+import { useOrganizationPermissions } from '@/composables/useOrganizationPermissions';
+import { useDarkMode } from '@/composables/useDarkMode';
 
 const showingNavigationDropdown = ref(false);
 const { fetchOrganizations, initCurrentOrganization } = useOrganizations();
+const { canViewAwsAccounts, canViewScans, canViewFindings } = useOrganizationPermissions();
+useDarkMode(); // Initialize dark mode
 
 onMounted(async () => {
     // Initialize organization context on app load
@@ -30,7 +35,7 @@ const logout = () => {
 </script>
 
 <template>
-    <div class="min-h-screen flex">
+    <div class="min-h-screen flex bg-gray-50 dark:bg-gray-900">
         <!-- Sidebar -->
         <aside class="hidden lg:flex lg:w-64 lg:flex-col lg:fixed lg:inset-y-0">
             <div class="flex-1 flex flex-col pt-5 pb-4 overflow-y-auto bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700">
@@ -69,6 +74,7 @@ const logout = () => {
                         Organizations
                     </Link>
                     <Link
+                        v-if="canViewAwsAccounts"
                         :href="route('aws-accounts.index')"
                         :class="[
                             route().current('aws-accounts.*')
@@ -83,6 +89,7 @@ const logout = () => {
                         AWS Accounts
                     </Link>
                     <Link
+                        v-if="canViewScans"
                         :href="route('scans.index')"
                         :class="[
                             route().current('scans.*')
@@ -97,15 +104,19 @@ const logout = () => {
                         Scans
                     </Link>
                     <Link
+                        v-if="canViewFindings"
                         href="#"
-                        class="text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 group flex items-center px-3 py-2 text-sm font-medium rounded-md"
+                        :class="[
+                            'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 group flex items-center px-3 py-2 text-sm font-medium rounded-md'
+                        ]"
                     >
                         <svg class="mr-3 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                         </svg>
-                        Reports
+                        Findings
                     </Link>
                     <Link
+                        v-if="canViewFindings"
                         href="#"
                         class="text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 group flex items-center px-3 py-2 text-sm font-medium rounded-md"
                     >
@@ -129,6 +140,7 @@ const logout = () => {
                         </div>
                     </div>
                     <div class="ml-4 flex items-center md:ml-6 space-x-4">
+                        <DarkModeToggle />
                         <button class="bg-white dark:bg-gray-700 p-1 rounded-full text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                             <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
@@ -161,7 +173,7 @@ const logout = () => {
             </header>
 
             <!-- Page Content -->
-            <main class="flex-1">
+            <main class="flex-1 bg-gray-50 dark:bg-gray-900">
                 <div class="py-6">
                     <div class="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
                         <slot />

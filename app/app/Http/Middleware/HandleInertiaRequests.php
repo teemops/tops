@@ -29,11 +29,36 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
+        // Get organization role from attributes (set by SetOrganizationContext middleware)
+        $organizationRole = $request->attributes->get('organization_role');
+        
+        // Fallback: if role is not set, try to calculate it from the organization
+        if ($organizationRole === null) {
+            $user = $request->user();
+            
+            if ($user) {
+                // Try to get organization from request attributes or input
+                $organization = $request->attributes->get('organization') 
+                    ?? $request->get('organization');
+                
+                // If not found, try to look it up from route parameter
+                if (!$organization && $request->route('orgId')) {
+                    $organization = \App\Models\Organization::where('org_id', $request->route('orgId'))->first();
+                }
+                
+                if ($organization) {
+                    $permissionService = app(\App\Services\OrganizationPermission::class);
+                    $organizationRole = $permissionService->getUserRole($user, $organization);
+                }
+            }
+        }
+        
         return [
             ...parent::share($request),
             'auth' => [
                 'user' => $request->user(),
             ],
+            'organization_role' => $organizationRole,
             'flash' => [
                 'success' => $request->session()->get('success'),
                 'error' => $request->session()->get('error'),
