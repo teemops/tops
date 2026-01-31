@@ -60,6 +60,15 @@ Route::middleware(['auth', 'organization.context'])->group(function () {
     Route::get('/scans/{scanId}', function (string $scanId) {
         return Inertia::render('Scans/Show', ['scanId' => $scanId]);
     })->name('scans.show');
+
+    // Findings
+    Route::get('/findings', function () {
+        return Inertia::render('Findings/Index');
+    })->name('findings.index');
+
+    Route::get('/findings/{findingType}', function (string $findingType) {
+        return Inertia::render('Findings/Show', ['findingType' => $findingType]);
+    })->name('findings.show');
 });
 
 require __DIR__.'/auth.php';

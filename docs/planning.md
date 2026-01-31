@@ -274,11 +274,12 @@ saas/
      - Encryption settings
      - Compliance checks (CIS, AWS Well-Architected)
 
-4. **Scan Results & Reporting**
-   - View scan results
-   - Filter and search findings
-   - Export reports (PDF, CSV, JSON)
-   - Dashboard with statistics
+4. **Scan Results & Reporting (Findings)**
+   - **Findings page (org-wide):** Summary panel (Executive Summary with Overall Security Score, total findings per severity) and Detailed Findings panel (all findings sorted by severity then oldest unresolved).
+   - **Latest-status rule:** A finding is only hidden if the latest record for that issue (vs ruleset) has passed; list reflects current open issues.
+   - **Filters:** AWS Account, Type (finding type / service). **Groupings:** Findings grouped by recommendation (remediation tips) for remediation workflows.
+   - **Remediation:** Expand a finding to view steps/links from recommendations; each finding type has a detail page showing all related resources and remediation. Recommendations/tips stored in app (e.g. `app/rules/recommendations/`) and updated when rulesets change.
+   - View scan results (per-scan); filter and search findings; export reports (PDF, CSV, JSON); dashboard with statistics.
 
 5. **Scheduling**
    - Schedule recurring scans
@@ -346,7 +347,13 @@ saas/
 3. Create results dashboard (Scans/Show.vue)
 4. Create organization/team management UI (Organizations/Index.vue, Settings.vue)
 
-### Step 7: EC2 Deployment
+### Step 7: Findings Feature
+1. Store recommendations/tips in app (e.g. `app/rules/recommendations/`) from `references/code/findings/tips.json`; load for groupings and remediation.
+2. API: org-wide findings list (with latest-status logic), Executive Summary (security score, total per severity); GET/PUT single finding (details, status update); optional GET /api/results/summary for dashboard.
+3. Findings page: Summary panel (Executive Summary) + Detailed Findings panel; filters (AWS Account, Type); group by recommendation; expand finding for remediation steps; per-finding-type detail page (all resources + remediation).
+4. Wire Findings nav item to Findings page; status update UI (mark resolved/ignored).
+
+### Step 8: EC2 Deployment
 1. Set up EC2 instance:
    - Instance type: t3.small
    - Operating system: Ubuntu 22.04 LTS
@@ -1280,6 +1287,22 @@ Response: {
   }
 }
 ```
+
+---
+
+### Findings Feature (User Story & Expected Behaviour)
+
+**User story:** As a user I want to view and analyse findings so I can remediate issues.
+
+**Sections:**
+1. **Summary panel (top):** Executive Summary — Overall Security Score; total findings per severity (critical, high, medium, low).
+2. **Detailed Findings panel (below):** View all findings sorted by severity first, then date (oldest unresolved first). Findings only take into consideration the latest status of an issue; an issue is only hidden if the latest record for that issue (compared against the ruleset) has passed as not an issue.
+3. **Filters:** AWS Account, Type (finding type / service).
+4. **Groupings for remediation:** Findings can be grouped by recommendation (see recommendations/tips file, e.g. `references/code/findings/tips.json`). Each recommendation (e.g. tops-rec-001) groups one or more rules (e.g. tops-s3-001, tops-s3-002). Tips/recommendations must be stored in the app (e.g. `app/rules/recommendations/`) and updated when new rulesets are added.
+5. **Expand a finding:** View remediation steps (steps, links, description, impact from the recommendation that contains that rule).
+6. **Per-finding-type page:** Each finding type (rule ID) can be viewed on a separate page showing all resources related to that finding and remediation.
+
+**Data source:** Recommendations/tips JSON (schema: recommendations with name, recommendation, impact, links, description, steps, rules[]). Scan results use `finding_type` = rule ID; recommendations reference rules via `rules: ["tops-iam-001", ...]`.
 
 ---
 
