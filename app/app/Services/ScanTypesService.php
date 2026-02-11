@@ -12,7 +12,7 @@ class ScanTypesService
     private static array $scanTypes = [
         ['value' => 'ec2', 'label' => 'EC2', 'region' => true],
         ['value' => 'iam', 'label' => 'IAM', 'region' => false],
-        ['value' => 's3', 'label' => 'S3', 'region' => true],
+        ['value' => 's3', 'label' => 'S3', 'region' => false],  // S3 bucket list is global; can run from any region
         ['value' => 'rds', 'label' => 'RDS', 'region' => true],
     ];
 

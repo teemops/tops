@@ -253,9 +253,22 @@ class ScansController extends Controller
             'status' => 'pending',
         ]);
 
-        // Dispatch scan job to SQS audit queue
-        \App\Jobs\ProcessAuditScanJob::dispatch($scan)
-            ->onConnection('sqs-audit');
+        $scanConnection = config('queue.scan_connection', 'sqs-audit');
+
+        try {
+            \App\Jobs\ProcessAuditScanJob::dispatch($scan)
+                ->onConnection($scanConnection);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Failed to dispatch scan job to queue', [
+                'scan_id' => $scan->id,
+                'connection' => $scanConnection,
+                'error' => $e->getMessage(),
+            ]);
+            return response()->json([
+                'error' => 'Scan was created but could not be queued for processing. Check that the queue connection is configured (e.g. for SQS: IAM Roles and that the queue exists). For local dev without SQS, set SCAN_QUEUE_CONNECTION=database and run: php artisan queue:work',
+                'scan_id' => $scan->id,
+            ], 503);
+        }
 
         return response()->json([
             'id' => $scan->id,

@@ -102,9 +102,9 @@ class ScanTypesServiceTest extends TestCase
 
         $this->assertIsArray($regionBased);
         $this->assertContains('ec2', $regionBased);
-        $this->assertContains('s3', $regionBased);
         $this->assertContains('rds', $regionBased);
         $this->assertNotContains('iam', $regionBased); // IAM is global
+        $this->assertNotContains('s3', $regionBased);   // S3 bucket list is global
     }
 
     /**
@@ -116,27 +116,27 @@ class ScanTypesServiceTest extends TestCase
 
         $this->assertIsArray($nonRegionBased);
         $this->assertContains('iam', $nonRegionBased);
+        $this->assertContains('s3', $nonRegionBased);  // S3 bucket list is global
         $this->assertNotContains('ec2', $nonRegionBased);
-        $this->assertNotContains('s3', $nonRegionBased);
         $this->assertNotContains('rds', $nonRegionBased);
     }
 
     /**
-     * Test isRegionBased returns true for region-based types
+     * Test isRegionBased returns true for region-based types (EC2, RDS only)
      */
     public function test_is_region_based_returns_true_for_region_types(): void
     {
         $this->assertTrue(ScanTypesService::isRegionBased('ec2'));
-        $this->assertTrue(ScanTypesService::isRegionBased('s3'));
         $this->assertTrue(ScanTypesService::isRegionBased('rds'));
     }
 
     /**
-     * Test isRegionBased returns false for global types
+     * Test isRegionBased returns false for global/single-region types (IAM, S3)
      */
     public function test_is_region_based_returns_false_for_global_types(): void
     {
         $this->assertFalse(ScanTypesService::isRegionBased('iam'));
+        $this->assertFalse(ScanTypesService::isRegionBased('s3'));
     }
 
     /**
