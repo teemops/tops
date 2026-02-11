@@ -256,13 +256,12 @@ class ProcessSqsMessages extends Command
         if (!$roleArn || !$externalId || !$uniqueId) {
             $this->warn('Create message missing required fields (TopsRoleArn, TopsExternalId, TopsUniqueId)');
             $response = $this->sendCloudFormationResponse($responseUrl, 'FAILED', 'Missing required fields in ResourceProperties', $stackId, $requestId, $logicalResourceId, $physicalResourceId);
-            
+
             if (app()->environment(['local', 'dev'])) {
-                Log::info('AWS account activated via SQS message (dev verbose)', [
+                Log::info('Create request rejected (missing required fields)', [
                     'unique_id' => $uniqueId,
                     'external_id' => $externalId,
                     'role_arn' => $roleArn,
-                    'request_type' => 'Create',
                     'response_url' => $responseUrl,
                     'response' => $response,
                 ]);
@@ -299,10 +298,7 @@ class ProcessSqsMessages extends Command
             return;
         }
 
-        // Extract AWS Account ID from Role ARN
-        // Format: arn:aws:iam::123456789012:role/TeemOps
-        preg_match('/arn:aws:iam::(\d+):role\/(.+)/', $roleArn, $matches);
-        $awsAccountId = $matches[1] ?? null;
+        $awsAccountId = $this->extractAwsAccountIdFromRoleArn($roleArn);
 
         if (!$awsAccountId) {
             $this->error("Could not extract AWS Account ID from Role ARN: {$roleArn}");
@@ -400,10 +396,7 @@ class ProcessSqsMessages extends Command
                 $currentRoleArn = $account->iam_role_arn;
                 
                 if ($currentRoleArn !== $roleArn) {
-                    // Extract AWS Account ID from Role ARN
-                    // Format: arn:aws:iam::123456789012:role/TeemOps
-                    preg_match('/arn:aws:iam::(\d+):role\/(.+)/', $roleArn, $matches);
-                    $awsAccountId = $matches[1] ?? null;
+                    $awsAccountId = $this->extractAwsAccountIdFromRoleArn($roleArn);
 
                     if ($awsAccountId) {
                         // Update the account with new IAM Role ARN and AWS Account ID
@@ -532,7 +525,20 @@ class ProcessSqsMessages extends Command
     }
 
     /**
-     * Delete message from SQS queue
+     * Extract AWS Account ID from IAM Role ARN.
+     * Format: arn:aws:iam::123456789012:role/RoleName
+     */
+    private function extractAwsAccountIdFromRoleArn(string $roleArn): ?string
+    {
+        if (preg_match('/arn:aws:iam::(\d+):role\/(.+)/', $roleArn, $matches) === 1) {
+            return $matches[1];
+        }
+        return null;
+    }
+
+    /**
+     * Delete message from SQS queue.
+     * Rethrows AwsException so callers can decide whether to retry (message remains visible).
      */
     private function deleteMessage(SqsClient $sqsClient, string $queueUrl, string $receiptHandle): void
     {
@@ -544,7 +550,9 @@ class ProcessSqsMessages extends Command
         } catch (AwsException $e) {
             Log::error('Failed to delete SQS message', [
                 'error' => $e->getMessage(),
+                'queue_url' => $queueUrl,
             ]);
+            throw $e;
         }
     }
 }

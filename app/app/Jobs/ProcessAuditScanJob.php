@@ -18,6 +18,8 @@ class ProcessAuditScanJob implements ShouldQueue
 {
     use Queueable, InteractsWithQueue, SerializesModels;
 
+    private const RULESET_BASIC = 'basic';
+
     /**
      * The number of times the job may be attempted.
      */
@@ -42,103 +44,51 @@ class ProcessAuditScanJob implements ShouldQueue
      */
     public function handle(): void
     {
-        // Reload scan to ensure we have latest data
         $this->scan->refresh();
 
-        // Check if scan was cancelled
         if ($this->scan->status === 'cancelled') {
             Log::info('Scan cancelled, skipping processing', ['scan_id' => $this->scan->id]);
             return;
         }
 
+        $awsAccount = null;
         try {
-            // Update scan status to running
             $this->scan->update([
                 'status' => 'running',
                 'started_at' => now(),
             ]);
 
-            // Get AWS account
-            $awsAccount = $this->scan->awsAccount;
-
-            if (!$awsAccount || $awsAccount->status !== 'completed') {
-                throw new \Exception('AWS account is not active');
-            }
-
-            // Get IAM role ARN and external ID
+            $awsAccount = $this->validateAndGetAwsAccount();
             $roleArn = $awsAccount->iam_role_arn;
             $externalId = $awsAccount->external_id;
-
-            if (!$roleArn || !$externalId) {
-                throw new \Exception('AWS account missing IAM role ARN or external ID');
-            }
-
-            // Get scan types
             $scanTypes = $this->scan->scan_types ?? [];
-
             if (empty($scanTypes)) {
                 throw new \Exception('No scan types specified');
             }
 
-            // Create scanner for assuming role
             $scanner = new AwsSecurityScanner($roleArn, $externalId);
             $credentials = $scanner->assumeRole();
 
-            // Phase 1: Execute scans using RulesEngine (data collection)
             $rulesEngine = new RulesEngine();
             $hasEc2Scan = false;
             $hasRdsScan = false;
-            $regionBasedServices = ScanTypesService::getRegionBased();
 
             foreach ($scanTypes as $scanType) {
                 if (ScanTypesService::isRegionBased($scanType)) {
-                    // For EC2 and RDS, get regions and dispatch region-specific jobs
                     if ($scanType === 'ec2') {
                         $hasEc2Scan = true;
                     } elseif ($scanType === 'rds') {
                         $hasRdsScan = true;
                     }
-                    
-                    $regions = $scanner->getAvailableRegions($credentials);
 
-                    // Store expected regions count for completion tracking
-                    // If multiple region-based services, use the max count
-                    $currentExpected = $this->scan->expected_regions_count ?? 0;
-                    $this->scan->update([
-                        'expected_regions_count' => max($currentExpected, count($regions)),
-                    ]);
-
-                    foreach ($regions as $region) {
-                        ProcessRegionScanJob::dispatch($this->scan, $region, $scanType)
-                            ->onConnection('sqs-audit-region');
-                    }
-
-                    Log::info("{$scanType} scan dispatched to regions", [
-                        'scan_id' => $this->scan->id,
-                        'service' => $scanType,
-                        'regions_count' => count($regions),
-                    ]);
+                    $this->dispatchRegionScansForService($scanner, $credentials, $scanType);
                 } else {
-                    // Execute scan for non-region-based services (IAM, S3)
-                    try {
-                        $rulesEngine->executeScan($this->scan, $scanType, $credentials);
-                        Log::info('Scan data collection completed', [
-                            'scan_id' => $this->scan->id,
-                            'service' => $scanType,
-                        ]);
-                    } catch (\Exception $e) {
-                        Log::error('Scan data collection failed', [
-                            'scan_id' => $this->scan->id,
-                            'service' => $scanType,
-                            'error' => $e->getMessage(),
-                        ]);
-                        // Continue with other services
-                    }
+                    $this->runGlobalScanForService($rulesEngine, $scanType, $credentials);
                 }
             }
 
             $hasRegionBasedScan = $hasEc2Scan || $hasRdsScan;
-            
+
             Log::info('All scan types processed, starting findings evaluation', [
                 'scan_id' => $this->scan->id,
                 'has_ec2' => $hasEc2Scan,
@@ -147,104 +97,10 @@ class ProcessAuditScanJob implements ShouldQueue
                 'scan_types' => $scanTypes,
             ]);
 
-            // Phase 2: Evaluate findings using FindingsEngine (only for non-region-based scans)
-            Log::info('Starting findings evaluation phase', [
-                'scan_id' => $this->scan->id,
-                'has_ec2' => $hasEc2Scan,
-                'has_rds' => $hasRdsScan,
-                'has_region_based' => $hasRegionBasedScan,
-            ]);
-
             if (!$hasRegionBasedScan) {
-                Log::info('Evaluating findings for non-EC2 scan', [
-                    'scan_id' => $this->scan->id,
-                ]);
-
-                $conditionEvaluator = new ConditionEvaluator();
-                $findingsEngine = new FindingsEngine($conditionEvaluator);
-                
-                try {
-                    // Evaluate findings using basic ruleset (can be extended to support multiple rulesets)
-                    $findingsEngine->evaluateScan($this->scan, ['basic']);
-                    
-                    Log::info('Findings evaluation completed', [
-                        'scan_id' => $this->scan->id,
-                    ]);
-                } catch (\Exception $e) {
-                    Log::error('Findings evaluation failed', [
-                        'scan_id' => $this->scan->id,
-                        'error' => $e->getMessage(),
-                        'trace' => $e->getTraceAsString(),
-                    ]);
-                    // Don't fail the scan if findings evaluation fails
-                } catch (\Throwable $e) {
-                    // Catch any fatal errors too
-                    Log::error('Findings evaluation failed with fatal error', [
-                        'scan_id' => $this->scan->id,
-                        'error' => $e->getMessage(),
-                        'trace' => $e->getTraceAsString(),
-                    ]);
-                }
-
-                // Mark scan as completed (ensure this happens even if findings evaluation failed)
-                // This MUST happen regardless of what happened above
-                Log::info('Attempting to mark scan as completed', [
-                    'scan_id' => $this->scan->id,
-                ]);
-
-                try {
-                    $this->scan->refresh(); // Reload to ensure we have latest status
-                    
-                    if ($this->scan->status === 'running') {
-                        $updateResult = $this->scan->update([
-                            'status' => 'completed',
-                            'completed_at' => now(),
-                        ]);
-
-                        if (!$updateResult) {
-                            Log::error('Scan update returned false', [
-                                'scan_id' => $this->scan->id,
-                            ]);
-                        }
-
-                        // Update AWS account last scan time
-                        $awsAccount->refresh();
-                        $awsAccount->update([
-                            'last_scan_at' => now(),
-                        ]);
-
-                        // Verify the update worked
-                        $this->scan->refresh();
-                        Log::info('Scan marked as completed successfully', [
-                            'scan_id' => $this->scan->id,
-                            'status' => $this->scan->status,
-                            'completed_at' => $this->scan->completed_at,
-                        ]);
-                    } else {
-                        Log::warning('Scan status is not running, skipping completion update', [
-                            'scan_id' => $this->scan->id,
-                            'current_status' => $this->scan->status,
-                        ]);
-                    }
-                } catch (\Exception $e) {
-                    Log::error('Failed to mark scan as completed', [
-                        'scan_id' => $this->scan->id,
-                        'error' => $e->getMessage(),
-                        'trace' => $e->getTraceAsString(),
-                    ]);
-                    // Re-throw to ensure the job fails and can retry
-                    throw $e;
-                } catch (\Throwable $e) {
-                    Log::error('Failed to mark scan as completed (fatal error)', [
-                        'scan_id' => $this->scan->id,
-                        'error' => $e->getMessage(),
-                        'trace' => $e->getTraceAsString(),
-                    ]);
-                    throw $e;
-                }
+                $this->evaluateFindings();
+                $this->markScanCompleted($awsAccount);
             } else {
-                // For region-based scans (EC2, RDS), we'll track completion via region jobs
-                // The scan will be marked as completed when all regions are done
                 Log::info('Scan with region-based service - waiting for region scans to complete', [
                     'scan_id' => $this->scan->id,
                     'has_ec2' => $hasEc2Scan,
@@ -258,48 +114,8 @@ class ProcessAuditScanJob implements ShouldQueue
                 'has_rds' => $hasRdsScan,
                 'has_region_based' => $hasRegionBasedScan,
             ]);
-        } catch (\Exception $e) {
-            Log::error('Scan failed', [
-                'scan_id' => $this->scan->id,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
-
-            // Check if scan has data but failed during findings evaluation
-            // In that case, mark as completed instead of failed
-            $this->scan->refresh();
-            $hasScanDetails = $this->scan->details()->exists();
-            
-            if ($hasScanDetails && !$hasRegionBasedScan && str_contains($e->getMessage(), 'Findings evaluation')) {
-                // If we have scan details and it's not a region-based scan, mark as completed
-                // The findings evaluation failure shouldn't fail the entire scan
-                Log::warning('Marking scan as completed despite findings evaluation error', [
-                    'scan_id' => $this->scan->id,
-                    'error' => $e->getMessage(),
-                ]);
-                
-                $this->scan->update([
-                    'status' => 'completed',
-                    'completed_at' => now(),
-                    'error_message' => 'Findings evaluation failed: ' . $e->getMessage(),
-                ]);
-                
-                if ($this->scan->awsAccount) {
-                    $this->scan->awsAccount->update([
-                        'last_scan_at' => now(),
-                    ]);
-                }
-            } else {
-                // Update scan status to failed for other errors
-                $this->scan->update([
-                    'status' => 'failed',
-                    'completed_at' => now(),
-                    'error_message' => $e->getMessage(),
-                ]);
-
-                // Re-throw to trigger retry mechanism
-                throw $e;
-            }
+        } catch (\Throwable $e) {
+            $this->handleScanFailure($e, $awsAccount);
         }
     }
 
@@ -318,5 +134,187 @@ class ProcessAuditScanJob implements ShouldQueue
             'completed_at' => now(),
             'error_message' => 'Job failed after ' . $this->tries . ' attempts: ' . $exception->getMessage(),
         ]);
+    }
+
+    private function validateAndGetAwsAccount(): \App\Models\AwsAccount
+    {
+        $awsAccount = $this->scan->awsAccount;
+        if (!$awsAccount || $awsAccount->status !== 'completed') {
+            throw new \Exception('AWS account is not active');
+        }
+        if (!$awsAccount->iam_role_arn || !$awsAccount->external_id) {
+            throw new \Exception('AWS account missing IAM role ARN or external ID');
+        }
+        return $awsAccount;
+    }
+
+    private function dispatchRegionScansForService(AwsSecurityScanner $scanner, array $credentials, string $scanType): void
+    {
+        $regions = $scanner->getAvailableRegions($credentials);
+        $currentExpected = $this->scan->expected_regions_count ?? 0;
+        $this->scan->update([
+            'expected_regions_count' => $currentExpected + count($regions),
+        ]);
+
+        $regionConnection = config('queue.scan_region_connection', 'sqs-audit-region');
+        foreach ($regions as $region) {
+            $regionJob = ProcessRegionScanJob::dispatch($this->scan, $region, $scanType)
+                ->onConnection($regionConnection);
+            if ($regionConnection === 'database') {
+                $regionJob->onQueue('teemops_audit_region');
+            }
+        }
+
+        Log::info("{$scanType} scan dispatched to regions", [
+            'scan_id' => $this->scan->id,
+            'service' => $scanType,
+            'regions_count' => count($regions),
+        ]);
+    }
+
+    private function runGlobalScanForService(RulesEngine $rulesEngine, string $scanType, array $credentials): void
+    {
+        $hasDataForService = $this->scan->details()->where('service', $scanType)->exists();
+        if ($hasDataForService) {
+            Log::info('Skipping data collection for service (already have scan_details)', [
+                'scan_id' => $this->scan->id,
+                'service' => $scanType,
+            ]);
+            return;
+        }
+
+        try {
+            $rulesEngine->executeScan($this->scan, $scanType, $credentials);
+            Log::info('Scan data collection completed', [
+                'scan_id' => $this->scan->id,
+                'service' => $scanType,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Scan data collection failed', [
+                'scan_id' => $this->scan->id,
+                'service' => $scanType,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    private function evaluateFindings(): void
+    {
+        $conditionEvaluator = new ConditionEvaluator();
+        $findingsEngine = new FindingsEngine($conditionEvaluator);
+
+        try {
+            $findingsEngine->evaluateScan($this->scan, [self::RULESET_BASIC]);
+            Log::info('Findings evaluation completed', ['scan_id' => $this->scan->id]);
+        } catch (\Throwable $e) {
+            Log::error('Findings evaluation failed', [
+                'scan_id' => $this->scan->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+        }
+    }
+
+    private function markScanCompleted(?\App\Models\AwsAccount $awsAccount): void
+    {
+        try {
+            $this->scan->refresh();
+            if ($this->scan->status !== 'running') {
+                Log::warning('Scan status is not running, skipping completion update', [
+                    'scan_id' => $this->scan->id,
+                    'current_status' => $this->scan->status,
+                ]);
+                return;
+            }
+
+            $updateResult = $this->scan->update([
+                'status' => 'completed',
+                'completed_at' => now(),
+            ]);
+            if (!$updateResult) {
+                Log::error('Scan update returned false', ['scan_id' => $this->scan->id]);
+            }
+
+            $this->updateAwsAccountLastScanAt($awsAccount);
+
+            $this->scan->refresh();
+            Log::info('Scan marked as completed successfully', [
+                'scan_id' => $this->scan->id,
+                'status' => $this->scan->status,
+                'completed_at' => $this->scan->completed_at,
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('Failed to mark scan as completed', [
+                'scan_id' => $this->scan->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            throw $e;
+        }
+    }
+
+    private function updateAwsAccountLastScanAt(?\App\Models\AwsAccount $awsAccount): void
+    {
+        if (!$awsAccount) {
+            return;
+        }
+        try {
+            $awsAccount->refresh();
+            $awsAccount->update(['last_scan_at' => now()]);
+        } catch (\Throwable $e) {
+            Log::warning('Failed to update AWS account last_scan_at', [
+                'scan_id' => $this->scan->id,
+                'aws_account_id' => $awsAccount->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    private function handleScanFailure(\Throwable $e, ?\App\Models\AwsAccount $awsAccount): void
+    {
+        Log::error('Scan failed', [
+            'scan_id' => $this->scan->id,
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+        ]);
+
+        $this->scan->refresh();
+        $hasScanDetails = $this->scan->details()->exists();
+        $hasRegionBasedScanInCatch = !empty(array_filter(
+            $this->scan->scan_types ?? [],
+            fn ($t) => ScanTypesService::isRegionBased($t)
+        ));
+
+        if ($hasScanDetails && !$hasRegionBasedScanInCatch) {
+            try {
+                $this->evaluateFindings();
+                Log::info('Findings evaluation ran in catch block', ['scan_id' => $this->scan->id]);
+            } catch (\Throwable $findingsEx) {
+                Log::warning('Findings evaluation in catch block failed', [
+                    'scan_id' => $this->scan->id,
+                    'error' => $findingsEx->getMessage(),
+                ]);
+            }
+        }
+
+        if ($hasScanDetails && !$hasRegionBasedScanInCatch && str_contains($e->getMessage(), 'Findings evaluation')) {
+            Log::warning('Marking scan as completed despite findings evaluation error', [
+                'scan_id' => $this->scan->id,
+                'error' => $e->getMessage(),
+            ]);
+            $this->scan->update([
+                'status' => 'completed',
+                'completed_at' => now(),
+                'error_message' => 'Findings evaluation failed: ' . $e->getMessage(),
+            ]);
+            $this->updateAwsAccountLastScanAt($this->scan->awsAccount);
+        } else {
+            $this->scan->update([
+                'status' => 'failed',
+                'completed_at' => now(),
+                'error_message' => $e->getMessage(),
+            ]);
+            throw $e;
+        }
     }
 }

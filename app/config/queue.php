@@ -30,6 +30,31 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Scan Job Queue Connection
+    |--------------------------------------------------------------------------
+    |
+    | Connection used to dispatch ProcessAuditScanJob (and region jobs). Use
+    | 'sqs-audit' when you have AWS SQS and workers consuming that queue.
+    | Use 'database' for local dev without SQS (then run queue:work with
+    | no connection or connection=database).
+    |
+    */
+    'scan_connection' => env('SCAN_QUEUE_CONNECTION', 'sqs-audit'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Scan Region Job Queue Connection
+    |--------------------------------------------------------------------------
+    |
+    | Connection used for ProcessRegionScanJob (EC2/RDS per-region scans). Use
+    | 'sqs-audit-region' when using SQS; use 'database' for local dev so one
+    | worker can process both main and region jobs.
+    |
+    */
+    'scan_region_connection' => env('SCAN_REGION_QUEUE_CONNECTION', 'sqs-audit-region'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Queue Connections
     |--------------------------------------------------------------------------
     |
