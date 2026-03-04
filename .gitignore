@@ -27,4 +27,4 @@ references/*/vendor
 /infra/scripts/prod/app.env
 /infra/scripts/test/app.env
 
-/.topsbuild
+/.topsbuild/

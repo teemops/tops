@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Features - AWS Security Scanning & Compliance | Teemops</title>
-    <meta name="description" content="Comprehensive AWS security scanning with CIS, PCI-DSS, SOC 2 compliance. Scan S3, IAM, EC2, RDS and more. Actionable remediation for every finding.">
+    <meta name="description" content="Comprehensive AWS security scanning across S3, IAM, EC2, RDS. CIS-focused with PCI-DSS and SOC 2 roadmap. Actionable remediation for every finding.">
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -24,6 +24,8 @@
         .gradient-bg {
             background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%);
         }
+        .nav-menu { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; }
+        .nav-menu.open { max-height: 20rem; }
     </style>
 </head>
 <body class="bg-white text-gray-900">
@@ -32,14 +34,27 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center h-16">
                 <div class="flex items-center">
-                    <a href="index.html" class="text-2xl font-bold text-primary">Teemops</a>
+                    <a href="index.html" class="flex items-center flex-shrink-0">
+                        <img src="logo.png" alt="Teem" class="h-10 w-auto" />
+                    </a>
                 </div>
+                <button type="button" class="md:hidden p-2 rounded-lg text-gray-600 hover:bg-gray-100" id="nav-toggle" aria-label="Open menu" aria-expanded="false">
+                    <svg class="w-6 h-6" id="nav-icon-menu" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+                    <svg class="w-6 h-6 hidden" id="nav-icon-close" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
                 <div class="hidden md:flex items-center space-x-8">
                     <a href="features.html" class="text-primary font-medium">Features</a>
                     <a href="pricing.html" class="text-gray-600 hover:text-gray-900">Pricing</a>
-                    <a href="#" class="text-gray-600 hover:text-gray-900">Docs</a>
-                    <a href="#" class="text-gray-600 hover:text-gray-900">Login</a>
-                    <a href="#" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-dark transition">Start Free</a>
+                    <a href="https://app.teem.nz/login" class="text-gray-600 hover:text-gray-900">Login</a>
+                    <a href="https://app.teem.nz/register" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-dark transition">Start Free</a>
+                </div>
+            </div>
+            <div class="nav-menu md:hidden" id="nav-menu">
+                <div class="py-4 space-y-2 border-t border-gray-100">
+                    <a href="features.html" class="block py-2 text-primary font-medium">Features</a>
+                    <a href="pricing.html" class="block py-2 text-gray-600 hover:text-gray-900">Pricing</a>
+                    <a href="https://app.teem.nz/login" class="block py-2 text-gray-600 hover:text-gray-900">Login</a>
+                    <a href="https://app.teem.nz/register" class="block py-2 text-primary font-medium">Start Free</a>
                 </div>
             </div>
         </div>
@@ -50,9 +65,9 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
             <h1 class="text-4xl md:text-5xl font-bold mb-6">Complete AWS Security Visibility</h1>
             <p class="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
-                Scan your entire AWS environment. Find misconfigurations. Fix them fast.
+                Built in New Zealand. Scan your entire AWS environment—find misconfigurations and fix them fast.
             </p>
-            <a href="#" class="inline-block bg-accent hover:bg-emerald-600 text-white px-8 py-4 rounded-lg font-semibold transition">
+            <a href="https://app.teem.nz/register" class="inline-block bg-accent hover:bg-emerald-600 text-white px-8 py-4 rounded-lg font-semibold transition">
                 Start Free Scan →
             </a>
         </div>
@@ -156,9 +171,9 @@
             <div class="grid lg:grid-cols-2 gap-12 items-center">
                 <div>
                     <span class="text-accent font-medium">Compliance Monitoring</span>
-                    <h2 class="text-3xl font-bold mt-2 mb-6">Stay Compliant, Automatically</h2>
+                    <h2 class="text-3xl font-bold mt-2 mb-6">Compliance-First Security</h2>
                     <p class="text-xl text-gray-600 mb-8">
-                        Continuous compliance monitoring against industry standards. Know your compliance score at all times—not just before audits.
+                        Our rules align with CIS AWS Foundations Benchmark. PCI-DSS and SOC 2 mapping are on our roadmap. Know your compliance posture—not just before audits.
                     </p>
                     
                     <div class="space-y-6">
@@ -168,25 +183,25 @@
                             </div>
                             <div>
                                 <h3 class="font-semibold mb-1">CIS AWS Foundations Benchmark</h3>
-                                <p class="text-gray-600 text-sm">40+ controls across all CIS sections with automated scoring</p>
+                                <p class="text-gray-600 text-sm">Rules aligned with CIS controls across IAM, S3, EC2, RDS</p>
                             </div>
                         </div>
                         <div class="flex gap-4">
-                            <div class="flex-shrink-0 w-12 h-12 bg-accent/10 rounded-lg flex items-center justify-center">
-                                <span class="text-accent font-bold text-sm">PCI</span>
+                            <div class="flex-shrink-0 w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
+                                <span class="text-gray-500 font-bold text-sm">PCI</span>
                             </div>
                             <div>
                                 <h3 class="font-semibold mb-1">PCI-DSS</h3>
-                                <p class="text-gray-600 text-sm">Payment card industry requirements for network and data security</p>
+                                <p class="text-gray-600 text-sm">Roadmap: Payment card industry requirements</p>
                             </div>
                         </div>
                         <div class="flex gap-4">
-                            <div class="flex-shrink-0 w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                                <span class="text-purple-600 font-bold text-sm">SOC</span>
+                            <div class="flex-shrink-0 w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
+                                <span class="text-gray-500 font-bold text-sm">SOC</span>
                             </div>
                             <div>
                                 <h3 class="font-semibold mb-1">SOC 2</h3>
-                                <p class="text-gray-600 text-sm">Security controls mapping for Trust Service Criteria</p>
+                                <p class="text-gray-600 text-sm">Roadmap: Trust Service Criteria mapping</p>
                             </div>
                         </div>
                     </div>
@@ -667,10 +682,10 @@
                 Start your first scan in under 5 minutes. Free tier available.
             </p>
             <div class="flex flex-col sm:flex-row gap-4 justify-center">
-                <a href="#" class="bg-accent hover:bg-emerald-600 text-white px-8 py-4 rounded-lg font-semibold transition">
+                <a href="https://app.teem.nz/register" class="bg-accent hover:bg-emerald-600 text-white px-8 py-4 rounded-lg font-semibold transition">
                     Start Free Scan
                 </a>
-                <a href="#" class="border border-white/30 hover:bg-white/10 text-white px-8 py-4 rounded-lg font-semibold transition">
+                <a href="mailto:hello@teem.nz?subject=Demo%20request" class="border border-white/30 hover:bg-white/10 text-white px-8 py-4 rounded-lg font-semibold transition">
                     Book a Demo
                 </a>
             </div>
@@ -683,14 +698,13 @@
             <div class="grid md:grid-cols-4 gap-8 mb-12">
                 <div>
                     <div class="text-2xl font-bold text-white mb-4">Teemops</div>
-                    <p class="text-sm">AWS security scanning made simple for growing tech companies.</p>
+                    <p class="text-sm">AWS security for CTOs and DevOps. Built in New Zealand for SaaS, fintech, and healthtech companies.</p>
                 </div>
                 <div>
                     <h4 class="font-semibold text-white mb-4">Product</h4>
                     <ul class="space-y-2 text-sm">
                         <li><a href="features.html" class="hover:text-white">Features</a></li>
                         <li><a href="pricing.html" class="hover:text-white">Pricing</a></li>
-                        <li><a href="#" class="hover:text-white">Documentation</a></li>
                     </ul>
                 </div>
                 <div>
@@ -714,5 +728,18 @@
             </div>
         </div>
     </footer>
+    <script>
+        document.getElementById('nav-toggle')?.addEventListener('click', function() {
+            const menu = document.getElementById('nav-menu');
+            const iconMenu = document.getElementById('nav-icon-menu');
+            const iconClose = document.getElementById('nav-icon-close');
+            const expanded = this.getAttribute('aria-expanded') === 'true';
+            menu.classList.toggle('open', !expanded);
+            iconMenu?.classList.toggle('hidden', !expanded);
+            iconClose?.classList.toggle('hidden', expanded);
+            this.setAttribute('aria-expanded', !expanded);
+            this.setAttribute('aria-label', expanded ? 'Open menu' : 'Close menu');
+        });
+    </script>
 </body>
 </html>
