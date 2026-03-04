@@ -254,7 +254,11 @@ saas/
    - User registration/login via Firebase Auth
    - OAuth support (Google, Apple, Microsoft)
    - Email/password authentication
-   - Optional MFA
+   - **Multi-Factor Authentication (MFA)** ⭐ ROADMAP PRIORITY
+     - TOTP (authenticator app) as primary method
+     - Email OTP fallback for each login (if TOTP unavailable)
+     - Profile settings: Add, view, remove MFA device
+     - Persistent alert when MFA not enabled (shown at top of app until enabled)
    - Firebase token verification in backend
    - Multi-tenant organization/team support
    - Role-based access control (RBAC)
@@ -1474,6 +1478,30 @@ Response: {
 ---
 
 ## Future Roadmap
+
+### High Priority Items
+
+#### Multi-Factor Authentication (MFA)
+**Feature**: Full MFA support for user accounts
+
+**Description**:
+- **Primary**: TOTP (authenticator app: Google Authenticator, Authy, etc.)
+- **Fallback**: Email OTP sent for each login when TOTP is unavailable (e.g., lost device)
+- **Profile UI**: Add MFA (setup wizard), view MFA device info, remove MFA (with re-auth)
+- **Security UX**: Persistent alert at top of screen when MFA is not enabled—visible until user enables MFA or explicitly dismisses (optional: allow dismiss with reminder)
+
+**User flows**:
+1. **Add MFA**: Profile → MFA section → "Enable MFA" → Scan QR / enter secret → Verify with code → Done
+2. **View MFA**: Profile → MFA section → Shows device type, last used (if available)
+3. **Remove MFA**: Profile → MFA section → "Remove MFA" → Confirm with password or current TOTP → MFA disabled
+4. **Login OTP fallback**: Login → Password correct → "Use authenticator app" OR "Email me a code" → If email: enter 6-digit OTP from email → Authenticated
+
+**Implementation Notes**:
+- Firebase Auth supports TOTP MFA natively; use Firebase MFA APIs
+- Email OTP: Backend sends one-time code to user email; code valid for 5–10 minutes
+- Rate limit OTP requests (e.g., 3 per 15 min per user) to prevent abuse
+
+---
 
 ### Low Priority Items
 

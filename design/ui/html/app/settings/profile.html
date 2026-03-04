@@ -14,6 +14,25 @@
         <a href="../index.html" class="text-blue-600 hover:text-blue-500 dark:text-blue-400">← Back to Index</a>
       </div>
       <main class="flex-1">
+  <!-- MFA Disabled Alert: Persistent at top of screen (app-wide when MFA off) -->
+  <div class="bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 py-3">
+      <div class="flex items-center justify-between flex-wrap gap-2">
+        <div class="flex items-center gap-3">
+          <svg class="h-5 w-5 text-amber-600 dark:text-amber-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+          </svg>
+          <p class="text-sm font-medium text-amber-800 dark:text-amber-200">
+            Multi-factor authentication is not enabled. Your account is less secure.
+          </p>
+        </div>
+        <a href="#mfa-section" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-amber-900 bg-amber-400 hover:bg-amber-300 dark:bg-amber-600 dark:hover:bg-amber-500 dark:text-amber-900 transition-colors">
+          Enable MFA
+        </a>
+      </div>
+    </div>
+  </div>
+
   <div class="py-6">
     <div class="max-w-3xl mx-auto px-4 sm:px-6 md:px-8">
       <!-- Header -->
@@ -121,6 +140,31 @@
             </button>
           </div>
         </form>
+      </div>
+
+      <!-- MFA Section: State 1 - MFA Disabled (Enable CTA) -->
+      <div id="mfa-section" class="mt-8 bg-white dark:bg-gray-800 shadow rounded-lg border border-gray-200 dark:border-gray-700">
+        <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+          <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Multi-Factor Authentication</h2>
+          <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">Add an extra layer of security to your account</p>
+        </div>
+        <div class="px-6 py-6">
+          <div class="flex items-start gap-4">
+            <div class="flex-shrink-0 w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
+              <svg class="h-6 w-6 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+              </svg>
+            </div>
+            <div class="flex-1">
+              <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                Use an authenticator app (Google Authenticator, Authy) or receive codes by email. Required for stronger account protection.
+              </p>
+              <a href="mfa-setup.html" class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
+                Enable MFA
+              </a>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>

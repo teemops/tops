@@ -2,7 +2,7 @@
 
 ## Layout: Sidebar App Layout
 
-Detailed report view with executive summary and findings.
+Detailed security report view with executive summary, compliance breakdown, and full findings list. Designed for sharing with stakeholders and export to PDF/CSV.
 
 ## Visual Mockup
 
@@ -10,19 +10,31 @@ Detailed report view with executive summary and findings.
 <main class="flex-1">
   <div class="py-6">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
+      <!-- Breadcrumb -->
+      <nav class="mb-6 flex" aria-label="Breadcrumb">
+        <ol class="flex items-center space-x-2 text-sm">
+          <li><a href="/reports" class="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300">Reports</a></li>
+          <li><span class="text-gray-400 dark:text-gray-500">/</span></li>
+          <li class="text-gray-900 dark:text-white font-medium">Production AWS • Jan 15, 2024</li>
+        </ol>
+      </nav>
+
       <!-- Header -->
       <div class="mb-8 flex items-center justify-between">
         <div>
           <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Security Report</h1>
-          <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">Production AWS • Generated Jan 15, 2024</p>
+          <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">Production AWS • Generated Jan 15, 2024 • Scan completed 2 hours ago</p>
         </div>
         <div class="flex items-center space-x-3">
-          <button class="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50">
+          <button class="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700">
             Export PDF
           </button>
-          <button class="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50">
+          <button class="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700">
             Export CSV
           </button>
+          <a href="/scans/123" class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
+            View Scan
+          </a>
         </div>
       </div>
 
@@ -30,18 +42,20 @@ Detailed report view with executive summary and findings.
       <div class="bg-white dark:bg-gray-800 shadow rounded-lg border border-gray-200 dark:border-gray-700 mb-8">
         <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
           <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Executive Summary</h2>
+          <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">High-level overview for stakeholders</p>
         </div>
         <div class="px-6 py-6">
-          <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+          <div class="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4">
             <div>
-              <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-4">Overall Security Score</h3>
+              <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Overall Security Score</h3>
               <div class="text-4xl font-bold text-gray-900 dark:text-white mb-2">85%</div>
-              <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                <div class="bg-green-600 h-2 rounded-full" style="width: 85%"></div>
+              <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+                <div class="bg-green-600 h-2.5 rounded-full" style="width: 85%"></div>
               </div>
+              <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">Based on CIS benchmarks</p>
             </div>
             <div>
-              <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-4">Findings Summary</h3>
+              <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3">Findings Summary</h3>
               <div class="space-y-2">
                 <div class="flex items-center justify-between">
                   <span class="text-sm text-gray-600 dark:text-gray-400">Critical</span>
@@ -61,12 +75,105 @@ Detailed report view with executive summary and findings.
                 </div>
               </div>
             </div>
+            <div>
+              <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Resources Scanned</h3>
+              <div class="text-2xl font-bold text-gray-900 dark:text-white">142</div>
+              <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Across 12 AWS services</p>
+            </div>
+            <div>
+              <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Compliance</h3>
+              <div class="space-y-2 text-sm">
+                <div class="flex justify-between"><span class="text-gray-600 dark:text-gray-400">CIS</span><span class="font-medium text-gray-900 dark:text-white">85%</span></div>
+                <div class="flex justify-between"><span class="text-gray-600 dark:text-gray-400">PCI-DSS</span><span class="font-medium text-gray-900 dark:text-white">92%</span></div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      <!-- Findings Section (similar to scan detail) -->
-      <!-- ... -->
+      <!-- Compliance Overview -->
+      <div class="bg-white dark:bg-gray-800 shadow rounded-lg border border-gray-200 dark:border-gray-700 mb-8">
+        <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+          <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Compliance by Framework</h2>
+        </div>
+        <div class="px-6 py-6 space-y-5">
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-sm font-medium text-gray-700 dark:text-gray-300">CIS AWS Foundations Benchmark v2.0</span>
+              <span class="text-sm font-medium text-gray-900 dark:text-white">85%</span>
+            </div>
+            <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+              <div class="bg-green-600 h-2.5 rounded-full" style="width: 85%"></div>
+            </div>
+          </div>
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-sm font-medium text-gray-700 dark:text-gray-300">PCI-DSS 4.0</span>
+              <span class="text-sm font-medium text-gray-900 dark:text-white">92%</span>
+            </div>
+            <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+              <div class="bg-green-600 h-2.5 rounded-full" style="width: 92%"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Findings Section -->
+      <div class="bg-white dark:bg-gray-800 shadow rounded-lg border border-gray-200 dark:border-gray-700">
+        <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between flex-wrap gap-4">
+          <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Findings (23 total)</h2>
+          <div class="flex items-center space-x-3">
+            <select class="text-sm border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white px-3 py-1.5">
+              <option>All severities</option>
+              <option>Critical</option>
+              <option>High</option>
+              <option>Medium</option>
+              <option>Low</option>
+            </select>
+            <select class="text-sm border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white px-3 py-1.5">
+              <option>Sort by severity</option>
+              <option>Sort by service</option>
+              <option>Sort by resource</option>
+            </select>
+          </div>
+        </div>
+        <div class="divide-y divide-gray-200 dark:divide-gray-700">
+          <!-- Finding 1: Critical -->
+          <div class="px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
+            <div class="flex items-start justify-between">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center flex-wrap gap-2">
+                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">Critical</span>
+                  <h3 class="text-sm font-medium text-gray-900 dark:text-white">S3 Bucket Public Access</h3>
+                </div>
+                <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                  Bucket "public-assets" has public read access enabled. This exposes all objects in the bucket to the internet.
+                </p>
+                <div class="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
+                  <span>Resource: s3://public-assets</span>
+                  <span>Service: S3</span>
+                  <span>Region: us-east-1</span>
+                </div>
+              </div>
+              <div class="ml-4 flex-shrink-0">
+                <button class="text-sm font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400">View Details</button>
+              </div>
+            </div>
+          </div>
+          <!-- Finding 2: Critical -->
+          <div class="px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">...</div>
+          <!-- Finding 3: High -->
+          <div class="px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">...</div>
+          <!-- More findings... -->
+        </div>
+        <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between">
+          <p class="text-sm text-gray-500 dark:text-gray-400">Showing 1-10 of 23 findings</p>
+          <div class="flex space-x-2">
+            <button class="px-3 py-1 text-sm border rounded-md disabled:opacity-50">Previous</button>
+            <button class="px-3 py-1 text-sm border rounded-md">Next</button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </main>
@@ -75,17 +182,66 @@ Detailed report view with executive summary and findings.
 ## Component Breakdown
 
 ### shadcn-vue Components Used
-- `Card` - Summary sections
-- `Progress` - Security score indicator
-- `Button` - Export buttons
+- `Card` - Executive summary, compliance, findings containers
+- `Progress` - Security score and compliance bars
+- `Button` - Export and actions
+- `Select` - Severity/sort filters
+- `Breadcrumb` - Navigation
+- `Badge` - Severity indicators
+
+### Layout Structure
+- Breadcrumb for navigation context
+- Header with report metadata and export actions
+- 4-column executive summary grid
+- Compliance framework progress section
+- Findings list with filters, pagination
+
+## Responsive Behavior
+
+### Desktop (lg: 1024px+)
+- 4-column executive summary
+- Full findings list
+
+### Tablet (md: 768px)
+- 2-column executive summary
+- Filters stack on smaller screens
+
+### Mobile (< 768px)
+- Single-column executive summary
+- Stacked action buttons
+- Simplified filters
+
+## Interaction States
+
+- **Export PDF/CSV**: Triggers download; show loading state
+- **View Scan**: Links to scan detail page
+- **Findings Rows**: Hover background; click "View Details" opens modal/drawer
+- **Severity Filter**: Filters list client-side or refetches
+- **Sort**: Reorders findings
+- **Pagination**: Load next/prev page
+
+## Color Tokens
+
+- **Progress Bars**: `bg-green-600` (80%+), `bg-green-500` (60–79%), `bg-amber-500` (<60%)
+- **Severity Badges**: Red (Critical), Orange (High), Amber (Medium), Blue (Low)
+
+## Spacing Guide
+
+- **Page Padding**: `px-4 sm:px-6 md:px-8`
+- **Section Spacing**: `mb-8` (32px)
+- **Card Padding**: `px-6 py-4` headers, `px-6 py-6` content
 
 ## Implementation Notes
 
-1. **Export Formats**: PDF and CSV export
-2. **Executive Summary**: High-level overview for CTOs
-3. **Findings**: Same structure as scan detail page
+1. **Export Formats**: PDF via jsPDF or server-side; CSV as tabular export
+2. **Executive Summary**: Derived from scan results; cache for performance
+3. **Findings**: Same data as scan detail; optionally link to scan
+4. **Compliance**: Map findings to framework controls; calculate pass/fail
+5. **Breadcrumb**: Reports list → this report
+6. **Shareable**: Consider shareable link with optional expiry
 
 ## Laravel Starter Kit Integration
 
 - Page: `resources/js/Pages/Reports/Show.vue`
-
+- Route: `reports/{report}`
+- Uses scan data; report may be a snapshot or live view
