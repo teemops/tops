@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import Dropdown from '@/Components/Dropdown.vue';
 import DropdownLink from '@/Components/DropdownLink.vue';
+import MfaAlertBanner from '@/Components/MfaAlertBanner.vue';
 import NotificationContainer from '@/Components/NotificationContainer.vue';
 import OrganizationSelector from '@/Components/OrganizationSelector.vue';
 import DarkModeToggle from '@/Components/DarkModeToggle.vue';
@@ -185,6 +186,9 @@ const logout = () => {
                     </div>
                 </div>
             </header>
+
+            <!-- MFA disabled alert -->
+            <MfaAlertBanner />
 
             <!-- Page Content -->
             <main class="flex-1 bg-gray-50 dark:bg-gray-900">
