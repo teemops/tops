@@ -9,6 +9,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 class SetOrganizationContext
 {
+
     /**
      * Handle an incoming request.
      */
@@ -17,10 +18,20 @@ class SetOrganizationContext
         $user = auth()->user();
 
         if (!$user) {
-            // Allow unauthenticated web requests through (e.g. login page); API gets 401
+
+            // Allow guest auth routes through even if they expect JSON
+            if (
+                $request->is('auth/firebase/*') ||
+                $request->routeIs('firebase.*') ||
+                $request->routeIs('login') ||
+                $request->routeIs('register')
+            ) {
+                return $next($request);
+            }
             if ($request->expectsJson() || $request->is('api/*')) {
                 return response()->json(['error' => 'Unauthorized'], 401);
             }
+
             return $next($request);
         }
 
@@ -61,13 +72,13 @@ class SetOrganizationContext
             // Attach organization to request
             $request->merge(['organization' => $organization]);
             $request->attributes->set('organization', $organization); // Also set in attributes for easier access
-            
+
             // Attach user's role to request for permission checks
             $permissionService = app(\App\Services\OrganizationPermission::class);
             $role = $permissionService->getUserRole($user, $organization);
             $request->merge(['organization_role' => $role]);
             $request->attributes->set('organization_role', $role); // Also set in attributes for Inertia sharing
-            
+
             $request->setUserResolver(function () use ($organization) {
                 return $organization;
             });
@@ -121,7 +132,7 @@ class SetOrganizationContext
             if ($organization) {
                 $request->merge(['organization' => $organization]);
                 $request->attributes->set('organization', $organization); // Also set in attributes for easier access
-                
+
                 // Attach user's role to request
                 $permissionService = app(\App\Services\OrganizationPermission::class);
                 $role = $permissionService->getUserRole($user, $organization);

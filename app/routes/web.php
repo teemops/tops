@@ -4,6 +4,7 @@ use App\Http\Controllers\ProfileController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 
 Route::get('/', function () {
@@ -11,9 +12,14 @@ Route::get('/', function () {
     if (Auth::check()) {
         return redirect()->route('dashboard');
     }
-    
+
     // If not authenticated, redirect to login page
     return redirect()->route('login');
+});
+
+Route::get('/log-test', function () {
+    Log::info('Log test endpoint hit');
+    return 'logged';
 });
 
 Route::get('/dashboard', function () {

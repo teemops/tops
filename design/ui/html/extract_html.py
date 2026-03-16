@@ -13,6 +13,7 @@ HTML_DIR = Path(__file__).parent
 # Mapping of markdown files to HTML output paths
 FILE_MAPPINGS = {
     'auth/login.md': 'auth/login.html',
+    'auth/login-mfa-authenticator.md': 'auth/login-mfa-authenticator.html',
     'auth/login-otp.md': 'auth/login-otp.html',
     'auth/register.md': 'auth/register.html',
     'auth/password-reset.md': 'auth/password-reset.html',
