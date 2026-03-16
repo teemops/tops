@@ -25,7 +25,15 @@ Route::middleware('guest')->group(function () {
     // Firebase Auth OAuth verification
     Route::post('auth/firebase/verify', [\App\Http\Controllers\Auth\FirebaseAuthController::class, 'verify'])
         ->name('firebase.verify');
-    
+
+    // Firebase Auth MFA verification (after password when MFA enabled)
+    Route::post('auth/firebase/verify-mfa', [\App\Http\Controllers\Auth\FirebaseAuthController::class, 'verifyMfa'])
+        ->name('firebase.verify-mfa');
+
+    // Request email OTP for MFA fallback
+    Route::post('auth/firebase/request-email-otp', [\App\Http\Controllers\Auth\FirebaseAuthController::class, 'requestEmailOtp'])
+        ->name('firebase.request-email-otp');
+
     // Firebase Auth registration (email/password signup)
     Route::post('auth/firebase/register', [\App\Http\Controllers\Auth\FirebaseAuthController::class, 'register'])
         ->name('firebase.register');

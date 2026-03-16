@@ -255,7 +255,7 @@ The login page uses the split layout with branding on the left and the login for
 ## Implementation Notes
 
 1. **Form Validation**: Use Laravel validation with Inertia.js error handling
-2. **MFA Flow**: After successful password entry, if MFA is enabled: show TOTP code input OR "Email me a code" option (see `auth/login-otp.html` for email OTP fallback wireframe)
+2. **Login flow**: Login (email/password or OAuth) → backend returns `mfa_required` or `email_otp_required` → verification step → session created. If MFA enabled: show TOTP first with "Email me a code instead" fallback (see `login-mfa-authenticator.md`). If MFA not enabled: show email OTP only ("Send code to my email") (see `login-otp.md`).
 3. **OAuth Integration**: Buttons should trigger Laravel Socialite flows
 4. **Remember Me**: Store authentication token in cookie
 5. **Dark Mode**: All colors have dark mode variants
