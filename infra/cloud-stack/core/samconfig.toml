@@ -1,0 +1,30 @@
+version = 0.1
+
+# Core stacks: SQS, SNS, IAM EC2 root role, VPC
+[default.build.parameters]
+cached = true
+parallel = true
+
+[default.deploy.parameters]
+stack_name = "teemops-core"
+resolve_s3 = true
+s3_prefix = "teemops-core"
+capabilities = "CAPABILITY_IAM CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND"
+template_file = "template.yaml"
+fail_on_empty_changeset = false
+
+# EC2 + ALB (deploy after core; supply parameters for VPC subnets, cert, AMI, etc.)
+confirm_changeset = true
+parameter_overrides = "VpcName=\"tops-vpc\" VpcCidr=\"10.100.0.0/16\" VpcOption=\"standard\" VpcNATGateway=\"false\""
+image_repositories = []
+
+[default.global.parameters]
+region = "ap-southeast-6"
+[ec2.deploy.parameters]
+stack_name = "teemops-ec2"
+resolve_s3 = true
+s3_prefix = "teemops-sam-ec2"
+region = "ap-southeast-6"
+capabilities = "CAPABILITY_IAM CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND"
+template_file = "template-ec2.yaml"
+fail_on_empty_changeset = false
