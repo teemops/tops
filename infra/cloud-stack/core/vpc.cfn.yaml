@@ -152,3 +152,24 @@ Resources:
       DestinationCidrBlock: 0.0.0.0/0
       NatGatewayId:
         Ref: TopsNATGateway
+
+Outputs:
+  VpcId:
+    Description: VPC ID
+    Value: !Ref TopsVPC
+  PublicSubnet1Id:
+    Condition: HasPublicSubnet1
+    Description: First public subnet
+    Value: !Ref TopsSubnet1Public
+  PublicSubnet2Id:
+    Condition: HasPublicSubnet2
+    Description: Second public subnet
+    Value: !Ref TopsSubnet2Public
+  PrivateSubnet1Id:
+    Condition: HasPrivateSubnet1
+    Description: First private subnet
+    Value: !Ref TopsSubnet1Private
+  PrivateSubnet2Id:
+    Condition: HasPrivateSubnet2
+    Description: Second private subnet
+    Value: !Ref TopsSubnet2Private

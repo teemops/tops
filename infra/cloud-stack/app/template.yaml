@@ -1,0 +1,70 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Teemops EC2 + ALB - deploy after template.yaml; pass VPC subnets and other parameters
+
+Parameters:
+  VPC:
+    Type: AWS::EC2::VPC::Id
+  Subnet:
+    Type: String
+    Description: Comma-separated instance subnet IDs (e.g. from VPC stack Outputs)
+  ALBSubnet1:
+    Type: AWS::EC2::Subnet::Id
+  ALBSubnet2:
+    Type: AWS::EC2::Subnet::Id
+  SSLCertificateArn:
+    Type: String
+    Description: ACM certificate ARN for HTTPS listener
+  TopsEc2InstanceProfile:
+    Type: String
+    Description: Instance profile name or ARN (from iam.ec2.root.role stack output)
+  AMI:
+    Type: AWS::EC2::Image::Id
+  InstanceType:
+    Type: String
+    Default: t3.micro
+  RootVolumeSize:
+    Type: Number
+    Default: 30
+  AppId:
+    Type: String
+  AppName:
+    Type: String
+  CustomerId:
+    Type: String
+  KeyPair:
+    Type: AWS::EC2::KeyPair::KeyName
+  HasPublicIp:
+    Type: String
+    AllowedValues: ["true", "false"]
+    Default: "true"
+  HasElasticIp:
+    Type: String
+    AllowedValues: ["true", "false"]
+    Default: "false"
+
+Resources:
+  Ec2AlbStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: ec2.alb.launch.cfn.yaml
+      Parameters:
+        VPC: !Ref VPC
+        Subnet: !Ref Subnet
+        ALBSubnet1: !Ref ALBSubnet1
+        ALBSubnet2: !Ref ALBSubnet2
+        SSLCertificateArn: !Ref SSLCertificateArn
+        TopsEc2InstanceProfile: !Ref TopsEc2InstanceProfile
+        AMI: !Ref AMI
+        InstanceType: !Ref InstanceType
+        RootVolumeSize: !Ref RootVolumeSize
+        AppId: !Ref AppId
+        AppName: !Ref AppName
+        CustomerId: !Ref CustomerId
+        KeyPair: !Ref KeyPair
+        HasPublicIp: !Ref HasPublicIp
+        HasElasticIp: !Ref HasElasticIp
+
+Outputs:
+  Ec2AlbStackId:
+    Value: !Ref Ec2AlbStack

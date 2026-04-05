@@ -1,0 +1,21 @@
+version = 0.1
+
+# DB Stack
+[default.build.parameters]
+cached = true
+parallel = true
+
+[default.deploy.parameters]
+stack_name = "teemops-rds"
+resolve_s3 = true
+s3_prefix = "teemops-rds"
+capabilities = "CAPABILITY_IAM CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND"
+template_file = "template.yaml"
+fail_on_empty_changeset = false
+confirm_changeset = true
+parameter_overrides = "DBSubnet1=\"subnet-08e801325c441c7ae\" DBSubnet2=\"subnet-04d1396f58a48330f\" DBInstanceClass=\"db.t4g.micro\" Engine=\"mysql\" EngineVersion=\"8.4.8\" AllocatedStorage=\"20\" MaxAllocatedStorage=\"20\" TopsAppSecurityGroup=\"sg-00001e26a8c164d84\" VPC=\"vpc-04da45fd0ee39eee4\" DBInstanceName=\"tops-rds\" MasterUsername=\"admin\""
+image_repositories = []
+
+[default.global.parameters]
+region = "ap-southeast-6"
+
