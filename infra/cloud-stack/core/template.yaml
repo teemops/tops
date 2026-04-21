@@ -1,0 +1,56 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Teemops core infrastructure - SQS, SNS, IAM EC2 root role, VPC (nested CloudFormation; SAM packaging)
+
+Parameters:
+  VpcName:
+    Type: String
+    Description: Name tag for the VPC
+  VpcCidr:
+    Type: String
+    Description: VPC CIDR block
+  VpcOption:
+    Type: String
+    AllowedValues: [basic, standard, private, public]
+    Default: standard
+    Description: Subnet layout (see vpc.cfn.yaml)
+  VpcNATGateway:
+    Type: String
+    AllowedValues: ["true", "false"]
+    Default: "true"
+    Description: Create a NAT gateway when the VPC layout supports it
+
+Resources:
+  SqsStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: sqs.cfn.yaml
+
+  IamEc2RootStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: iam.ec2.root.role.cfn.yaml
+
+  VpcStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: vpc.cfn.yaml
+      Parameters:
+        Name: !Ref VpcName
+        CIDR: !Ref VpcCidr
+        Option: !Ref VpcOption
+        NATGateway: !Ref VpcNATGateway
+
+Outputs:
+  SqsStackId:
+    Value: !Ref SqsStack
+  IamEc2RootStackId:
+    Value: !Ref IamEc2RootStack
+  VpcStackId:
+    Value: !Ref VpcStack
+  VpcId:
+    Description: VPC ID from nested stack (for template-ec2.yaml)
+    Value: !GetAtt VpcStack.Outputs.VpcId
+  IamInstanceProfileArn:
+    Description: Instance profile ARN from iam.ec2.root.role (for EC2 template)
+    Value: !GetAtt IamEc2RootStack.Outputs.InstanceProfile

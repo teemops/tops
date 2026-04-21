@@ -1,0 +1,101 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Teemops RDS Initial Launch Template
+Parameters:
+  DBSubnet1:
+    Description: First subnet for the DB subnet group (use a different AZ than DBSubnet2)
+    Type: AWS::EC2::Subnet::Id
+  DBSubnet2:
+    Description: Second subnet for the DB subnet group (different AZ from DBSubnet1)
+    Type: AWS::EC2::Subnet::Id
+  DBInstanceClass:
+    Description: DB Instance Class
+    Type: String
+    Default: db.t4g.micro
+  Engine:
+    Description: Engine
+    Type: String
+    AllowedValues: ["mysql", "postgres"]
+    Default: "mysql"
+  EngineVersion:
+    Description: Engine Version
+    Type: String
+    Default: "8.4.8"
+  AllocatedStorage:
+    Description: Allocated Storage
+    Type: Number
+    Default: 20
+  MaxAllocatedStorage:
+    Description: Max Allocated Storage
+    Type: Number
+    Default: 100
+  TopsAppSecurityGroup:
+    Description: App Security Group
+    Type: AWS::EC2::SecurityGroup::Id
+  VPC:
+    Description: VPC
+    Type: AWS::EC2::VPC::Id
+  DBInstanceName:
+    Description: DB Instance Name
+    Type: String
+    Default: "tops-rds"
+  MasterUsername:
+    Description: Master DB username (password is generated and stored in Secrets Manager; max 16 chars for MySQL)
+    Type: String
+    Default: admin
+    MinLength: 1
+    MaxLength: 63
+Resources:
+  TopsDBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: !Sub RDS subnets for ${AWS::StackName}
+      SubnetIds:
+        - !Ref DBSubnet1
+        - !Ref DBSubnet2
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-db-subnet-group
+  TopsRDS:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      VPCSecurityGroups:
+        - !Ref TopsRDSSecurityGroup
+      DBSubnetGroupName: !Ref TopsDBSubnetGroup
+      DBInstanceClass: !Ref DBInstanceClass
+      Engine: !Ref Engine
+      EngineVersion: !Ref EngineVersion
+      AllocatedStorage: !Ref AllocatedStorage
+      MaxAllocatedStorage: !Ref MaxAllocatedStorage
+      MasterUsername: !Ref MasterUsername
+      ManageMasterUserPassword: true
+      Tags:
+        - Key: Name
+          Value: !Ref DBInstanceName
+  TopsRDSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub Security group for ${AWS::StackName}
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          SourceSecurityGroupId: !Ref TopsAppSecurityGroup
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          FromPort: 0
+          ToPort: 65535
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-db-security-group
+Outputs:
+  DBSubnetGroupName:
+    Description: RDS DB subnet group name
+    Value: !Ref TopsDBSubnetGroup
+  DBInstanceId:
+    Description: RDS InstanceId
+    Value: !Ref TopsRDS
+  MasterUserSecretArn:
+    Description: Secrets Manager secret ARN for the RDS master user password
+    Value: !GetAtt TopsRDS.MasterUserSecret.SecretArn

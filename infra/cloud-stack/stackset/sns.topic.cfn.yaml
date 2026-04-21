@@ -1,0 +1,101 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: SNS Topic which sits in root teemops account (not child accounts)
+Parameters:
+  SQSLabel:
+    Type: String
+    Description: 'Teemops SQS Label'
+    Default: 'teemops_main'
+  SQSRegion:
+    Type: String
+    Description: 'Teemops SQS Region'
+    Default: 'ap-southeast-6'
+Resources:
+  TopsSNS:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: 'teemops-sns'
+  TopsCWEventPolicy:
+    Type: AWS::Events::EventBusPolicy
+    Properties: 
+      Action: "events:PutEvents"
+      Principal: "*"
+      StatementId: "TopsCWEventsFromOtherAccounts"
+  TopsCWRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: 'Teemops Cloudwatch events for when instances shut down and start, reboot'
+      Targets:
+        - 
+          Arn:
+            Fn::Join:
+              - ''
+              - - 'arn:aws:sns:'
+                - !Ref "AWS::Region"
+                - ':'
+                - !Ref "AWS::AccountId"
+                - ':teemops-sns'
+          Id: "TargetTopsSNSTopic"
+      EventPattern: '{
+  "source": [
+    "aws.ec2"
+  ],
+  "detail-type": [
+    "EC2 Instance State-change Notification"
+  ]
+}'
+  TopsSNSPolicy:
+    DependsOn: TopsSNS
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      PolicyDocument:
+        Id: TopsSNSTopicPolicy
+        Version: '2012-10-17'
+        Statement:
+        - Sid: alllow-admin-account
+          Effect: Allow
+          Principal:
+            AWS: "*"
+          Action:
+          - sns:Publish
+          - sns:RemovePermission
+          - sns:SetTopicAttributes
+          - sns:DeleteTopic
+          - sns:ListSubscriptionsByTopic
+          - sns:GetTopicAttributes
+          - sns:Receive
+          - sns:AddPermission
+          - sns:Subscribe
+          Resource: "*"
+          Condition:
+              StringEquals:
+                'AWS:SourceOwner': !Ref "AWS::AccountId"
+        - Sid: allow-all-aws-users
+          Effect: Allow
+          Principal:
+            AWS: "*"
+          Action: sns:Publish
+          Resource: "*"
+          # Condition:
+          #   StringEquals:
+          #     'sns:MessageAttributes.TopsRawTopsRootAccountHash': 'teemops-123'
+      Topics:
+      - !Ref TopsSNS
+  TopsSubscriber:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref TopsSNS
+      Protocol: sqs
+      Endpoint: 
+        Fn::Join:
+          - ''
+          - - 'arn:aws:sqs:'
+            - !Ref SQSRegion
+            - ':'
+            - !Ref 'AWS::AccountId'
+            - ':'
+            - !Ref SQSLabel
+  
+Outputs:
+  TopicArn:
+    Description: Teemops SNS Topic
+    Value: !Ref TopsSNS

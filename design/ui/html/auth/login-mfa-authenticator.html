@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verify with Authenticator - Teemops</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900">
+  <div class="fixed top-4 left-4 z-50"><a href="../index.html" class="inline-flex items-center px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">← Back to Index</a></div>
+  <div class="min-h-screen flex">
+    <!-- Left Side: Branding -->
+    <div class="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-gray-900 to-gray-800 items-center justify-center p-12">
+      <div class="max-w-md">
+        <div class="mb-8">
+          <img src="/logo.png" alt="Teemops Logo" class="h-12 w-auto mb-6">
+          <h1 class="text-4xl font-bold text-white mb-4">Simplify Cloud</h1>
+          <p class="text-xl text-gray-300">Cloud security made simple for busy CTOs</p>
+        </div>
+        <div class="space-y-4 text-gray-400">
+          <div class="flex items-start">
+            <svg class="h-6 w-6 mr-3 mt-0.5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+            </svg>
+            <div>
+              <p class="font-medium text-white">Multi-factor authentication</p>
+              <p class="text-sm">Extra security for your account</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Side: MFA Form -->
+    <div class="flex-1 flex items-center justify-center p-8 lg:p-12">
+      <div class="w-full max-w-md">
+        <!-- Mobile Logo -->
+        <div class="lg:hidden mb-8 text-center">
+          <img src="/logo.png" alt="Teemops Logo" class="h-10 w-auto mx-auto mb-4">
+          <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Verify your identity</h1>
+        </div>
+
+        <!-- Desktop Heading -->
+        <div class="hidden lg:block mb-8">
+          <h1 class="text-3xl font-bold text-gray-900 dark:text-white mb-2">Verify your identity</h1>
+          <p class="text-gray-600 dark:text-gray-400">Enter the 6-digit code from your authenticator app</p>
+        </div>
+
+        <!-- MFA Form -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-8 shadow-sm">
+          <div class="mb-6 flex items-center justify-center">
+            <div class="w-14 h-14 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+              <svg class="h-7 w-7 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+              </svg>
+            </div>
+          </div>
+          <p class="text-sm text-gray-600 dark:text-gray-400 text-center mb-6">
+            Open your authenticator app (Google Authenticator, Authy, etc.) and enter the code shown for Teemops.
+          </p>
+          <form class="space-y-6">
+            <div>
+              <label for="otp" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Verification code
+              </label>
+              <input
+                type="text"
+                id="otp"
+                name="otp"
+                inputmode="numeric"
+                autocomplete="one-time-code"
+                maxlength="6"
+                placeholder="000000"
+                class="w-full px-4 py-3 text-center text-2xl font-mono tracking-widest border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+              />
+            </div>
+            <button
+              type="submit"
+              class="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              Verify & sign in
+            </button>
+          </form>
+
+          <!-- Fallback: Email OTP -->
+          <div class="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+            <p class="text-sm text-gray-500 dark:text-gray-400 text-center">Don't have your authenticator?</p>
+            <a href="login-otp.html" class="block mt-2 text-sm font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 text-center">
+              Email me a code instead
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

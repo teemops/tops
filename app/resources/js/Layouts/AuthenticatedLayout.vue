@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import ApplicationLogo from '@/Components/ApplicationLogo.vue';
+import MfaAlertBanner from '@/Components/MfaAlertBanner.vue';
 import Dropdown from '@/Components/Dropdown.vue';
 import DropdownLink from '@/Components/DropdownLink.vue';
 import NavLink from '@/Components/NavLink.vue';
@@ -178,6 +179,9 @@ const showingNavigationDropdown = ref(false);
                     </div>
                 </div>
             </nav>
+
+            <!-- MFA disabled alert -->
+            <MfaAlertBanner />
 
             <!-- Page Heading -->
             <header

@@ -1,0 +1,21 @@
+version = 0.1
+
+# App Stack EC2, ALB, TG etc
+[default.build.parameters]
+cached = true
+parallel = true
+
+[default.deploy.parameters]
+stack_name = "teemops-ec2"
+resolve_s3 = true
+s3_prefix = "teemops-ec2"
+capabilities = "CAPABILITY_IAM CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND"
+template_file = "template.yaml"
+fail_on_empty_changeset = false
+confirm_changeset = true
+parameter_overrides = "VPC=\"vpc-04da45fd0ee39eee4\" Subnet=\"subnet-08e801325c441c7ae\" ALBSubnet1=\"subnet-0acbe7449684ff20d\" ALBSubnet2=\"subnet-0bfd4138adf9d3ad9\" SSLCertificateArn=\"arn:aws:acm:ap-southeast-6:995114123204:certificate/3c60d582-e257-41b9-93de-fd6ff0b18fbd\" TopsEc2InstanceProfile=\"TeemopsInstanceProfile\" AMI=\"ami-0d9dbc22316e93d37\" InstanceType=\"t3.micro\" RootVolumeSize=\"100\" AppId=\"1\" AppName=\"tops\" CustomerId=\"1\" KeyPair=\"bf\" HasPublicIp=\"true\" HasElasticIp=\"true\""
+image_repositories = []
+
+[default.global.parameters]
+region = "ap-southeast-6"
+

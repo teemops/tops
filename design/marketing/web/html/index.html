@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Teemops - AWS Security Scanning Made Simple</title>
-    <meta name="description" content="Find AWS misconfigurations before attackers do. Continuous security scanning with CIS, PCI-DSS, SOC 2 compliance monitoring. Start free.">
+    <meta name="description" content="Find AWS misconfigurations before attackers do. Continuous security scanning across S3, IAM, EC2, RDS. CIS-focused with PCI-DSS and SOC 2 roadmap. Start free.">
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -32,6 +32,9 @@
         .hero-light {
             background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
         }
+        /* Mobile menu */
+        .nav-menu { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; }
+        .nav-menu.open { max-height: 20rem; }
     </style>
 </head>
 <body class="bg-white text-gray-900">
@@ -40,14 +43,27 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center h-16">
                 <div class="flex items-center">
-                    <a href="/" class="text-2xl font-bold text-primary">Teemops</a>
+                    <a href="index.html" class="flex items-center flex-shrink-0">
+                        <img src="logo.png" alt="Teem" class="h-10 w-auto" />
+                    </a>
                 </div>
+                <button type="button" class="md:hidden p-2 rounded-lg text-gray-600 hover:bg-gray-100" id="nav-toggle" aria-label="Open menu" aria-expanded="false">
+                    <svg class="w-6 h-6" id="nav-icon-menu" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+                    <svg class="w-6 h-6 hidden" id="nav-icon-close" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
                 <div class="hidden md:flex items-center space-x-8">
                     <a href="features.html" class="text-gray-600 hover:text-gray-900">Features</a>
                     <a href="pricing.html" class="text-gray-600 hover:text-gray-900">Pricing</a>
-                    <a href="#" class="text-gray-600 hover:text-gray-900">Docs</a>
-                    <a href="#" class="text-gray-600 hover:text-gray-900">Login</a>
-                    <a href="#" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-dark transition">Start Free</a>
+                    <a href="https://app.teem.nz/login" class="text-gray-600 hover:text-gray-900">Login</a>
+                    <a href="https://app.teem.nz/register" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-dark transition">Start Free</a>
+                </div>
+            </div>
+            <div class="nav-menu md:hidden" id="nav-menu">
+                <div class="py-4 space-y-2 border-t border-gray-100">
+                    <a href="features.html" class="block py-2 text-gray-600 hover:text-gray-900">Features</a>
+                    <a href="pricing.html" class="block py-2 text-gray-600 hover:text-gray-900">Pricing</a>
+                    <a href="https://app.teem.nz/login" class="block py-2 text-gray-600 hover:text-gray-900">Login</a>
+                    <a href="https://app.teem.nz/register" class="block py-2 text-primary font-medium">Start Free</a>
                 </div>
             </div>
         </div>
@@ -62,10 +78,10 @@
                         AWS Security Scanning Made Simple
                     </h1>
                     <p class="text-xl text-gray-300 mb-8">
-                        Find misconfigurations before attackers do. Get actionable fixes in minutes, not weeks.
+                        Built in New Zealand. Find misconfigurations before attackers do—get actionable fixes in minutes, not weeks.
                     </p>
                     <div class="flex flex-col sm:flex-row gap-4">
-                        <a href="#" class="bg-accent hover:bg-emerald-600 text-white px-8 py-4 rounded-lg font-semibold text-center transition">
+                        <a href="https://app.teem.nz/register" class="bg-accent hover:bg-emerald-600 text-white px-8 py-4 rounded-lg font-semibold text-center transition">
                             Start Free Scan
                         </a>
                         <a href="#how-it-works" class="border border-white/30 hover:bg-white/10 text-white px-8 py-4 rounded-lg font-semibold text-center transition">
@@ -162,9 +178,9 @@
                 </div>
             </div>
             <div class="mt-12 text-center">
-                <p class="text-lg text-gray-700 font-medium">
+                <h2 class="text-3xl md:text-4xl font-bold mb-6">
                     You're one misconfiguration away from a headline you don't want.
-                </p>
+                </h2>
                 <p class="text-gray-500 mt-2">
                     The average data breach costs <span class="font-semibold">$4.45 million</span>. For SMBs, it can mean the end.
                 </p>
@@ -247,7 +263,7 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center mb-12">
                 <h2 class="text-3xl md:text-4xl font-bold mb-4">Everything You Need to Secure AWS</h2>
-                <p class="text-xl text-gray-600">Comprehensive security coverage without the complexity</p>
+                <p class="text-xl text-gray-600">For CTOs and DevOps teams at SaaS, fintech, and healthtech companies</p>
             </div>
             <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
                 <div class="bg-white p-6 rounded-xl shadow-sm">
@@ -266,7 +282,7 @@
                         </svg>
                     </div>
                     <h3 class="text-lg font-semibold mb-2">Compliance Monitoring</h3>
-                    <p class="text-gray-600">CIS, PCI-DSS, and SOC 2 compliance scores in real-time.</p>
+                    <p class="text-gray-600">CIS-focused rules today. PCI-DSS and SOC 2 alignment on the roadmap.</p>
                 </div>
                 <div class="bg-white p-6 rounded-xl shadow-sm">
                     <div class="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center mb-4">
@@ -328,7 +344,7 @@
                 <div class="text-center">
                     <div class="w-16 h-16 bg-primary text-white rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-6">2</div>
                     <h3 class="text-xl font-semibold mb-3">Run Your First Scan</h3>
-                    <p class="text-gray-600 mb-2">We scan your entire AWS environment against 100+ security checks.</p>
+                    <p class="text-gray-600 mb-2">We scan your entire AWS environment against 25+ security checks across S3, IAM, EC2, and RDS.</p>
                     <p class="text-sm text-gray-400">Time: 5 minutes</p>
                 </div>
                 <div class="text-center">
@@ -339,7 +355,7 @@
                 </div>
             </div>
             <div class="text-center mt-12">
-                <a href="#" class="bg-primary hover:bg-primary-dark text-white px-8 py-4 rounded-lg font-semibold transition inline-block">
+                <a href="https://app.teem.nz/register" class="bg-primary hover:bg-primary-dark text-white px-8 py-4 rounded-lg font-semibold transition inline-block">
                     Start Your Free Scan →
                 </a>
             </div>
@@ -350,20 +366,21 @@
     <section class="py-20 bg-secondary text-white">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center mb-12">
-                <h2 class="text-3xl md:text-4xl font-bold mb-4">Trusted by Growing Tech Companies</h2>
+                <h2 class="text-3xl md:text-4xl font-bold mb-4">Built in New Zealand for Growing Tech Teams</h2>
+                <p class="text-gray-400 max-w-2xl mx-auto">Join teams across NZ and beyond securing their AWS environments—SaaS, fintech, and healthtech.</p>
             </div>
             <div class="grid grid-cols-2 md:grid-cols-4 gap-8 mb-16">
                 <div class="text-center">
-                    <div class="text-4xl md:text-5xl font-bold text-accent mb-2">1,000+</div>
-                    <div class="text-gray-400">AWS accounts scanned</div>
+                    <div class="text-4xl md:text-5xl font-bold text-accent mb-2">4</div>
+                    <div class="text-gray-400">AWS services scanned</div>
                 </div>
                 <div class="text-center">
-                    <div class="text-4xl md:text-5xl font-bold text-accent mb-2">50,000+</div>
-                    <div class="text-gray-400">Misconfigurations found</div>
-                </div>
-                <div class="text-center">
-                    <div class="text-4xl md:text-5xl font-bold text-accent mb-2">100+</div>
+                    <div class="text-4xl md:text-5xl font-bold text-accent mb-2">25+</div>
                     <div class="text-gray-400">Security checks</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-4xl md:text-5xl font-bold text-accent mb-2">S3</div>
+                    <div class="text-gray-400">IAM • EC2 • RDS</div>
                 </div>
                 <div class="text-center">
                     <div class="text-4xl md:text-5xl font-bold text-accent mb-2">&lt; 5 min</div>
@@ -371,6 +388,7 @@
                 </div>
             </div>
             <!-- Testimonials -->
+            <p class="text-center text-gray-400 text-sm mb-6">What teams securing AWS are saying</p>
             <div class="grid md:grid-cols-2 gap-8">
                 <div class="bg-white/5 backdrop-blur p-6 rounded-xl">
                     <p class="text-lg mb-4">
@@ -420,10 +438,10 @@
                 See your AWS security posture in the next 5 minutes.
             </p>
             <div class="flex flex-col sm:flex-row gap-4 justify-center">
-                <a href="#" class="bg-accent hover:bg-emerald-600 text-white px-8 py-4 rounded-lg font-semibold transition">
+                <a href="https://app.teem.nz/register" class="bg-accent hover:bg-emerald-600 text-white px-8 py-4 rounded-lg font-semibold transition">
                     Start Free Scan
                 </a>
-                <a href="#" class="border border-white/30 hover:bg-white/10 text-white px-8 py-4 rounded-lg font-semibold transition">
+                <a href="mailto:hello@teem.nz?subject=Demo%20request" class="border border-white/30 hover:bg-white/10 text-white px-8 py-4 rounded-lg font-semibold transition">
                     Book a Demo
                 </a>
             </div>
@@ -436,14 +454,13 @@
             <div class="grid md:grid-cols-4 gap-8 mb-12">
                 <div>
                     <div class="text-2xl font-bold text-white mb-4">Teemops</div>
-                    <p class="text-sm">AWS security scanning made simple for growing tech companies.</p>
+                    <p class="text-sm">AWS security for CTOs and DevOps. Built in New Zealand for SaaS, fintech, and healthtech companies.</p>
                 </div>
                 <div>
                     <h4 class="font-semibold text-white mb-4">Product</h4>
                     <ul class="space-y-2 text-sm">
                         <li><a href="features.html" class="hover:text-white">Features</a></li>
                         <li><a href="pricing.html" class="hover:text-white">Pricing</a></li>
-                        <li><a href="#" class="hover:text-white">Documentation</a></li>
                         <li><a href="#" class="hover:text-white">Changelog</a></li>
                     </ul>
                 </div>
@@ -483,5 +500,18 @@
             </div>
         </div>
     </footer>
+    <script>
+        document.getElementById('nav-toggle')?.addEventListener('click', function() {
+            const menu = document.getElementById('nav-menu');
+            const iconMenu = document.getElementById('nav-icon-menu');
+            const iconClose = document.getElementById('nav-icon-close');
+            const expanded = this.getAttribute('aria-expanded') === 'true';
+            menu.classList.toggle('open', !expanded);
+            iconMenu?.classList.toggle('hidden', !expanded);
+            iconClose?.classList.toggle('hidden', expanded);
+            this.setAttribute('aria-expanded', !expanded);
+            this.setAttribute('aria-label', expanded ? 'Open menu' : 'Close menu');
+        });
+    </script>
 </body>
 </html>

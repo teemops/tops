@@ -154,7 +154,8 @@ export async function signInWithOAuth(provider: 'google' | 'github' | 'microsoft
 }
 
 // Get current user's ID token
-export async function getIdToken(): Promise<string | null> {
+// forceRefresh: when true, always fetches a new token (use for login flow to avoid expired token issues)
+export async function getIdToken(forceRefresh = false): Promise<string | null> {
     if (!auth) {
         throw new Error('Firebase is not configured.');
     }
@@ -162,7 +163,7 @@ export async function getIdToken(): Promise<string | null> {
     if (!user) {
         return null;
     }
-    return await user.getIdToken();
+    return await user.getIdToken(forceRefresh);
 }
 
 // Sign in with email and password

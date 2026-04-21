@@ -1,0 +1,49 @@
+Resources:
+  TopsSQS:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: teemops_main
+      VisibilityTimeout: 300
+      MessageRetentionPeriod: 86400
+      RedrivePolicy:
+        deadLetterTargetArn:
+          Fn::GetAtt:
+          - TopsSQSDLQ
+          - Arn
+        maxReceiveCount: 5
+  TopsSQSDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: teemops_main_dlq
+      VisibilityTimeout: 300
+      MessageRetentionPeriod: 86400
+  TopsAuditSQS:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: teemops_audit
+      VisibilityTimeout: 300
+      MessageRetentionPeriod: 86400
+      RedrivePolicy:
+        deadLetterTargetArn:
+          Fn::GetAtt:
+          - TopsAuditSQSDLQ
+          - Arn
+        maxReceiveCount: 5
+  TopsAuditRegionSQS:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: teemops_audit_region
+      VisibilityTimeout: 300
+      MessageRetentionPeriod: 86400
+      RedrivePolicy:
+        deadLetterTargetArn:
+          Fn::GetAtt:
+          - TopsAuditSQSDLQ
+          - Arn
+        maxReceiveCount: 5
+  TopsAuditSQSDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: teemops_audit_dlq
+      VisibilityTimeout: 300
+      MessageRetentionPeriod: 86400

@@ -13,6 +13,8 @@ HTML_DIR = Path(__file__).parent
 # Mapping of markdown files to HTML output paths
 FILE_MAPPINGS = {
     'auth/login.md': 'auth/login.html',
+    'auth/login-mfa-authenticator.md': 'auth/login-mfa-authenticator.html',
+    'auth/login-otp.md': 'auth/login-otp.html',
     'auth/register.md': 'auth/register.html',
     'auth/password-reset.md': 'auth/password-reset.html',
     'auth/email-verify.md': 'auth/email-verify.html',
@@ -29,6 +31,10 @@ FILE_MAPPINGS = {
     'app/reports/view.md': 'app/reports/view.html',
     'app/insights/analytics.md': 'app/insights/analytics.html',
     'app/settings/profile.md': 'app/settings/profile.html',
+    'app/settings/profile-mfa-enabled.md': 'app/settings/profile-mfa-enabled.html',
+    'app/settings/mfa-setup.md': 'app/settings/mfa-setup.html',
+    'app/settings/mfa-setup-verify.md': 'app/settings/mfa-setup-verify.html',
+    'app/settings/mfa-remove.md': 'app/settings/mfa-remove.html',
     'app/settings/appearance.md': 'app/settings/appearance.html',
 }
 

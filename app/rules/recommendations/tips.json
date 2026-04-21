@@ -1,0 +1,150 @@
+{
+    "$schema": "tops/recommend/ruleset/schema.v1",
+    "name": "tips.json",
+    "description": "Basic tips and recommendations for AWS findings",
+    "recommendations": [
+        {
+            "name": "tops-rec-001",
+            "recommendation": "Secure S3 Buckets",
+            "impact": "Potential data breach or unauthorized access to data",
+            "links": [
+                "https://docs.aws.amazon.com/AmazonS3/latest/dev/security-best-practices.html"
+            ],
+            "description": "S3 Buckets should be secured to prevent unauthorized access",
+            "steps": [
+                "Enable S3 Public Access Block",
+                "Enable S3 Bucket Encryption"
+            ],
+            "rules": [
+                "tops-s3-001",
+                "tops-s3-002"
+            ]
+        },
+        {
+            "name": "tops-rec-002",
+            "recommendation": "Secure EC2 Instances",
+            "impact": "Potential unauthorized access to systems",
+            "links": [
+                "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/iam-roles-for-amazon-ec2.html",
+                "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-instance-addressing.html#concepts-public-addresses",
+                "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/introduction.html"
+            ],
+            "description": "EC2 Instances to be secured to limit access to systems. This should include disabling IAM Roles and Public IP Addresses",
+            "steps": [
+                "Remove Public IP Address",
+                "Remove or reduce IAM Role Instance Profile permissions",
+                "Add an optional Load Balancer to provide access to the instance from outside the VPC"
+            ],
+            "rules": [
+                "tops-ec2-002"
+            ]
+        },
+        {
+            "name": "tops-rec-003",
+            "recommendation": "Improve EC2 Instance Monitoring",
+            "impact": "Potential outage not detected or recovered from",
+            "links": [
+                "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-cloudwatch-new.html",
+                "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-recover.html"
+            ],
+            "description": "EC2 Instances to enable Cloudwatch Monitoring to detect potential outages and enable Auto Recovery to recover from them",
+            "steps": [
+                "Enable Cloudwatch Monitoring",
+                "Enable Auto Recovery"
+            ],
+            "rules": [
+                "tops-ec2-001",
+                "tops-ec2-003"
+            ]
+        },
+        {
+            "name": "tops-rec-004",
+            "recommendation": "Enable MFA for IAM Users",
+            "impact": "Potential unauthorized access to systems",
+            "links": [
+                "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_mfa.html"
+            ],
+            "description": "IAM Users must have an MFA device enabled",
+            "steps": [
+                "Enable MFA for IAM Users"
+            ],
+            "rules": [
+                "tops-iam-001"
+            ]
+        },
+        {
+            "name": "tops-rec-005",
+            "recommendation": "Remove IAM User Access Keys",
+            "impact": "Potential unauthorized access to systems",
+            "links": [
+                "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html",
+                "https://docs.aws.amazon.com/cloudshell/latest/userguide/welcome.html",
+                "https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sso.html"
+            ],
+            "description": "IAM Users should not have access keys",
+            "steps": [
+                "Remove IAM User Access Keys",
+                "Use AWS Cloud Shell",
+                "Use AWS CLI V2 and enable authentication through IAM Identity Center"
+            ],
+            "rules": [
+                "tops-iam-002"
+            ]
+        },
+        {
+            "name": "tops-rec-006",
+            "recommendation": "Secure VPC Subnets",
+            "impact": "Potential unauthorized access to systems",
+            "links": [
+                "https://docs.aws.amazon.com/vpc/latest/userguide/modify-subnets.html",
+                "https://docs.aws.amazon.com/vpc/latest/userguide/vpc-example-private-subnets-nat.html"
+            ],
+            "description": "VPC Subnets should be secured to prevent unauthorized access",
+            "steps": [
+                "Set Default EC2 Instances to Private IP Address only",
+                "Ensure subnets with EC2 instances have a private route table"
+            ],
+            "rules": [
+                "tops-ec2-004"
+            ]
+        },
+        {
+            "name": "tops-rec-007",
+            "recommendation": "IAM User Policies",
+            "impact": "Potential unauthorized access to systems",
+            "links": [
+                "https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies.html",
+                "https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies_managed-vs-inline.html",
+                "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_groups.html"
+            ],
+            "description": "IAM Policies to be managed through IAM Groups",
+            "steps": [
+                "Setup IAM Group",
+                "Add IAM Policies to IAM Group",
+                "Add Users to IAM Group",
+                "Remove IAM Policies from IAM User"
+            ],
+            "rules": [
+                "tops-iam-003",
+                "tops-iam-004"
+            ]
+        },
+        {
+            "name": "tops-rec-008",
+            "recommendation": "DNSSEC for Route53",
+            "impact": "Potential malicious domain resolution",
+            "links": [
+                "https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/domain-configure-dnssec.html",
+                "https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/dns-configuring-dnssec.html"
+            ],
+            "description": "Enable DNSSEC for Route53 Public Hosted Zones",
+            "steps": [
+                "Select Route53 Public Hosted Zone",
+                "Enable DNSSEC"
+            ],
+            "rules": [
+                "tops-route53-001"
+            ]
+        }
+    ]
+}

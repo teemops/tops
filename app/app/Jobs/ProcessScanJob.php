@@ -58,7 +58,7 @@ class ProcessScanJob implements ShouldQueue
             // Get AWS account
             $awsAccount = $this->scan->awsAccount;
 
-            if (!$awsAccount || $awsAccount->status !== 'active') {
+            if (!$awsAccount || $awsAccount->status !== 'completed') {
                 throw new \Exception('AWS account is not active');
             }
 
@@ -96,10 +96,15 @@ class ProcessScanJob implements ShouldQueue
                 'completed_at' => now(),
             ]);
 
-            // Update AWS account last scan time
-            $awsAccount->update([
-                'last_scan_at' => now(),
-            ]);
+            try {
+                $awsAccount->update(['last_scan_at' => now()]);
+            } catch (\Throwable $e) {
+                Log::warning('Failed to update AWS account last_scan_at', [
+                    'scan_id' => $this->scan->id,
+                    'aws_account_id' => $awsAccount->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
 
             Log::info('Scan completed successfully', [
                 'scan_id' => $this->scan->id,

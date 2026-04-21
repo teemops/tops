@@ -1,0 +1,80 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Teemops RDS — nested stack; parameters match rds.cfn.yaml
+
+Parameters:
+  DBSubnet1:
+    Description: First subnet for the DB subnet group (use a different AZ than DBSubnet2)
+    Type: AWS::EC2::Subnet::Id
+  DBSubnet2:
+    Description: Second subnet for the DB subnet group (different AZ from DBSubnet1)
+    Type: AWS::EC2::Subnet::Id
+  DBInstanceClass:
+    Description: DB Instance Class
+    Type: String
+    Default: db.t4g.micro
+  Engine:
+    Description: Engine
+    Type: String
+    AllowedValues: ["mysql", "postgres"]
+    Default: "mysql"
+  EngineVersion:
+    Description: Engine Version
+    Type: String
+    Default: "8.0.33"
+  AllocatedStorage:
+    Description: Allocated Storage
+    Type: Number
+    Default: 20
+  MaxAllocatedStorage:
+    Description: Max Allocated Storage
+    Type: Number
+    Default: 100
+  TopsAppSecurityGroup:
+    Description: App Security Group
+    Type: AWS::EC2::SecurityGroup::Id
+  VPC:
+    Description: VPC
+    Type: AWS::EC2::VPC::Id
+  DBInstanceName:
+    Description: DB Instance Name
+    Type: String
+    Default: "tops-rds"
+  MasterUsername:
+    Description: Master DB username (password is generated and stored in Secrets Manager; max 16 chars for MySQL)
+    Type: String
+    Default: admin
+    MinLength: 1
+    MaxLength: 63
+
+Resources:
+  RdsStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: rds.cfn.yaml
+      Parameters:
+        DBSubnet1: !Ref DBSubnet1
+        DBSubnet2: !Ref DBSubnet2
+        DBInstanceClass: !Ref DBInstanceClass
+        Engine: !Ref Engine
+        EngineVersion: !Ref EngineVersion
+        AllocatedStorage: !Ref AllocatedStorage
+        MaxAllocatedStorage: !Ref MaxAllocatedStorage
+        TopsAppSecurityGroup: !Ref TopsAppSecurityGroup
+        VPC: !Ref VPC
+        DBInstanceName: !Ref DBInstanceName
+        MasterUsername: !Ref MasterUsername
+
+Outputs:
+  RdsStackId:
+    Description: Nested RDS stack ID
+    Value: !Ref RdsStack
+  DBSubnetGroupName:
+    Description: RDS DB subnet group name
+    Value: !GetAtt RdsStack.Outputs.DBSubnetGroupName
+  DBInstanceId:
+    Description: RDS InstanceId
+    Value: !GetAtt RdsStack.Outputs.DBInstanceId
+  MasterUserSecretArn:
+    Description: Secrets Manager secret ARN for the RDS master user password
+    Value: !GetAtt RdsStack.Outputs.MasterUserSecretArn
