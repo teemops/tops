@@ -75,4 +75,8 @@ return [
         'tenant' => env('MICROSOFT_TENANT_ID', 'common'),
     ],
 
+    'mfa' => [
+        'api_url' => env('MFA_AUTH_API', env('VITE_MFA_AUTH_API', 'http://127.0.0.1:8787')),
+    ],
+
 ];

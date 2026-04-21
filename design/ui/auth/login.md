@@ -255,12 +255,13 @@ The login page uses the split layout with branding on the left and the login for
 ## Implementation Notes
 
 1. **Form Validation**: Use Laravel validation with Inertia.js error handling
-2. **OAuth Integration**: Buttons should trigger Laravel Socialite flows
-3. **Remember Me**: Store authentication token in cookie
-4. **Dark Mode**: All colors have dark mode variants
-5. **Accessibility**: Proper labels, ARIA attributes, keyboard navigation
-6. **Loading States**: Show loading spinner on submit button during authentication
-7. **Error Display**: Show validation errors below form fields using Inertia's error bag
+2. **Login flow**: Login (email/password or OAuth) → backend returns `mfa_required` or `email_otp_required` → verification step → session created. If MFA enabled: show TOTP first with "Email me a code instead" fallback (see `login-mfa-authenticator.md`). If MFA not enabled: show email OTP only ("Send code to my email") (see `login-otp.md`).
+3. **OAuth Integration**: Buttons should trigger Laravel Socialite flows
+4. **Remember Me**: Store authentication token in cookie
+5. **Dark Mode**: All colors have dark mode variants
+6. **Accessibility**: Proper labels, ARIA attributes, keyboard navigation
+7. **Loading States**: Show loading spinner on submit button during authentication
+8. **Error Display**: Show validation errors below form fields using Inertia's error bag
 
 ## Laravel Starter Kit Integration
 

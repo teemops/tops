@@ -84,34 +84,45 @@ class Scan extends Model
             return;
         }
 
-        // Get all unique regions that have scan_details for any region-based service
-        $processedRegions = $this->details()
+        // Count distinct (region, service) pairs - one per region job that completed
+        $processedRegionJobs = $this->details()
             ->whereIn('service', $regionBasedServices)
+            ->whereNotNull('region')
+            ->select('region', 'service')
             ->distinct()
-            ->pluck('region')
-            ->filter()
-            ->unique()
+            ->get()
             ->count();
 
-        // Get expected regions count (stored when regions were dispatched)
-        // If not stored, we'll use a fallback: check if scan has been running for a while
-        $expectedRegions = $this->expected_regions_count ?? null;
+        $expectedRegionJobs = $this->expected_regions_count ?? null;
 
         $shouldComplete = false;
+        $staleMinutes = 60; // Mark running scan as completed after this many minutes (partial/timeout)
 
-        if ($expectedRegions !== null) {
-            // We have expected count, check if all regions are done
-            $shouldComplete = $processedRegions >= $expectedRegions;
-        } else {
-            // Fallback: If scan has been running for more than 10 minutes and has scan_details,
-            // and we've processed at least 5 regions (reasonable minimum), mark as complete
-            // This handles cases where expected_regions_count wasn't stored
-            $shouldComplete = $this->started_at 
-                && $this->started_at->diffInMinutes(now()) > 10 
-                && $processedRegions >= 5;
+        if ($expectedRegionJobs !== null) {
+            $shouldComplete = $processedRegionJobs >= $expectedRegionJobs;
+        }
+
+        // Timeout: if scan has been running too long, mark completed (partial) so it doesn't stay "Running" forever
+        if (!$shouldComplete && $this->started_at && $this->started_at->diffInMinutes(now()) >= $staleMinutes) {
+            \Illuminate\Support\Facades\Log::warning('Region-based scan timed out, marking completed with partial results', [
+                'scan_id' => $this->id,
+                'processed_region_jobs' => $processedRegionJobs,
+                'expected_region_jobs' => $expectedRegionJobs,
+            ]);
+            $shouldComplete = true;
+        }
+
+        if (!$shouldComplete && $expectedRegionJobs === null && $this->started_at) {
+            // Fallback: no expected count stored (legacy), use 10 min + at least 5 region jobs
+            $shouldComplete = $this->started_at->diffInMinutes(now()) > 10 && $processedRegionJobs >= 5;
         }
 
         if ($shouldComplete) {
+            $timedOut = $expectedRegionJobs !== null
+                && $processedRegionJobs < $expectedRegionJobs
+                && $this->started_at
+                && $this->started_at->diffInMinutes(now()) >= $staleMinutes;
+
             // Evaluate findings for non-region-based scan types present in this scan
             $nonRegionTypes = array_values(
                 array_intersect($this->scan_types ?? [], ScanTypesService::getNonRegionBased())
@@ -132,27 +143,26 @@ class Scan extends Model
                         'scan_id' => $this->id,
                         'error' => $e->getMessage(),
                     ]);
-                    // Don't fail the scan if findings evaluation fails
                 }
             }
 
-            // Mark scan as completed
             $this->update([
                 'status' => 'completed',
                 'completed_at' => now(),
+                'error_message' => $timedOut
+                    ? "Scan timed out (partial results). {$processedRegionJobs}/{$expectedRegionJobs} region jobs completed."
+                    : null,
             ]);
 
-            // Update AWS account last scan time
             if ($this->awsAccount) {
-                $this->awsAccount->update([
-                    'last_scan_at' => now(),
-                ]);
+                $this->awsAccount->update(['last_scan_at' => now()]);
             }
 
             \Illuminate\Support\Facades\Log::info('Region-based scan marked as completed', [
                 'scan_id' => $this->id,
-                'processed_regions' => $processedRegions,
-                'expected_regions' => $expectedRegions,
+                'processed_region_jobs' => $processedRegionJobs,
+                'expected_region_jobs' => $expectedRegionJobs,
+                'timed_out' => $timedOut,
             ]);
         }
     }

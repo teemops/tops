@@ -7,7 +7,7 @@ import { useNotifications, type Notification as NotificationType } from '@/compo
 const { notifications, showSuccess, showError, showWarning, showInfo, dismiss } = useNotifications();
 const page = usePage();
 
-// Watch for flash messages from Laravel on page updates
+// Watch for flash messages from backend on page updates
 watch(
     () => page.props.flash,
     (flash: any) => {

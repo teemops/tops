@@ -35,6 +35,14 @@
               <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Email Verify</h3>
               <p class="text-sm text-gray-600 dark:text-gray-400">Email verification page</p>
             </a>
+            <a href="auth/login-mfa-authenticator.html" class="block p-6 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow">
+              <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Login MFA (Authenticator)</h3>
+              <p class="text-sm text-gray-600 dark:text-gray-400">Enter code from authenticator app</p>
+            </a>
+            <a href="auth/login-otp.html" class="block p-6 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow">
+              <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Login OTP (Email Fallback)</h3>
+              <p class="text-sm text-gray-600 dark:text-gray-400">Email OTP when authenticator unavailable</p>
+            </a>
           </div>
         </section>
 
@@ -122,10 +130,26 @@
 
           <div class="mb-6">
             <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-3">Settings</h3>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <a href="app/settings/profile.html" class="block p-6 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow">
                 <h4 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Profile Settings</h4>
-                <p class="text-sm text-gray-600 dark:text-gray-400">User profile management</p>
+                <p class="text-sm text-gray-600 dark:text-gray-400">User profile (MFA disabled)</p>
+              </a>
+              <a href="app/settings/profile-mfa-enabled.html" class="block p-6 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow">
+                <h4 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Profile – MFA Enabled</h4>
+                <p class="text-sm text-gray-600 dark:text-gray-400">View MFA device, remove</p>
+              </a>
+              <a href="app/settings/mfa-setup.html" class="block p-6 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow">
+                <h4 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">MFA Setup</h4>
+                <p class="text-sm text-gray-600 dark:text-gray-400">Add MFA – QR code step</p>
+              </a>
+              <a href="app/settings/mfa-setup-verify.html" class="block p-6 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow">
+                <h4 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">MFA Verify</h4>
+                <p class="text-sm text-gray-600 dark:text-gray-400">Enter 6-digit code to confirm</p>
+              </a>
+              <a href="app/settings/mfa-remove.html" class="block p-6 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow">
+                <h4 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Remove MFA</h4>
+                <p class="text-sm text-gray-600 dark:text-gray-400">Confirm removal with password</p>
               </a>
               <a href="app/settings/appearance.html" class="block p-6 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow">
                 <h4 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Appearance Settings</h4>

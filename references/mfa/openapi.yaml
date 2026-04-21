@@ -1,0 +1,190 @@
+openapi: 3.0.3
+info:
+  title: MFA OTP API
+  description: API for storing and retrieving MFA tokens. Built with Cloudflare Workers.
+  version: 0.0.1
+
+paths:
+  /api/generate:
+    get:
+      summary: Generate OTP secret
+      description: |
+        Generates a new TOTP secret for the authenticated user. Returns an existing secret if one was previously generated but not yet verified.
+        Requires a valid JWT Bearer token.
+      operationId: generate
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Secret generated or existing unverified secret returned
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/GenerateSuccess'
+                  - $ref: '#/components/schemas/GenerateAlreadyVerified'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/verify:
+    post:
+      summary: Verify OTP
+      description: Verifies the OTP token for the authenticated user and enables MFA on the account.
+      operationId: verify
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OtpRequest'
+      responses:
+        '200':
+          description: OTP verified or already verified
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerifySuccess'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/GuidNotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/validate:
+    post:
+      summary: Validate OTP
+      description: Validates an OTP token for login. Requires MFA to already be verified and enabled.
+      operationId: validate
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OtpRequest'
+      responses:
+        '200':
+          description: OTP validated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidateSuccess'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/GuidNotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/get/{ja7b782bx}:
+    get:
+      summary: Get current OTP code
+      description: Returns the current TOTP code for the given base32 secret. Does not require authentication.
+      operationId: get
+      parameters:
+        - name: ja7b782bx
+          in: path
+          required: true
+          description: Base32-encoded TOTP secret
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Current OTP code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetSuccess'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token with guid claim
+
+  schemas:
+    OtpRequest:
+      type: object
+      required:
+        - otp
+      properties:
+        otp:
+          type: string
+          description: 6-digit OTP code from authenticator app
+
+    GenerateSuccess:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        base32:
+          type: string
+          description: Base32-encoded secret for authenticator apps
+        otpauth_url:
+          type: string
+          description: otpauth:// URL for adding to authenticator apps
+
+    GenerateAlreadyVerified:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: OTP already verified.
+
+    VerifySuccess:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+          example: OTP verified.
+
+    ValidateSuccess:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: OTP validated.
+
+    GetSuccess:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        otp:
+          type: string
+          description: Current 6-digit TOTP code
+
+  responses:
+    Unauthorized:
+      description: Invalid or missing token
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+    GuidNotFound:
+      description: User GUID not found
+    ServerError:
+      description: Internal server error

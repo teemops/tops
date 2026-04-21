@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import Dropdown from '@/Components/Dropdown.vue';
 import DropdownLink from '@/Components/DropdownLink.vue';
+import MfaAlertBanner from '@/Components/MfaAlertBanner.vue';
 import NotificationContainer from '@/Components/NotificationContainer.vue';
 import OrganizationSelector from '@/Components/OrganizationSelector.vue';
 import DarkModeToggle from '@/Components/DarkModeToggle.vue';
@@ -13,7 +14,7 @@ import { useDarkMode } from '@/composables/useDarkMode';
 const showingNavigationDropdown = ref(false);
 const { fetchOrganizations, initCurrentOrganization } = useOrganizations();
 const { canViewAwsAccounts, canViewScans, canViewFindings } = useOrganizationPermissions();
-useDarkMode(); // Initialize dark mode
+const { isDark } = useDarkMode();
 
 onMounted(async () => {
     // Initialize organization context on app load
@@ -41,7 +42,18 @@ const logout = () => {
             <div class="flex-1 flex flex-col pt-5 pb-4 overflow-y-auto bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700">
                 <div class="flex items-center flex-shrink-0 px-4 mb-8">
                     <Link :href="route('dashboard')" class="flex items-center">
-                        <span class="text-xl font-bold text-gray-900 dark:text-white">Teemops</span>
+                        <img
+                            v-if="isDark"
+                            src="/images/brand/tops-logo-darkmode.png"
+                            alt="Teem Logo"
+                            class="h-8 w-auto"
+                        />
+                        <img
+                            v-else
+                            src="/images/brand/tops-logo-lightmode.jpg"
+                            alt="Teem Logo"
+                            class="h-8 w-auto"
+                        />
                     </Link>
                 </div>
                 <nav class="flex-1 px-3 space-y-1">
@@ -105,9 +117,12 @@ const logout = () => {
                     </Link>
                     <Link
                         v-if="canViewFindings"
-                        href="#"
+                        :href="route('findings.index')"
                         :class="[
-                            'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 group flex items-center px-3 py-2 text-sm font-medium rounded-md'
+                            route().current('findings.*')
+                                ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white'
+                                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700',
+                            'group flex items-center px-3 py-2 text-sm font-medium rounded-md'
                         ]"
                     >
                         <svg class="mr-3 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -171,6 +186,9 @@ const logout = () => {
                     </div>
                 </div>
             </header>
+
+            <!-- MFA disabled alert -->
+            <MfaAlertBanner />
 
             <!-- Page Content -->
             <main class="flex-1 bg-gray-50 dark:bg-gray-900">
