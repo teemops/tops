@@ -39,4 +39,8 @@ server {
         location /rc- {
                 try_files $uri $uri/ =404;
         }
+
+        location /health {
+                return 200 'OK';
+        }
 }
