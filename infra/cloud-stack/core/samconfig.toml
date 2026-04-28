@@ -15,7 +15,7 @@ fail_on_empty_changeset = false
 
 # EC2 + ALB (deploy after core; supply parameters for VPC subnets, cert, AMI, etc.)
 confirm_changeset = true
-parameter_overrides = "VpcName=\"tops-vpc\" VpcCidr=\"10.100.0.0/16\" VpcOption=\"standard\" VpcNATGateway=\"false\""
+parameter_overrides = "VpcName=\"tops-vpc\" VpcCidr=\"10.100.0.0/16\" VpcOption=\"standard\" VpcNATGateway=\"false\" S3DeploymentBucketName=\"tops-deploy\" Environment=\"test\""
 image_repositories = []
 
 [default.global.parameters]

@@ -25,9 +25,8 @@ sudo -u www-data composer update
 cd /srv/apps/tops/app
 sudo -u www-data npm install --legacy-peer-deps
 #build front-end assets for production
-export APP_URL=https://app.teem.nz
-export ZIGGY_URL=https://app.teem.nz
-export ASSET_URL=https://app.teem.nz
+# These variables should be loaded from /srv/apps/tops/app/.env into /etc/environment above.
+# No need to redefine APP_URL, ZIGGY_URL, ASSET_URL here.
 sudo -u www-data npm run build
 
 #remove vite specific files

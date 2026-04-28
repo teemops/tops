@@ -168,7 +168,11 @@ Resources:
       Port: 80
       Protocol: HTTP
       HealthCheckEnabled: true
-      HealthCheckPath: /
+      HealthCheckPath: /health
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 10
+      HealthCheckHealthyThresholdCount: 2
+      HealthCheckUnhealthyThresholdCount: 2
       HealthCheckPort: "80"
       Targets:
         - Id: !Ref TopsEc2
