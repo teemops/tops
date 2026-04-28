@@ -36,6 +36,19 @@ echo "Check php"
 #check if php is installed
 if ! [ -x "$(command -v php)" ]; then
   echo 'php is not installed.' >&2
+  sudo apt-get update
+  # Ubuntu 24.04+: PHP 8.3 is in universe (no PPA). Ubuntu 22.04: use Ondrej PPA. Minimal images may need universe enabled.
+  if [ -f /etc/os-release ] && . /etc/os-release && [ "${ID:-}" = "ubuntu" ] && ! apt-cache show php8.3-cli &>/dev/null; then
+    echo 'PHP 8.3 not in apt cache; enabling universe (needed on Ubuntu 24.04 for php8.3-* packages).'
+    sudo apt-get install -y software-properties-common
+    sudo add-apt-repository universe -y
+    sudo apt-get update
+  fi
+  if [ -f /etc/os-release ] && . /etc/os-release && [ "${ID:-}" = "ubuntu" ] && ! apt-cache show php8.3-cli &>/dev/null; then
+    echo 'Adding Ondrej PHP PPA (PHP 8.3 on Ubuntu 22.04 and older is not in default archives).'
+    sudo add-apt-repository ppa:ondrej/php -y
+    sudo apt-get update
+  fi
   sudo apt-get install -y php8.3 php8.3-cli php8.3-common php8.3-mysql php8.3-zip php8.3-gd php8.3-mbstring php8.3-xml php8.3-bcmath
   sudo apt-get install -y php8.3-curl
 fi

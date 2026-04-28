@@ -19,7 +19,14 @@ Parameters:
     AllowedValues: ["true", "false"]
     Default: "true"
     Description: Create a NAT gateway when the VPC layout supports it
-
+  S3DeploymentBucketName:
+    Type: String
+    Description: Name of the S3 bucket for deployment
+    Default: "tops-deploy"
+  Environment:
+    Type: String
+    Description: Environment
+    Default: "test"
 Resources:
   SqsStack:
     Type: AWS::CloudFormation::Stack
@@ -40,6 +47,22 @@ Resources:
         CIDR: !Ref VpcCidr
         Option: !Ref VpcOption
         NATGateway: !Ref VpcNATGateway
+  S3DeploymentBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub ${Environment}-${S3DeploymentBucketName}
+      VersioningConfiguration:
+        Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${Environment}-${S3DeploymentBucketName}
+        - Key: Environment
+          Value: !Ref Environment
 
 Outputs:
   SqsStackId:
