@@ -34,10 +34,10 @@ onMounted(() => {
         isFirebaseReset.value = true;
         actionCode.value = oobCode;
         // Extract email from URL if available
-        const emailParam = urlParams.get('email');
-        if (emailParam) {
-            form.email = emailParam;
-        }
+        // const emailParam = urlParams.get('email');
+        // if (emailParam) {
+        //     form.email = emailParam;
+        // }
     }
 });
 
