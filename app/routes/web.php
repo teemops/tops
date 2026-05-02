@@ -13,13 +13,19 @@ Route::get('/', function () {
         return redirect()->route('dashboard');
     }
 
-    // If not authenticated, redirect to login page
-    return redirect()->route('login');
-});
-
-Route::get('/log-test', function () {
-    Log::info('Log test endpoint hit');
-    return 'logged';
+    //First check for the mode=resetPassword in the URL
+    if (request()->has('mode') && request()->get('mode') === 'resetPassword') {
+        //this will return the resetPassword page and pass the firebase oobCode to the page
+        return Inertia::render('Auth/ResetPassword', 
+        [
+            'oobCode' => request()->get('oobCode'), 
+            'mode' => request()->get('mode'),
+            'apiKey' => request()->get('apiKey')
+        ]);
+    } else {
+        // If not authenticated, redirect to login page
+        return redirect()->route('login');
+    }
 });
 
 Route::get('/dashboard', function () {
