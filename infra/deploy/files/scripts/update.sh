@@ -33,6 +33,7 @@ sudo -u www-data npm run build
 rm -f public/hot
 php artisan optimize:clear
 php artisan config:cache
+php artisan config:clear
 
 #migrate database
 sudo -u www-data php artisan migrate
