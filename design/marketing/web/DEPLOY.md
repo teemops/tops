@@ -25,7 +25,7 @@ html/
 ├── index.html      # Homepage
 ├── features.html   # Features page
 ├── pricing.html    # Pricing page
-└── logo.png       # Brand logo (from design/brand/TeemLogo1ps-small.png)
+└── logo.png       # Brand logo — run design/brand/build-teemops-logo.py (transparent PNG)
 ```
 
 ## SEO (Optional)

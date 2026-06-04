@@ -1,42 +1,55 @@
 <script setup lang="ts">
+import { onMounted } from 'vue';
 import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
-import { Link, useForm, usePage } from '@inertiajs/vue3';
-import { updateFirebaseProfile } from '@/composables/useFirebase';
+import { Link, useForm } from '@inertiajs/vue3';
+import { getCurrentUser, updateFirebaseProfile } from '@/composables/useFirebase';
 
-defineProps<{
-    mustVerifyEmail?: Boolean;
-    status?: String;
+interface ProfileUser {
+    name: string;
+    email: string;
+    email_verified_at?: string | null;
+}
+
+const props = defineProps<{
+    profileUser: ProfileUser;
+    mustVerifyEmail?: boolean;
+    status?: string;
 }>();
 
-const user = usePage().props.auth.user;
+function resolveEmail(fallback?: string | null): string {
+    if (fallback) {
+        return fallback;
+    }
+    return getCurrentUser()?.email ?? '';
+}
 
 const form = useForm({
-    name: user.name,
-    email: user.email,
+    name: props.profileUser.name ?? '',
+    email: resolveEmail(props.profileUser.email),
+});
+
+onMounted(() => {
+    form.name = props.profileUser.name ?? '';
+    form.email = resolveEmail(props.profileUser.email);
 });
 
 const submit = async () => {
-    const originalName = user.name;
+    const originalName = props.profileUser.name;
     const nameChanged = form.name !== originalName;
-    
-    // If name changed, update Firebase first (before Laravel update)
+
     if (nameChanged && form.name) {
         try {
             await updateFirebaseProfile({
                 displayName: form.name,
             });
-        } catch (error: any) {
-            // If Firebase update fails, show error but still allow Laravel update
-            // This way user can update their name in Laravel even if Firebase is having issues
+        } catch (error: unknown) {
             console.warn('Failed to update Firebase profile:', error);
-            // Continue with Laravel update anyway
         }
     }
-    
-    // Update in Laravel (this is our source of truth)
+
     form.patch(route('profile.update'));
 };
 </script>
@@ -88,7 +101,7 @@ const submit = async () => {
                 <InputError class="mt-2" :message="form.errors.email" />
             </div>
 
-            <div v-if="mustVerifyEmail && user.email_verified_at === null">
+            <div v-if="mustVerifyEmail && props.profileUser.email_verified_at === null">
                 <p class="mt-2 text-sm text-gray-800 dark:text-gray-200">
                     Your email address is unverified.
                     <Link
