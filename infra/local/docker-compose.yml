@@ -1,0 +1,18 @@
+services:
+  ministack:
+    image: ministackorg/ministack
+    container_name: cloud-security-ministack
+    restart: unless-stopped
+    environment:
+      LOG_LEVEL: INFO
+      MINISTACK_WORKER_THREADS: 64
+      PERSIST_STATE: 1
+      STATE_DIR: /tmp/ministack-state
+      S3_PERSIST: 1
+      S3_DATA_DIR: /tmp/ministack-data/s3
+      # SERVICES
+    ports:
+      - "4566:4566"
+    volumes:
+      - ./state-data:/tmp/ministack-state
+      - ./s3-data:/tmp/ministack-data/s3
