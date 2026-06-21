@@ -24,17 +24,29 @@ class PasswordResetLinkController extends Controller
 
     /**
      * Handle an incoming password reset link request.
-     * 
-     * Note: This endpoint is kept for backward compatibility but is no longer used.
-     * Password reset is now handled entirely by Firebase on the frontend.
      *
      * @throws \Illuminate\Validation\ValidationException
      */
     public function store(Request $request): RedirectResponse
     {
-        // Password reset is now handled by Firebase on the frontend
-        // This endpoint is kept for backward compatibility but redirects back
-        // with a message indicating to use the frontend form
-        return back()->with('status', 'Please use the form above to reset your password.');
+        if (config('features.firebase_auth')) {
+            return back()->with('status', 'Please use the form above to reset your password.');
+        }
+
+        $request->validate([
+            'email' => 'required|email',
+        ]);
+
+        $status = Password::sendResetLink(
+            $request->only('email')
+        );
+
+        if ($status == Password::RESET_LINK_SENT) {
+            return back()->with('status', __($status));
+        }
+
+        throw ValidationException::withMessages([
+            'email' => [trans($status)],
+        ]);
     }
 }

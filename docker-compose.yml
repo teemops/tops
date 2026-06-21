@@ -1,34 +1,121 @@
 services:
   mysql:
     image: mysql:8.0
-    container_name: cloud-security-mysql
+    container_name: teemops-mysql
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-mysql}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-teemops}
       MYSQL_USER: ${MYSQL_USER:-teem}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-b43c8ef4c93eb502}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-teemops_dev_password}
     ports:
       - "${MYSQL_PORT:-3306}:3306"
     volumes:
-      - ./mysql-data:/var/lib/mysql
+      - mysql-data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-rootpassword}"]
-      interval: 10s
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-mysql}"]
+      interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 30s
     command: --default-authentication-plugin=mysql_native_password
+
   maildev:
     image: maildev/maildev
-    container_name: maildev
+    container_name: teemops-maildev
+    restart: unless-stopped
     ports:
-      - 8090:1080
-      - 1025:1025
-    restart: always
+      - "8090:1080"
+      - "1025:1025"
     logging:
-      driver: "json-file"
+      driver: json-file
       options:
-        max-size: "1m"
+        max-size: 1m
+
+  app:
+    build:
+      context: .
+      dockerfile: docker/app/Dockerfile
+    container_name: teemops-app
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-8080}:80"
+    env_file:
+      - path: .env
+        required: false
+      - path: generated/teemops.env
+        required: false
     environment:
-      MAILDEV_SMTP_PORT: 1025
-      MAILDEV_WEB_PORT: 1080
+      APP_URL: ${APP_URL:-http://localhost:8080}
+      APP_ENV: ${APP_ENV:-local}
+      APP_DEBUG: ${APP_DEBUG:-true}
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_DATABASE: ${MYSQL_DATABASE:-teemops}
+      DB_USERNAME: ${MYSQL_USER:-teem}
+      DB_PASSWORD: ${MYSQL_PASSWORD:-teemops_dev_password}
+      LOG_CHANNEL: ${LOG_CHANNEL:-stderr}
+      QUEUE_CONNECTION: ${QUEUE_CONNECTION:-database}
+      SCAN_QUEUE_CONNECTION: ${SCAN_QUEUE_CONNECTION:-database}
+      SCAN_REGION_QUEUE_CONNECTION: ${SCAN_REGION_QUEUE_CONNECTION:-database}
+      MAIL_MAILER: smtp
+      MAIL_HOST: maildev
+      MAIL_PORT: "1025"
+      FIREBASE_USER_AUTH: ${FIREBASE_USER_AUTH:-false}
+      AWS_DEFAULT_REGION: ${TOPS_DEPLOYMENT_REGION:-}
+      AWS_REGION: ${TOPS_DEPLOYMENT_REGION:-}
+      AWS_PROFILE: ${AWS_PROFILE:-default}
+      AWS_SDK_LOAD_CONFIG: "1"
+      AWS_SHARED_CREDENTIALS_FILE: /var/www/.aws/credentials
+      AWS_CONFIG_FILE: /var/www/.aws/config
+    volumes:
+      - app-storage:/var/www/html/storage
+      - ${HOME}/.aws:/var/www/.aws:ro
+    depends_on:
+      mysql:
+        condition: service_healthy
+      maildev:
+        condition: service_started
+
+  worker:
+    build:
+      context: .
+      dockerfile: docker/app/Dockerfile
+    container_name: teemops-worker
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+      - path: generated/teemops.env
+        required: false
+    environment:
+      APP_ENV: ${APP_ENV:-local}
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_DATABASE: ${MYSQL_DATABASE:-teemops}
+      DB_USERNAME: ${MYSQL_USER:-teem}
+      DB_PASSWORD: ${MYSQL_PASSWORD:-teemops_dev_password}
+      LOG_CHANNEL: ${LOG_CHANNEL:-stderr}
+      QUEUE_CONNECTION: ${QUEUE_CONNECTION:-database}
+      SCAN_QUEUE_CONNECTION: ${SCAN_QUEUE_CONNECTION:-database}
+      SCAN_REGION_QUEUE_CONNECTION: ${SCAN_REGION_QUEUE_CONNECTION:-database}
+      FIREBASE_USER_AUTH: ${FIREBASE_USER_AUTH:-false}
+      AWS_DEFAULT_REGION: ${TOPS_DEPLOYMENT_REGION:-}
+      AWS_REGION: ${TOPS_DEPLOYMENT_REGION:-}
+      AWS_PROFILE: ${AWS_PROFILE:-default}
+      AWS_SDK_LOAD_CONFIG: "1"
+      AWS_SHARED_CREDENTIALS_FILE: /var/www/.aws/credentials
+      AWS_CONFIG_FILE: /var/www/.aws/config
+    entrypoint: ["/usr/local/bin/worker-entrypoint.sh"]
+    volumes:
+      - app-storage:/var/www/html/storage
+      - ${HOME}/.aws:/var/www/.aws:ro
+    depends_on:
+      app:
+        condition: service_started
+
+volumes:
+  mysql-data:
+  app-storage:

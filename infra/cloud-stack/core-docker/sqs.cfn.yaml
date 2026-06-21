@@ -1,0 +1,93 @@
+Resources:
+  TopsSQS:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: teemops_main
+      VisibilityTimeout: 300
+      MessageRetentionPeriod: 86400
+      RedrivePolicy:
+        deadLetterTargetArn:
+          Fn::GetAtt:
+          - TopsSQSDLQ
+          - Arn
+        maxReceiveCount: 5
+  TopsSQSDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: teemops_main_dlq
+      VisibilityTimeout: 300
+      MessageRetentionPeriod: 86400
+  TopsAuditSQS:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: teemops_audit
+      VisibilityTimeout: 300
+      MessageRetentionPeriod: 86400
+      RedrivePolicy:
+        deadLetterTargetArn:
+          Fn::GetAtt:
+          - TopsAuditSQSDLQ
+          - Arn
+        maxReceiveCount: 5
+  TopsAuditRegionSQS:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: teemops_audit_region
+      VisibilityTimeout: 300
+      MessageRetentionPeriod: 86400
+      RedrivePolicy:
+        deadLetterTargetArn:
+          Fn::GetAtt:
+          - TopsAuditSQSDLQ
+          - Arn
+        maxReceiveCount: 5
+  TopsAuditSQSDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: teemops_audit_dlq
+      VisibilityTimeout: 300
+      MessageRetentionPeriod: 86400
+  TopsMainSQSPolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref TopsSQS
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: allow-sns-topsa
+            Effect: Allow
+            Principal: "*"
+            Action:
+              - SQS:SendMessage
+              - SQS:ReceiveMessage
+            Resource:
+              - !GetAtt TopsSQS.Arn
+            Condition:
+              ArnLike:
+                "aws:SourceArn":
+                  - Fn::Join:
+                      - ""
+                      - - "arn:aws:sns:*:"
+                        - !Ref "AWS::AccountId"
+                        - ":teemops-sns"
+
+Outputs:
+  TopsMainQueueName:
+    Description: Main SQS queue for CloudFormation custom resource callbacks
+    Value: !GetAtt TopsSQS.QueueName
+  TopsMainQueueArn:
+    Description: ARN of teemops_main queue
+    Value: !GetAtt TopsSQS.Arn
+  TopsAuditQueueName:
+    Description: Audit scan job queue name
+    Value: !GetAtt TopsAuditSQS.QueueName
+  TopsAuditQueueArn:
+    Description: ARN of teemops_audit queue
+    Value: !GetAtt TopsAuditSQS.Arn
+  TopsAuditRegionQueueName:
+    Description: Region audit scan job queue name
+    Value: !GetAtt TopsAuditRegionSQS.QueueName
+  TopsAuditRegionQueueArn:
+    Description: ARN of teemops_audit_region queue
+    Value: !GetAtt TopsAuditRegionSQS.Arn
