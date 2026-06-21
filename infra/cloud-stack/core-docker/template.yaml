@@ -27,14 +27,29 @@ Resources:
         Status: Enabled
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
-        BlockPublicPolicy: true
+        BlockPublicPolicy: false
         IgnorePublicAcls: true
-        RestrictPublicBuckets: true
+        RestrictPublicBuckets: false
       Tags:
         - Key: Name
           Value: !Sub ${Environment}-${AWS::AccountId}-${S3DeploymentBucketName}
         - Key: Environment
           Value: !Ref Environment
+
+  S3DeploymentBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref S3DeploymentBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: PublicReadChildAccountTemplates
+            Effect: Allow
+            Principal: "*"
+            Action: s3:GetObject
+            Resource: !Sub
+              - ${BucketArn}/templates/*
+              - BucketArn: !GetAtt S3DeploymentBucket.Arn
 
 Outputs:
   AwsAccountId:

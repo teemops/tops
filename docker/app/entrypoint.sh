@@ -45,6 +45,12 @@ sync_env_from_compose() {
 
 sync_env_from_compose APP_URL
 sync_env_from_compose FIREBASE_USER_AUTH
+sync_env_from_compose AWS_DEFAULT_REGION
+sync_env_from_compose TOPS_DEPLOYMENT_REGION
+sync_env_from_compose AWS_PARENT_ACCOUNT_ID
+sync_env_from_compose TOPS_CFN_TEMPLATE_URL
+sync_env_from_compose TOPS_SQS_NAME
+sync_env_from_compose TOPS_SQS_ARN
 
 if [ -z "${APP_KEY:-}" ] || [ "${APP_KEY}" = "base64:" ]; then
     php artisan key:generate --force --no-interaction

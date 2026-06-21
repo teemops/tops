@@ -17,5 +17,5 @@ parameter_overrides = "DBSubnet1=\"subnet-08e801325c441c7ae\" DBSubnet2=\"subnet
 image_repositories = []
 
 [default.global.parameters]
-region = "ap-southeast-6"
+region = "us-east-1"
 

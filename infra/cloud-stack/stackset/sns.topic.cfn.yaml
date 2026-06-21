@@ -7,8 +7,7 @@ Parameters:
     Default: 'teemops_main'
   SQSRegion:
     Type: String
-    Description: 'Teemops SQS Region'
-    Default: 'ap-southeast-6'
+    Description: 'Teemops SQS Region (must match TOPS_DEPLOYMENT_REGION)'
 Resources:
   TopsSNS:
     Type: AWS::SNS::Topic
