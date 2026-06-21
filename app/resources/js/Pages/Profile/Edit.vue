@@ -5,6 +5,7 @@ import MfaSection from './Partials/MfaSection.vue';
 import UpdatePasswordForm from './Partials/UpdatePasswordForm.vue';
 import UpdateProfileInformationForm from './Partials/UpdateProfileInformationForm.vue';
 import { Head } from '@inertiajs/vue3';
+import { useFirebaseAuthEnabled } from '@/composables/useFeatures';
 
 const props = defineProps<{
     profileUser: {
@@ -15,6 +16,8 @@ const props = defineProps<{
     mustVerifyEmail?: boolean;
     status?: string;
 }>();
+
+const firebaseAuthEnabled = useFirebaseAuthEnabled();
 </script>
 
 <template>
@@ -43,6 +46,7 @@ const props = defineProps<{
                 </div>
 
                 <div
+                    v-if="firebaseAuthEnabled"
                     class="bg-white p-4 shadow sm:rounded-lg sm:p-8 dark:bg-gray-800"
                 >
                     <MfaSection class="max-w-xl" />

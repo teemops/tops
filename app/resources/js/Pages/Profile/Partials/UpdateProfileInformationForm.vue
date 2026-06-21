@@ -5,7 +5,8 @@ import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import { Link, useForm } from '@inertiajs/vue3';
-import { getCurrentUser, updateFirebaseProfile } from '@/composables/useFirebase';
+import { updateFirebaseProfile } from '@/composables/useFirebase';
+import { useFirebaseAuthEnabled } from '@/composables/useFeatures';
 
 interface ProfileUser {
     name: string;
@@ -19,28 +20,23 @@ const props = defineProps<{
     status?: string;
 }>();
 
-function resolveEmail(fallback?: string | null): string {
-    if (fallback) {
-        return fallback;
-    }
-    return getCurrentUser()?.email ?? '';
-}
+const firebaseAuthEnabled = useFirebaseAuthEnabled();
 
 const form = useForm({
     name: props.profileUser.name ?? '',
-    email: resolveEmail(props.profileUser.email),
+    email: props.profileUser.email ?? '',
 });
 
 onMounted(() => {
     form.name = props.profileUser.name ?? '';
-    form.email = resolveEmail(props.profileUser.email);
+    form.email = props.profileUser.email ?? '';
 });
 
 const submit = async () => {
     const originalName = props.profileUser.name;
     const nameChanged = form.name !== originalName;
 
-    if (nameChanged && form.name) {
+    if (firebaseAuthEnabled.value && nameChanged && form.name) {
         try {
             await updateFirebaseProfile({
                 displayName: form.name,

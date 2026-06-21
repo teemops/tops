@@ -1,0 +1,84 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: "Teemops Docker messaging infrastructure \u2014 SQS queues and S3 deploy\
+  \ bucket (no VPC)"
+Parameters:
+  S3DeploymentBucketName:
+    Type: String
+    Description: Suffix for the deployment bucket; full name is {Environment}-{AccountId}-{suffix}
+    Default: tops-deploy
+  Environment:
+    Type: String
+    Description: Environment label (used as bucket name prefix)
+    Default: test
+Resources:
+  SqsStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: SqsStack/template.yaml
+    Metadata:
+      SamResourceId: SqsStack
+  S3DeploymentBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName:
+        Fn::Sub: ${Environment}-${AWS::AccountId}-${S3DeploymentBucketName}
+      VersioningConfiguration:
+        Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Sub: ${Environment}-${AWS::AccountId}-${S3DeploymentBucketName}
+      - Key: Environment
+        Value:
+          Ref: Environment
+Outputs:
+  AwsAccountId:
+    Description: AWS account ID where resources were created
+    Value:
+      Ref: AWS::AccountId
+  DeploymentBucketName:
+    Description: S3 bucket for Teemops deployment artifacts
+    Value:
+      Ref: S3DeploymentBucket
+  TopsMainQueueName:
+    Description: Main SQS queue name
+    Value:
+      Fn::GetAtt:
+      - SqsStack
+      - Outputs.TopsMainQueueName
+  TopsMainQueueArn:
+    Description: Main SQS queue ARN
+    Value:
+      Fn::GetAtt:
+      - SqsStack
+      - Outputs.TopsMainQueueArn
+  TopsAuditQueueName:
+    Description: Audit scan queue name
+    Value:
+      Fn::GetAtt:
+      - SqsStack
+      - Outputs.TopsAuditQueueName
+  TopsAuditQueueArn:
+    Description: Audit scan queue ARN
+    Value:
+      Fn::GetAtt:
+      - SqsStack
+      - Outputs.TopsAuditQueueArn
+  TopsAuditRegionQueueName:
+    Description: Region audit scan queue name
+    Value:
+      Fn::GetAtt:
+      - SqsStack
+      - Outputs.TopsAuditRegionQueueName
+  TopsAuditRegionQueueArn:
+    Description: Region audit scan queue ARN
+    Value:
+      Fn::GetAtt:
+      - SqsStack
+      - Outputs.TopsAuditRegionQueueArn

@@ -22,21 +22,20 @@ Route::middleware('guest')->group(function () {
 
     Route::post('login', [AuthenticatedSessionController::class, 'store']);
 
-    // Firebase Auth OAuth verification
-    Route::post('auth/firebase/verify', [\App\Http\Controllers\Auth\FirebaseAuthController::class, 'verify'])
-        ->name('firebase.verify');
+    // Firebase Auth OAuth verification (requires FIREBASE_USER_AUTH=true)
+    Route::middleware('firebase.auth.enabled')->group(function () {
+        Route::post('auth/firebase/verify', [\App\Http\Controllers\Auth\FirebaseAuthController::class, 'verify'])
+            ->name('firebase.verify');
 
-    // Firebase Auth MFA verification (after password when MFA enabled)
-    Route::post('auth/firebase/verify-mfa', [\App\Http\Controllers\Auth\FirebaseAuthController::class, 'verifyMfa'])
-        ->name('firebase.verify-mfa');
+        Route::post('auth/firebase/verify-mfa', [\App\Http\Controllers\Auth\FirebaseAuthController::class, 'verifyMfa'])
+            ->name('firebase.verify-mfa');
 
-    // Request email OTP for MFA fallback
-    Route::post('auth/firebase/request-email-otp', [\App\Http\Controllers\Auth\FirebaseAuthController::class, 'requestEmailOtp'])
-        ->name('firebase.request-email-otp');
+        Route::post('auth/firebase/request-email-otp', [\App\Http\Controllers\Auth\FirebaseAuthController::class, 'requestEmailOtp'])
+            ->name('firebase.request-email-otp');
 
-    // Firebase Auth registration (email/password signup)
-    Route::post('auth/firebase/register', [\App\Http\Controllers\Auth\FirebaseAuthController::class, 'register'])
-        ->name('firebase.register');
+        Route::post('auth/firebase/register', [\App\Http\Controllers\Auth\FirebaseAuthController::class, 'register'])
+            ->name('firebase.register');
+    });
 
     Route::get('forgot-password', [PasswordResetLinkController::class, 'create'])
         ->name('password.request');
