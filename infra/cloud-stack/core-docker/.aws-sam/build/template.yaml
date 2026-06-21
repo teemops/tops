@@ -27,9 +27,9 @@ Resources:
         Status: Enabled
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
-        BlockPublicPolicy: true
+        BlockPublicPolicy: false
         IgnorePublicAcls: true
-        RestrictPublicBuckets: true
+        RestrictPublicBuckets: false
       Tags:
       - Key: Name
         Value:
@@ -37,6 +37,25 @@ Resources:
       - Key: Environment
         Value:
           Ref: Environment
+  S3DeploymentBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket:
+        Ref: S3DeploymentBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Sid: PublicReadChildAccountTemplates
+          Effect: Allow
+          Principal: '*'
+          Action: s3:GetObject
+          Resource:
+            Fn::Sub:
+            - ${BucketArn}/templates/*
+            - BucketArn:
+                Fn::GetAtt:
+                - S3DeploymentBucket
+                - Arn
 Outputs:
   AwsAccountId:
     Description: AWS account ID where resources were created

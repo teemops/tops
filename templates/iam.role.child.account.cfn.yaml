@@ -10,6 +10,10 @@ Parameters:
     MinLength: 12
     MaxLength: 12
     Default: "163057906376"
+  ParentDeploymentRegion:
+    Type: String
+    Description: "AWS region where the Teemops parent SNS topic is deployed (TOPS_DEPLOYMENT_REGION)"
+    AllowedPattern: "[a-z0-9-]+"
   ExternalId:
     Type: String
     Description: "External STS ID DO NOT CHANGE"
@@ -36,7 +40,7 @@ Resources:
       ServiceToken: !Join
         - ""
         - - "arn:aws:sns:"
-          - !Ref "AWS::Region"
+          - !Ref ParentDeploymentRegion
           - ":"
           - !Ref ParentAWSAccountId
           - ":teemops-sns"
