@@ -1,4 +1,4 @@
-# Teemops Docker Compose (Phase 1 + 2)
+# Teemops Docker Compose (Phase 1–3)
 
 Run the full stack (Laravel app, MySQL, Maildev, queue worker):
 
@@ -46,6 +46,25 @@ Output is written to `generated/teemops.env` (gitignored). The app and worker lo
 Logs: `generated/install.log`
 
 On EC2 without mounted credentials, set `TOPS_INSTALLER_NETWORK=host` in `.env` before `./install.sh`.
+
+## Phase 3: Add an AWS account (end to end)
+
+Once messaging is installed, connecting a customer AWS account works without any manual refresh:
+
+1. Ensure the worker is polling for account-linking callbacks:
+
+   ```bash
+   docker compose logs -f worker   # look for: Polling SQS queue: teemops_main
+   ```
+
+2. In the app, open **AWS Accounts → Add AWS Account** and click **Open AWS Console**. This creates a pending account and opens a CloudFormation quick-create link in your deployment region (the region and parent account are baked into the URL — nothing is hard-coded).
+3. Complete the CloudFormation stack in your AWS Console. Its custom resource notifies the `teemops-sns` topic, which fans out to the `teemops_main` SQS queue.
+4. The worker's `aws:process-sqs` command consumes the message, activates the account, and replies to CloudFormation (the stack reaches `CREATE_COMPLETE`).
+5. The modal is polling `GET /api/aws-accounts/{id}` and flips to **Account connected** on its own, then closes and refreshes the list — no manual refresh needed.
+
+**Fallbacks**
+- If messaging hasn't been installed, "Add AWS Account" returns a clear message to run `./install.sh` first.
+- If CloudFormation is slow or fails, the modal offers **Enter details manually** (paste the AWS account ID + IAM role ARN).
 
 ## Services
 
