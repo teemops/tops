@@ -43,6 +43,7 @@ sync_env_from_compose() {
     fi
 }
 
+sync_env_from_compose APP_KEY
 sync_env_from_compose APP_URL
 sync_env_from_compose FIREBASE_USER_AUTH
 sync_env_from_compose AWS_DEFAULT_REGION

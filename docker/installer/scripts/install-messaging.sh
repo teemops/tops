@@ -89,7 +89,7 @@ deploy_sns() {
     --region "$AWS_DEFAULT_REGION" \
     --no-fail-on-empty-changeset \
     --parameter-overrides \
-      "SQSLabel=teemops_main SQSRegion=${AWS_DEFAULT_REGION}" \
+      "SQSLabel=teemops_main" \
     2>&1 | tee -a "$LOG_FILE"
 
   export SNS_STACK="$stack_name"
