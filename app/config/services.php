@@ -50,6 +50,7 @@ return [
         'deployment_region' => env('TOPS_DEPLOYMENT_REGION', env('AWS_DEFAULT_REGION', 'us-east-1')),
         'sqs_name' => env('TOPS_SQS_NAME'),
         'sqs_arn' => env('TOPS_SQS_ARN'),
+        'sns_arn' => env('TOPS_SNS_ARN'),
         'audit_sqs_name' => env('TOPS_AUDIT_SQS_NAME', 'teemops_audit'),
         'audit_sqs_arn' => env('TOPS_AUDIT_SQS_ARN'),
         'audit_region_sqs_name' => env('TOPS_AUDIT_REGION_SQS_NAME', 'teemops_audit_region'),

@@ -5,9 +5,6 @@ Parameters:
     Type: String
     Description: 'Teemops SQS Label'
     Default: 'teemops_main'
-  SQSRegion:
-    Type: String
-    Description: 'Teemops SQS Region (must match TOPS_DEPLOYMENT_REGION)'
 Resources:
   TopsSNS:
     Type: AWS::SNS::Topic
@@ -84,11 +81,13 @@ Resources:
     Properties:
       TopicArn: !Ref TopsSNS
       Protocol: sqs
-      Endpoint: 
+      Endpoint:
         Fn::Join:
           - ''
           - - 'arn:aws:sqs:'
-            - !Ref SQSRegion
+            # SNS topic and SQS queue are deployed together in the same region,
+            # so derive the queue region from this stack's region.
+            - !Ref 'AWS::Region'
             - ':'
             - !Ref 'AWS::AccountId'
             - ':'
