@@ -37,6 +37,15 @@ export TOPS_INSTALL_TARGET="${TOPS_INSTALL_TARGET:-docker}"
 echo "Teemops installer (target=${TOPS_INSTALL_TARGET}, region=${TOPS_DEPLOYMENT_REGION}, env=${TOPS_ENVIRONMENT})"
 echo ""
 
+if ! docker info >/dev/null 2>&1; then
+  echo "Docker daemon is not reachable from this user." >&2
+  echo "Check that Docker is running and that your account can access /var/run/docker.sock." >&2
+  echo "On Linux, fix it with:" >&2
+  echo "  sudo usermod -aG docker \$USER" >&2
+  echo "Then log out and back in (or run: newgrp docker)." >&2
+  exit 1
+fi
+
 COMPOSE=(docker compose -f docker-compose.yml -f docker-compose.install.yml --profile install)
 
 "${COMPOSE[@]}" build installer

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue';
+import { ref, watch, computed, onBeforeUnmount } from 'vue';
 import { useAwsAccounts } from '@/composables/useAwsAccounts';
 import { useOrganizations } from '@/composables/useOrganizations';
 import { useNotifications } from '@/composables/useNotifications';
@@ -17,15 +17,22 @@ const emit = defineEmits<{
     created: [];
 }>();
 
-const { initAccount, createAccountManually } = useAwsAccounts();
+const { initAccount, createAccountManually, accounts, startPolling, stopPolling, getAccount } = useAwsAccounts();
 const { currentOrganization } = useOrganizations();
 const { showSuccess, showError } = useNotifications();
+
+// Soft timeout before we hint that CloudFormation is taking unusually long (ms).
+const CONNECT_TIMEOUT_MS = 180000;
 
 const step = ref<'cloudformation' | 'manual'>('cloudformation');
 const cloudFormationUrl = ref<string | null>(null);
 const pendingAccountId = ref<string | null>(null);
 const initializing = ref(false);
 const creating = ref(false);
+const checking = ref(false);
+const connectionStatus = ref<'idle' | 'waiting' | 'completed' | 'error'>('idle');
+const timedOut = ref(false);
+let timeoutTimer: number | undefined;
 
 // Manual entry form
 const awsAccountId = ref('');
@@ -38,12 +45,70 @@ watch(() => props.modelValue, (newValue) => {
         step.value = 'cloudformation';
         cloudFormationUrl.value = null;
         pendingAccountId.value = null;
+        connectionStatus.value = 'idle';
+        timedOut.value = false;
         awsAccountId.value = '';
         iamRoleArn.value = '';
         accountName.value = '';
         errors.value = {};
+    } else {
+        cleanup();
     }
 });
+
+// The composable's poller keeps the matching entry in `accounts` up to date;
+// mirror its status into the modal so the banner reflects live progress.
+watch(
+    () => accounts.value.find((acc) => acc.id === pendingAccountId.value)?.status,
+    (status) => {
+        if (!pendingAccountId.value) return;
+        if (status === 'completed') {
+            handleConnected();
+        } else if (status === 'error') {
+            connectionStatus.value = 'error';
+        }
+    }
+);
+
+const cleanup = () => {
+    if (pendingAccountId.value) {
+        stopPolling(pendingAccountId.value);
+    }
+    if (timeoutTimer !== undefined) {
+        clearTimeout(timeoutTimer);
+        timeoutTimer = undefined;
+    }
+    timedOut.value = false;
+};
+
+onBeforeUnmount(cleanup);
+
+const handleConnected = () => {
+    if (connectionStatus.value === 'completed') return; // guard against double-fire
+    connectionStatus.value = 'completed';
+    cleanup();
+    showSuccess('AWS account connected');
+    emit('created');
+    // Give the user a moment to see the success state before closing.
+    window.setTimeout(() => emit('update:modelValue', false), 1500);
+};
+
+const checkNow = async () => {
+    if (!pendingAccountId.value) return;
+    checking.value = true;
+    try {
+        const account = await getAccount(pendingAccountId.value);
+        if (account.status === 'completed') {
+            handleConnected();
+        } else if (account.status === 'error') {
+            connectionStatus.value = 'error';
+        }
+    } catch {
+        // Transient errors are fine — background polling will keep trying.
+    } finally {
+        checking.value = false;
+    }
+};
 
 const handleInitCloudFormation = async () => {
     if (!currentOrganization.value?.org_id) {
@@ -58,10 +123,19 @@ const handleInitCloudFormation = async () => {
         const response = await initAccount();
         cloudFormationUrl.value = response.cloudFormationUrl;
         pendingAccountId.value = response.accountId;
-        
+        connectionStatus.value = 'waiting';
+        timedOut.value = false;
+
         // Open CloudFormation URL in new window
         window.open(response.cloudFormationUrl, '_blank');
-        
+
+        // Poll for the account to flip to completed once CloudFormation notifies
+        // the parent SNS topic and the SQS worker processes the callback.
+        startPolling(pendingAccountId.value);
+        timeoutTimer = window.setTimeout(() => {
+            timedOut.value = true;
+        }, CONNECT_TIMEOUT_MS);
+
         showSuccess('CloudFormation setup initiated. Complete the stack in AWS Console.');
     } catch (err: any) {
         if (err.response?.data?.errors) {
@@ -156,12 +230,44 @@ const canSubmitManual = computed(() => {
                                 </div>
 
                                 <div v-if="cloudFormationUrl" class="mb-4">
-                                    <div class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+                                    <!-- Waiting for CloudFormation -->
+                                    <div
+                                        v-if="connectionStatus === 'waiting'"
+                                        class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4"
+                                    >
                                         <p class="text-sm text-yellow-800 dark:text-yellow-200">
                                             <strong>Status:</strong> 🟡 Waiting for CloudFormation completion...
                                         </p>
                                         <p class="text-xs text-yellow-700 dark:text-yellow-300 mt-2">
-                                            The CloudFormation stack should open in a new window. Complete it to finish adding your account.
+                                            The CloudFormation stack should open in a new window. Once you complete it, this account will connect automatically — no need to refresh.
+                                        </p>
+                                        <p v-if="timedOut" class="text-xs text-yellow-700 dark:text-yellow-300 mt-2">
+                                            This is taking longer than expected. The account will still appear once CloudFormation finishes, or you can
+                                            <button type="button" class="underline font-medium" @click="handleManualEntry">enter the details manually</button>.
+                                        </p>
+                                    </div>
+
+                                    <!-- Connected -->
+                                    <div
+                                        v-else-if="connectionStatus === 'completed'"
+                                        class="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4"
+                                    >
+                                        <p class="text-sm text-green-800 dark:text-green-200">
+                                            <strong>Status:</strong> ✅ Account connected! Finishing up...
+                                        </p>
+                                    </div>
+
+                                    <!-- Error -->
+                                    <div
+                                        v-else-if="connectionStatus === 'error'"
+                                        class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4"
+                                    >
+                                        <p class="text-sm text-red-800 dark:text-red-200">
+                                            <strong>Status:</strong> ⚠️ We couldn't complete the connection.
+                                        </p>
+                                        <p class="text-xs text-red-700 dark:text-red-300 mt-2">
+                                            Check the CloudFormation stack in your AWS Console, or
+                                            <button type="button" class="underline font-medium" @click="handleManualEntry">enter the details manually</button>.
                                         </p>
                                     </div>
                                 </div>
@@ -177,10 +283,18 @@ const canSubmitManual = computed(() => {
                         >
                             {{ initializing ? 'Initializing...' : 'Open AWS Console' }}
                         </PrimaryButton>
+                        <PrimaryButton
+                            v-if="cloudFormationUrl && connectionStatus === 'waiting'"
+                            @click="checkNow"
+                            :disabled="checking"
+                            class="sm:ml-3 sm:w-auto sm:text-sm"
+                        >
+                            {{ checking ? 'Checking...' : "Check now" }}
+                        </PrimaryButton>
                         <button
-                            v-if="cloudFormationUrl"
+                            v-if="cloudFormationUrl && connectionStatus !== 'completed'"
                             @click="handleCancel"
-                            class="w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-800 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm"
+                            class="mt-3 sm:mt-0 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-800 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm"
                         >
                             Close
                         </button>

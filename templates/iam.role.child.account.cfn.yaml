@@ -5,11 +5,10 @@ Parameters:
   # Parent AWS Account
   ParentAWSAccountId:
     Type: String
-    Description: "The AWS Account ID of the Teemops root account"
+    Description: "The AWS Account ID of the Teemops root account (supplied by the app via the quick-create URL)"
     AllowedPattern: "[0-9]{12}"
     MinLength: 12
     MaxLength: 12
-    Default: "163057906376"
   ParentDeploymentRegion:
     Type: String
     Description: "AWS region where the Teemops parent SNS topic is deployed (TOPS_DEPLOYMENT_REGION)"

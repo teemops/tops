@@ -71,7 +71,7 @@ This is the **docker-compose install roadmap** agreed when scoping Phase 1. It s
 |-------|--------|-------------|---------|
 | **1** | **Done** | `docker-compose.yml`, `docker/app/*`, MySQL, maildev, worker, `.env.docker.example`, `prepare-build.sh`, `FIREBASE_USER_AUTH` flag | App runs locally **without AWS** |
 | **2** | **Done** | `core-docker` SAM (SQS + S3), installer container, `install.sh`, `generated/teemops.env`, SNS in pinned region, child template upload | One-command **AWS messaging** in `TOPS_DEPLOYMENT_REGION` |
-| **3** | Planned | Pin CFN URL region; S3-hosted child template fully wired; end-to-end “Add AWS account” hardened | **Add AWS account** works reliably for self-hosted (partially done in Phase 2 upload + `ParentDeploymentRegion`) |
+| **3** | **Done** | Pin CFN URL region; S3-hosted child template fully wired; end-to-end “Add AWS account” hardened (frontend status polling, `init()` pending de-dup, stale-region/parent-account cleanup) | **Add AWS account** works reliably for self-hosted — modal polls and flips to Active automatically |
 | **4** | Planned | `core-aws` SAM (VPC + IAM + EC2/ALB), docker on EC2, `TOPS_INSTALL_TARGET=aws` path in `install.sh` | **AWS-hosted production** path (EC2 + ALB, no RDS yet) |
 | **5** | Planned | StackSet multi-region SNS (optional `TOPS_SNS_REGIONS=all\|list` flag) | Child CFN stacks in **any region** can notify parent |
 | **6** | Planned | `ENABLE_RDS=true` path, `infra/cloud-stack/db/` wired into installer | **Managed MySQL (RDS)** instead of compose MySQL |
@@ -278,9 +278,9 @@ See also [docker-compose.README.md](../../docker-compose.README.md) at repo root
 ## 8. Remaining gaps / follow-ups
 
 - **Software updates & schema migrations** for self-hosted customers (process not fully designed in this session).
-- **Phase 3–6** per roadmap above.
+- **Phase 4–6** per roadmap above (Phase 3 complete).
 - **Re-run `./install.sh`** after template or bucket policy changes to refresh `generated/teemops.env` and re-upload child CFN template.
-- **`infra/cloud-stack/deploy/INSTRUCTIONS.md`** still references legacy NZ region — update when touching manual deploy docs.
+- ~~**`infra/cloud-stack/deploy/INSTRUCTIONS.md`** still references legacy NZ region~~ — done (Phase 3): now points at `TOPS_DEPLOYMENT_REGION`.
 - **Existing stacks** using old bucket name `{env}-tops-deploy` may need manual cleanup on redeploy.
 
 ---

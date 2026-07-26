@@ -47,13 +47,22 @@ class AwsAccountsController extends Controller
         // Derive UniqueId from organization's orgId (does not change once org is created)
         $uniqueId = $organization->org_id;
 
-        // Create pending AWS account record
-        $account = AwsAccount::create([
-            'organization_id' => $organization->id,
-            'name' => 'Pending AWS Account', // Will be updated when CloudFormation completes
-            'status' => 'pending',
-            'unique_id' => $uniqueId, // Derived from orgId, same for all accounts in this org
-        ]);
+        // Reuse an existing pending account for this org rather than piling up
+        // orphan pending rows on every "Open AWS Console" click. The SQS callback
+        // matches on unique_id + external_id, so returning the same record is safe.
+        $account = AwsAccount::where('organization_id', $organization->id)
+            ->where('status', 'pending')
+            ->orderBy('created_at', 'desc')
+            ->first();
+
+        if (! $account) {
+            $account = AwsAccount::create([
+                'organization_id' => $organization->id,
+                'name' => 'Pending AWS Account', // Will be updated when CloudFormation completes
+                'status' => 'pending',
+                'unique_id' => $uniqueId, // Derived from orgId, same for all accounts in this org
+            ]);
+        }
 
         $cloudFormationUrl = $this->buildInitCloudFormationUrl(
             $account->external_id,
