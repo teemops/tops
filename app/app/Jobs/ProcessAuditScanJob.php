@@ -80,29 +80,28 @@ class ProcessAuditScanJob implements ShouldQueue
             $credentials = $scanner->assumeRole();
 
             $rulesEngine = new RulesEngine();
-            $hasEc2Scan = false;
-            $hasRdsScan = false;
+
+            // Track which region-based services were dispatched (for log context only).
+            // The completion decision below is driven by whether ANY selected scan type
+            // is region-based — not by a per-service allowlist — so newly added
+            // region-based services (CloudTrail, Lambda, KMS, ...) correctly wait for
+            // their region jobs instead of completing prematurely with no results.
+            $dispatchedRegionServices = [];
 
             foreach ($scanTypes as $scanType) {
                 if (ScanTypesService::isRegionBased($scanType)) {
-                    if ($scanType === 'ec2') {
-                        $hasEc2Scan = true;
-                    } elseif ($scanType === 'rds') {
-                        $hasRdsScan = true;
-                    }
-
+                    $dispatchedRegionServices[] = $scanType;
                     $this->dispatchRegionScansForService($scanner, $credentials, $scanType);
                 } else {
                     $this->runGlobalScanForService($rulesEngine, $scanType, $credentials);
                 }
             }
 
-            $hasRegionBasedScan = $hasEc2Scan || $hasRdsScan;
+            $hasRegionBasedScan = !empty($dispatchedRegionServices);
 
             Log::info('All scan types processed, starting findings evaluation', [
                 'scan_id' => $this->scan->id,
-                'has_ec2' => $hasEc2Scan,
-                'has_rds' => $hasRdsScan,
+                'region_based_services' => $dispatchedRegionServices,
                 'has_region_based' => $hasRegionBasedScan,
                 'scan_types' => $scanTypes,
             ]);
@@ -113,8 +112,7 @@ class ProcessAuditScanJob implements ShouldQueue
             } else {
                 Log::info('Scan with region-based service - waiting for region scans to complete', [
                     'scan_id' => $this->scan->id,
-                    'has_ec2' => $hasEc2Scan,
-                    'has_rds' => $hasRdsScan,
+                    'region_based_services' => $dispatchedRegionServices,
                 ]);
 
                 // If every region job failed to dispatch (or getAvailableRegions
@@ -131,8 +129,7 @@ class ProcessAuditScanJob implements ShouldQueue
 
             Log::info('Scan processing completed', [
                 'scan_id' => $this->scan->id,
-                'has_ec2' => $hasEc2Scan,
-                'has_rds' => $hasRdsScan,
+                'region_based_services' => $dispatchedRegionServices,
                 'has_region_based' => $hasRegionBasedScan,
             ]);
         } catch (\Throwable $e) {
@@ -257,7 +254,7 @@ class ProcessAuditScanJob implements ShouldQueue
         $findingsEngine = new FindingsEngine($conditionEvaluator);
 
         try {
-            $findingsEngine->evaluateScan($this->scan, [self::RULESET_BASIC]);
+            $findingsEngine->evaluateScan($this->scan, $this->scan->rulesets ?? [self::RULESET_BASIC]);
             Log::info('Findings evaluation completed', ['scan_id' => $this->scan->id]);
         } catch (\Throwable $e) {
             Log::error('Findings evaluation failed', [

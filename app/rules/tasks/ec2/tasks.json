@@ -132,6 +132,13 @@
                                 "Filters": "[['Name' => 'vpc-id', 'Values' => [$item['VpcId']]]]"
                             }
                         }
+                    },
+                    {
+                        "describeFlowLogs": {
+                            "params": {
+                                "Filter": "[['Name' => 'resource-id', 'Values' => [$item['VpcId']]]]"
+                            }
+                        }
                     }
                 ],
                 "items": {

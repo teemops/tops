@@ -50,8 +50,16 @@ export interface ScanType {
     label: string;
 }
 
+export interface ScanProfile {
+    value: string;
+    label: string;
+    description: string;
+    services: string[];
+}
+
 const scans = ref<Scan[]>([]);
 const scanTypes = ref<ScanType[]>([]);
+const scanProfiles = ref<ScanProfile[]>([]);
 const loading = ref(false);
 const error = ref<string | null>(null);
 const pollingIntervals = ref<Map<string, number>>(new Map());
@@ -77,6 +85,24 @@ export function useScans() {
                 { value: 'iam', label: 'IAM' },
                 { value: 's3', label: 'S3' },
                 { value: 'rds', label: 'RDS' },
+            ];
+        }
+    };
+
+    const fetchScanProfiles = async () => {
+        try {
+            const response = await axios.get('/api/scan-profiles');
+            scanProfiles.value = response.data.scanProfiles;
+        } catch (err: any) {
+            console.error('Error fetching scan profiles:', err);
+            // Fallback to the Basic profile if the API fails
+            scanProfiles.value = [
+                {
+                    value: 'basic',
+                    label: 'Basic',
+                    description: 'Core security checks across all supported services',
+                    services: ['s3', 'iam', 'ec2', 'rds', 'cloudtrail', 'lambda', 'kms'],
+                },
             ];
         }
     };
@@ -142,6 +168,31 @@ export function useScans() {
             const response = await axios.post(`/api/organizations/${orgId}/scans`, {
                 aws_account_id: awsAccountId,
                 scan_types: scanTypes,
+            });
+
+            const newScan = response.data;
+            scans.value.unshift(newScan);
+            return newScan;
+        } catch (err: any) {
+            error.value = err.response?.data?.message || err.response?.data?.error || 'Failed to create scan';
+            throw err;
+        } finally {
+            loading.value = false;
+        }
+    };
+
+    const createScanFromProfiles = async (
+        orgId: string,
+        awsAccountId: string,
+        profiles: string[]
+    ): Promise<Scan> => {
+        loading.value = true;
+        error.value = null;
+
+        try {
+            const response = await axios.post(`/api/organizations/${orgId}/scans`, {
+                aws_account_id: awsAccountId,
+                scan_profiles: profiles,
             });
 
             const newScan = response.data;
@@ -262,12 +313,15 @@ export function useScans() {
     return {
         scans: computed(() => scans.value),
         scanTypes: computed(() => scanTypes.value),
+        scanProfiles: computed(() => scanProfiles.value),
         pagination: computed(() => pagination.value),
         loading: computed(() => loading.value),
         error: computed(() => error.value),
         fetchScanTypes,
+        fetchScanProfiles,
         fetchScans,
         createScan,
+        createScanFromProfiles,
         getScan,
         getScanResults,
         cancelScan,

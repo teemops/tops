@@ -17,6 +17,7 @@ class Scan extends Model
         'organization_id',
         'aws_account_id',
         'scan_types',
+        'rulesets',
         'status',
         'started_at',
         'completed_at',
@@ -26,6 +27,7 @@ class Scan extends Model
 
     protected $casts = [
         'scan_types' => 'array',
+        'rulesets' => 'array',
         'started_at' => 'datetime',
         'completed_at' => 'datetime',
     ];
@@ -136,7 +138,7 @@ class Scan extends Model
                 try {
                     $conditionEvaluator = new \App\Services\RulesEngine\ConditionEvaluator();
                     $findingsEngine = new \App\Services\RulesEngine\FindingsEngine($conditionEvaluator);
-                    $findingsEngine->evaluateScan($this, ['basic']);
+                    $findingsEngine->evaluateScan($this, $this->rulesets ?? ['basic']);
                     
                     \Illuminate\Support\Facades\Log::info('Findings evaluation completed for non-region-based types', [
                         'scan_id' => $this->id,
