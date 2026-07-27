@@ -6,6 +6,7 @@ import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import { sendPasswordReset } from '@/composables/useFirebase';
+import { useFirebaseAuthEnabled } from '@/composables/useFeatures';
 import { ref } from 'vue';
 
 defineProps<{
@@ -18,11 +19,21 @@ const form = useForm({
 
 const successMessage = ref<string | null>(null);
 const errorMessage = ref<string | null>(null);
+const firebaseAuthEnabled = useFirebaseAuthEnabled();
 
 const submit = async () => {
     form.clearErrors();
     successMessage.value = null;
     errorMessage.value = null;
+
+    if (!firebaseAuthEnabled.value) {
+        form.post(route('password.email'), {
+            onSuccess: () => {
+                form.reset('email');
+            },
+        });
+        return;
+    }
     
     try {
         await sendPasswordReset(form.email);

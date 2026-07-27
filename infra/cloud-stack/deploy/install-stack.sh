@@ -2,7 +2,11 @@
 # Deploy SAM-packaged CloudFormation from the templates/ directory (this repo).
 set -euo pipefail
 
-export AWS_DEFAULT_REGION="${AWS_DEFAULT_REGION:-ap-southeast-6}"
+export AWS_DEFAULT_REGION="${AWS_DEFAULT_REGION:-${TOPS_DEPLOYMENT_REGION:-}}"
+if [[ -z "$AWS_DEFAULT_REGION" ]]; then
+  echo "Set AWS_DEFAULT_REGION or TOPS_DEPLOYMENT_REGION before running this script." >&2
+  exit 1
+fi
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 

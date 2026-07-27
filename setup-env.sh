@@ -32,7 +32,7 @@ AWS_PARENT_ACCOUNT_ID=123456789012
 ENCRYPTION_KEY=${ENCRYPTION_KEY}
 
 # CloudFormation Template URL
-CLOUDFORMATION_TEMPLATE_URL=https://s3.amazonaws.com/storage.auditaws.com/iam.role.child.account.cfn.yaml
+CLOUDFORMATION_TEMPLATE_URL=https://s3.amazonaws.com/storage.teemops.com/iam.role.child.account.cfn.yaml
 
 # Frontend Environment Variables
 NUXT_PUBLIC_FIREBASE_API_KEY=your-api-key

@@ -105,7 +105,13 @@ class FirebaseAuthController extends Controller
 
             // Require verification before session: MFA users → TOTP (or email fallback); others → email OTP.
             if ($this->mfaApi->isConfigured() && $this->mfaApi->isMfaEnabled($token)) {
+                if ($request->header('X-Inertia')) {
+                    return back()->with(['mfa_required' => true]);
+                }
                 return response()->json(['mfa_required' => true]);
+            }
+            if ($request->header('X-Inertia')) {
+                return back()->with(['email_otp_required' => true]);
             }
             return response()->json(['email_otp_required' => true]);
         } catch (\Exception $e) {

@@ -3,7 +3,6 @@
 namespace App\Services\Scanners;
 
 use App\Services\AwsSecurityScanner;
-use Aws\S3\S3Client;
 use Illuminate\Support\Facades\Log;
 
 class S3Scanner extends AwsSecurityScanner
@@ -36,24 +35,15 @@ class S3Scanner extends AwsSecurityScanner
         // Use provided region or default
         $s3Client = $this->createClient('s3', $credentials, $region);
 
-        try {
-            return match ($method) {
-                'listBuckets' => $s3Client->listBuckets($params)->toArray(),
-                'getBucketLocation' => $s3Client->getBucketLocation($params)->toArray(),
-                'getPublicAccessBlock' => $s3Client->getPublicAccessBlock($params)->toArray(),
-                'getBucketEncryption' => $s3Client->getBucketEncryption($params)->toArray(),
-                'getBucketVersioning' => $s3Client->getBucketVersioning($params)->toArray(),
-                'getBucketAcl' => $s3Client->getBucketAcl($params)->toArray(),
-                default => throw new \InvalidArgumentException("Unknown S3 method: {$method}"),
-            };
-        } catch (\Exception $e) {
-            Log::error("S3 API call failed: {$method}", [
-                'error' => $e->getMessage(),
-                'params' => $params,
-                'region' => $region,
-            ]);
-            throw $e;
-        }
+        return $this->callApi('S3', $method, $params, fn () => match ($method) {
+            'listBuckets' => $s3Client->listBuckets($params)->toArray(),
+            'getBucketLocation' => $s3Client->getBucketLocation($params)->toArray(),
+            'getPublicAccessBlock' => $s3Client->getPublicAccessBlock($params)->toArray(),
+            'getBucketEncryption' => $s3Client->getBucketEncryption($params)->toArray(),
+            'getBucketVersioning' => $s3Client->getBucketVersioning($params)->toArray(),
+            'getBucketAcl' => $s3Client->getBucketAcl($params)->toArray(),
+            default => throw new \InvalidArgumentException("Unknown S3 method: {$method}"),
+        }, ['region' => $region]);
     }
 
     /**
@@ -63,24 +53,15 @@ class S3Scanner extends AwsSecurityScanner
     private function getBucketRegion(string $bucketName, array $credentials): ?string
     {
         try {
-            // Create a client with default region to get bucket location
+            // GetBucketLocation requires the client's configured region to match the
+            // bucket's actual region (SigV4 signing fails with AuthorizationHeaderMalformed
+            // otherwise) — a chicken-and-egg problem when we don't yet know the region.
+            // determineBucketRegion() is built for exactly this: it issues a HeadBucket
+            // call and reads the region from the (possibly redirected) response, working
+            // regardless of the client's configured region.
             $s3Client = $this->createClient('s3', $credentials);
-            
-            $result = $s3Client->getBucketLocation(['Bucket' => $bucketName]);
-            $location = $result['LocationConstraint'] ?? null;
-            
-            // AWS returns null or empty string for us-east-1 (default region)
-            // Also handles EU which returns 'EU' instead of 'eu-west-1'
-            if (empty($location) || $location === '') {
-                return 'us-east-1';
-            }
-            
-            // Handle special case: 'EU' means 'eu-west-1'
-            if ($location === 'EU') {
-                return 'eu-west-1';
-            }
-            
-            return $location;
+
+            return $s3Client->determineBucketRegion($bucketName);
         } catch (\Exception $e) {
             Log::warning("Failed to get bucket region", [
                 'bucket' => $bucketName,

@@ -11,6 +11,7 @@ This directory contains all project documentation organized by topic.
 ### Architecture & Planning
 - [Architecture](./architecture.md) - System architecture and design decisions
 - [Planning](./planning.md) - Project planning and roadmap
+- [Docker self-hosted deployment session (2026-06-21)](./sessions/2026-06-21-docker-self-hosted-deployment.md) - ECS/Lambda assessment, Docker Compose Phases 1–2, installer, region wiring
 
 ### Features
 - [Feature Specifications](./features/features-spec.md) - All feature specifications and user stories

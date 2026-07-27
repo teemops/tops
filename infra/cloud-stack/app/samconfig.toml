@@ -17,5 +17,5 @@ parameter_overrides = "VPC=\"vpc-04da45fd0ee39eee4\" Subnet=\"subnet-08e801325c4
 image_repositories = []
 
 [default.global.parameters]
-region = "ap-southeast-6"
+region = "us-east-1"
 

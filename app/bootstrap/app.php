@@ -12,6 +12,9 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Same-origin SPA uses session cookies on /api/* when Firebase auth is disabled
+        $middleware->statefulApi();
+
         // Run SetOrganizationContext before HandleInertiaRequests so shared props get organization_role from cookie
         $middleware->web(append: [
             \App\Http\Middleware\SetOrganizationContext::class,
@@ -25,6 +28,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // Register API middleware aliases
         $middleware->alias([
             'firebase.auth' => \App\Http\Middleware\VerifyFirebaseToken::class,
+            'firebase.auth.enabled' => \App\Http\Middleware\EnsureFirebaseAuthEnabled::class,
             'organization.context' => \App\Http\Middleware\SetOrganizationContext::class,
         ]);
     })

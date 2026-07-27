@@ -245,7 +245,7 @@ export class AuthHelper {
      */
     async logout(): Promise<void> {
         // Click user menu dropdown
-        await this.page.click('button:has-text("JD")');
+        await this.page.getByRole('button', { name: /Open user menu for/i }).click();
         // Click logout button
         await this.page.click('button:has-text("Log Out")');
         await this.page.waitForURL('**/login', { timeout: 5000 });

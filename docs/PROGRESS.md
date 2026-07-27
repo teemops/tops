@@ -91,14 +91,16 @@ Last Updated: January 11, 2026
 - **Completed**:
   - Database schema (AwsAccount model with encryption)
   - API endpoints (CRUD operations)
-  - CloudFormation URL generation
+  - CloudFormation URL generation (region-pinned, `ParentDeploymentRegion`)
   - SNS callback handler with signature verification
+  - SQS-based account-linking (`aws:process-sqs`) with CloudFormation response
   - IAM Role ARN encryption
   - Frontend UI (AwsAccounts/Index, AddAwsAccountModal)
+  - **Status polling** — modal polls and auto-activates the account on CloudFormation completion (Phase 3)
+  - **Manual account entry fallback** (AddAwsAccountModal manual step)
+  - Feature tests for `init()` (config guard, URL params, pending de-dup, permissions)
 - **Missing**:
-  - Status polling/updates
-  - Manual account entry fallback
-  - Tests (unit and integration)
+  - Broader integration tests for the full onboarding flow
 - **Practices Alignment**: ⚠️
   - Security: Encryption implemented ✅
   - Product: Basic UI implemented, needs status updates ⚠️

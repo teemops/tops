@@ -1,353 +1,96 @@
-# Docker Compose Setup
+# Teemops Docker Compose (Phase 1–3)
 
-This directory contains a Docker Compose configuration for running MySQL locally during development.
+Run the full stack (Laravel app, MySQL, Maildev, queue worker):
 
-## Quick Start
+```bash
+cp .env.docker.example .env
+chmod +x docker/scripts/prepare-build.sh install.sh
+./docker/scripts/prepare-build.sh
+docker compose build
+docker compose up -d
+```
 
-1. **Start MySQL**:
+Open http://localhost:8080 — health checks:
+
+```bash
+curl -s http://localhost:8080/health
+curl -s http://localhost:8080/up
+```
+
+Maildev UI: http://localhost:8090
+
+## Phase 2: AWS messaging (SQS + SNS)
+
+Deploy real AWS queues in a single region and wire them into the app:
+
+1. Set `TOPS_DEPLOYMENT_REGION` in `.env` (e.g. `us-east-1`).
+2. Configure AWS credentials (`~/.aws/credentials` is mounted into containers).
+3. Run the installer:
+
+```bash
+./install.sh
+docker compose up -d --build
+```
+
+This creates:
+
+| AWS resource | Purpose |
+|--------------|---------|
+| SQS `teemops_main` | CloudFormation custom-resource callbacks (child account linking) |
+| SQS `teemops_audit` / `teemops_audit_region` | Scan job queues |
+| SNS `teemops-sns` | Publishes to `teemops_main` in your deployment region |
+| S3 `{env}-{account-id}-tops-deploy` | Deployment artifact bucket |
+
+Output is written to `generated/teemops.env` (gitignored). The app and worker load it automatically. After install, the worker runs database + SQS consumers via supervisord.
+
+Logs: `generated/install.log`
+
+On EC2 without mounted credentials, set `TOPS_INSTALLER_NETWORK=host` in `.env` before `./install.sh`.
+
+## Phase 3: Add an AWS account (end to end)
+
+Once messaging is installed, connecting a customer AWS account works without any manual refresh:
+
+1. Ensure the worker is polling for account-linking callbacks:
+
    ```bash
-   docker-compose up -d
+   docker compose logs -f worker   # look for: Polling SQS queue: teemops_main
    ```
 
-2. **Check MySQL status**:
-   ```bash
-   docker-compose ps
-   ```
+2. In the app, open **AWS Accounts → Add AWS Account** and click **Open AWS Console**. This creates a pending account and opens a CloudFormation quick-create link in your deployment region (the region and parent account are baked into the URL — nothing is hard-coded).
+3. Complete the CloudFormation stack in your AWS Console. Its custom resource notifies the `teemops-sns` topic, which fans out to the `teemops_main` SQS queue.
+4. The worker's `aws:process-sqs` command consumes the message, activates the account, and replies to CloudFormation (the stack reaches `CREATE_COMPLETE`).
+5. The modal is polling `GET /api/aws-accounts/{id}` and flips to **Account connected** on its own, then closes and refreshes the list — no manual refresh needed.
 
-3. **View MySQL logs**:
-   ```bash
-   docker-compose logs -f mysql
-   ```
+**Fallbacks**
+- If messaging hasn't been installed, "Add AWS Account" returns a clear message to run `./install.sh` first.
+- If CloudFormation is slow or fails, the modal offers **Enter details manually** (paste the AWS account ID + IAM role ARN).
 
-4. **Stop MySQL**:
-   ```bash
-   docker-compose down
-   ```
+## Services
 
-5. **Stop and remove volumes** (⚠️ This deletes all data):
-   ```bash
-   docker-compose down -v
-   ```
+| Service | Purpose |
+|---------|---------|
+| `app` | nginx + PHP-FPM, runs migrations on start |
+| `mysql` | Application database |
+| `maildev` | Captures outbound mail in dev |
+| `worker` | Database queue worker; after Phase 2 install, also SQS scan + account workers |
 
-## Environment Variables
-
-Create a `.env` file in the root directory with the following variables:
-
-```env
-MYSQL_ROOT_PASSWORD=mysql
-MYSQL_DATABASE=teemops
-MYSQL_USER=teem
-MYSQL_PASSWORD=b43c8ef4c93eb502
-MYSQL_PORT=3306
-```
-
-Or use the provided `.env.example` as a template.
-
-**Note:** These are the default values from `docker-compose.yml`. You can override them by setting these environment variables in your `.env` file.
-
-## Database Connection
-
-The MySQL container exposes port 3306 by default. 
-
-**For Laravel applications**, configure your `app/.env` file:
-```env
-DB_CONNECTION=mysql
-DB_HOST=127.0.0.1
-DB_PORT=3306
-DB_DATABASE=teemops
-DB_USERNAME=teem
-DB_PASSWORD=b43c8ef4c93eb502
-```
-
-**For other applications**, use this connection string:
-```
-mysql://teem:b43c8ef4c93eb502@localhost:3306/teemops
-```
-
-## Data Persistence
-
-MySQL data is stored in the `./mysql-data` directory, which is gitignored. This ensures:
-- Data persists between container restarts
-- Data is not committed to git
-- Easy to reset by deleting the directory
-
-## Laravel Database Migrations
-
-### Configure Laravel .env
-
-After starting MySQL, configure your Laravel application's `.env` file in the `app/` directory. Make sure to set both the environment and database settings:
-
-```env
-APP_ENV=local
-APP_DEBUG=true
-
-DB_CONNECTION=mysql
-DB_HOST=127.0.0.1
-DB_PORT=3306
-DB_DATABASE=teemops
-DB_USERNAME=teem
-DB_PASSWORD=b43c8ef4c93eb502
-```
-
-**Important:** 
-- `APP_ENV=local` is required for local development (Laravel defaults to `production` which requires confirmation prompts)
-- `DB_CONNECTION=mysql` must be set (Laravel defaults to `sqlite`)
-- The default database credentials match the docker-compose.yml configuration. Adjust if you've changed the environment variables.
-
-### Clear Configuration Cache
-
-If you've updated your `.env` file, clear the configuration cache:
+## Logs
 
 ```bash
-cd app
-php artisan config:clear
-php artisan cache:clear
+docker compose logs -f app
+docker compose ps
 ```
 
-### Run Migrations
-
-Navigate to the Laravel app directory and run migrations:
+## Reset database
 
 ```bash
-cd app
-php artisan migrate
+docker compose down -v
+docker compose up -d
 ```
 
-**If you get a "production environment" warning**, you can either:
-1. Fix your `.env` file (set `APP_ENV=local`) and clear config cache, or
-2. Use the `--force` flag (not recommended for production):
-   ```bash
-   php artisan migrate --force
-   ```
+## Feature flags
 
-**If it's still using SQLite**, check your `.env` file has `DB_CONNECTION=mysql` and run:
-```bash
-php artisan config:clear
-php artisan migrate
-```
-
-This will create all database tables defined in your migration files.
-
-### Common Migration Commands
-
-**Check migration status:**
-```bash
-cd app
-php artisan migrate:status
-```
-
-**Rollback last migration batch:**
-```bash
-cd app
-php artisan migrate:rollback
-```
-
-**Rollback all migrations:**
-```bash
-cd app
-php artisan migrate:reset
-```
-
-**Rollback and re-run all migrations:**
-```bash
-cd app
-php artisan migrate:refresh
-```
-
-**Drop all tables and re-run migrations (⚠️ Deletes all data):**
-```bash
-cd app
-php artisan migrate:fresh
-```
-
-**Run migrations with seeders:**
-```bash
-cd app
-php artisan migrate --seed
-```
-
-**Fresh migration with seeders:**
-```bash
-cd app
-php artisan migrate:fresh --seed
-```
-
-### Create New Migrations
-
-**Create a new migration:**
-```bash
-cd app
-php artisan make:migration create_table_name
-```
-
-**Create a migration with model:**
-```bash
-cd app
-php artisan make:model ModelName -m
-```
-
-### Database Seeders
-
-**Run seeders:**
-```bash
-cd app
-php artisan db:seed
-```
-
-**Run a specific seeder:**
-```bash
-cd app
-php artisan db:seed --class=DatabaseSeeder
-```
-
-### Verify Database Connection
-
-Test the database connection using Laravel Tinker:
-
-```bash
-cd app
-php artisan tinker
-```
-
-Then in Tinker:
-```php
-DB::connection()->getPdo(); // Should return PDO object if connected
-Schema::hasTable('users'); // Should return true
-```
-
-### Troubleshooting Migration Issues
-
-**Issue: "Application is in production" warning**
-
-This means `APP_ENV` is set to `production` or not set (defaults to production). Fix by:
-
-1. Edit `app/.env` and set:
-   ```env
-   APP_ENV=local
-   ```
-
-2. Clear config cache:
-   ```bash
-   cd app
-   php artisan config:clear
-   ```
-
-3. Run migrations again:
-   ```bash
-   php artisan migrate
-   ```
-
-**Issue: Using SQLite instead of MySQL**
-
-This means `DB_CONNECTION` is set to `sqlite` or not set. Fix by:
-
-1. Edit `app/.env` and set:
-   ```env
-   DB_CONNECTION=mysql
-   DB_HOST=127.0.0.1
-   DB_PORT=3306
-   DB_DATABASE=teemops
-   DB_USERNAME=teem
-   DB_PASSWORD=b43c8ef4c93eb502
-   ```
-
-2. Clear config cache:
-   ```bash
-   cd app
-   php artisan config:clear
-   ```
-
-3. Verify MySQL is running:
-   ```bash
-   docker-compose ps
-   ```
-
-4. Run migrations again:
-   ```bash
-   php artisan migrate
-   ```
-
-**Issue: Database connection refused**
-
-1. Check MySQL container is running:
-   ```bash
-   docker-compose ps
-   ```
-
-2. If not running, start it:
-   ```bash
-   docker-compose up -d
-   ```
-
-3. Wait a few seconds for MySQL to fully start, then try again.
-
-**Quick Fix: Force environment**
-
-If you need to run migrations immediately without fixing `.env`:
-
-```bash
-cd app
-php artisan migrate --env=local --force
-```
-
-However, it's better to fix your `.env` file properly.
-
-## Prisma Migrations
-
-After starting MySQL, run Prisma migrations:
-
-```bash
-cd backend
-npx prisma migrate dev
-```
-
-Or generate Prisma client:
-
-```bash
-cd backend
-npx prisma generate
-```
-
-## Accessing MySQL
-
-You can connect to MySQL using any MySQL client:
-
-```bash
-# Using MySQL CLI
-mysql -h localhost -P 3306 -u teem -pb43c8ef4c93eb502 teemops
-
-# Or using Docker
-docker-compose exec mysql mysql -u teem -pb43c8ef4c93eb502 teemops
-
-# Connect as root user
-docker-compose exec mysql mysql -u root -pmysql teemops
-```
-
-## Troubleshooting
-
-### Port Already in Use
-
-If port 3306 is already in use, change `MYSQL_PORT` in your `.env` file:
-
-```env
-MYSQL_PORT=3307
-```
-
-Then update your `DATABASE_URL` accordingly.
-
-### Reset Database
-
-To completely reset the database:
-
-```bash
-docker-compose down -v
-rm -rf mysql-data
-docker-compose up -d
-```
-
-### Check MySQL Health
-
-```bash
-docker-compose exec mysql mysqladmin ping -h localhost -u root -pmysql
-```
-
+| Variable | Default (Docker) | Description |
+|----------|------------------|-------------|
+| `FIREBASE_USER_AUTH` | `false` | When false, uses Laravel email/password login (no Firebase OAuth). Set `true` and rebuild to enable Firebase. |

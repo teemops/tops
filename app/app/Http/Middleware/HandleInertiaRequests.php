@@ -53,10 +53,17 @@ class HandleInertiaRequests extends Middleware
             }
         }
         
+        $user = $request->user();
+
         return [
             ...parent::share($request),
             'auth' => [
-                'user' => $request->user(),
+                'user' => $user ? [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'email_verified_at' => $user->email_verified_at,
+                ] : null,
             ],
             'organization_role' => $organizationRole,
             'flash' => [
@@ -64,6 +71,9 @@ class HandleInertiaRequests extends Middleware
                 'error' => $request->session()->get('error'),
                 'warning' => $request->session()->get('warning'),
                 'info' => $request->session()->get('info'),
+            ],
+            'features' => [
+                'firebase_auth' => config('features.firebase_auth'),
             ],
         ];
     }

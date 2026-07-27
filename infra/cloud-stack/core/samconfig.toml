@@ -19,12 +19,13 @@ parameter_overrides = "VpcName=\"tops-vpc\" VpcCidr=\"10.100.0.0/16\" VpcOption=
 image_repositories = []
 
 [default.global.parameters]
-region = "ap-southeast-6"
+region = "us-east-1"
+
 [ec2.deploy.parameters]
 stack_name = "teemops-ec2"
 resolve_s3 = true
 s3_prefix = "teemops-sam-ec2"
-region = "ap-southeast-6"
+region = "us-east-1"
 capabilities = "CAPABILITY_IAM CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND"
 template_file = "template-ec2.yaml"
 fail_on_empty_changeset = false

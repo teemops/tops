@@ -3,6 +3,7 @@
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="teemops-firebase-auth" content="{{ config('features.firebase_auth') ? '1' : '0' }}">
 
         <title inertia>{{ config('app.name', 'Teem') }}</title>
 

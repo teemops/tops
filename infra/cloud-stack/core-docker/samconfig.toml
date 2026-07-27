@@ -1,0 +1,18 @@
+version = 0.1
+
+[default.build.parameters]
+cached = true
+parallel = true
+
+[default.deploy.parameters]
+stack_name = "teemops-core-docker"
+resolve_s3 = true
+s3_prefix = "teemops-core-docker"
+capabilities = "CAPABILITY_IAM CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND"
+template_file = "template.yaml"
+confirm_changeset = false
+fail_on_empty_changeset = false
+parameter_overrides = "Environment=\"test\""
+
+[default.global.parameters]
+region = "us-east-1"

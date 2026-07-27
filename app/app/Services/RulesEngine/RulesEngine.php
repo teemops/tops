@@ -56,7 +56,15 @@ class RulesEngine
                     // Empty task config means it's an action, skip for now
                     continue;
                 }
-                
+
+                // tasks.json declares fallback action params under the file-level
+                // "config.defaults" block, not per-task — merge it in here (a
+                // per-task "defaults" key still wins) so buildActionParams() can
+                // find it via $taskConfig['defaults'].
+                if (!isset($taskConfig['defaults']) && isset($tasks['config']['defaults'])) {
+                    $taskConfig['defaults'] = $tasks['config']['defaults'];
+                }
+
                 $this->executeTask($scan, $scanner, $service, $taskName, $taskConfig, $credentials, $region);
             }
         }
