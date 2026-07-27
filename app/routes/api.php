@@ -49,6 +49,7 @@ Route::middleware(['api', 'firebase.auth', 'organization.context'])->group(funct
 
     // Scans
     Route::get('/scan-types', [ScansController::class, 'scanTypes']);
+    Route::get('/scan-profiles', [ScansController::class, 'scanProfiles']);
     Route::get('/organizations/{orgId}/scans', [ScansController::class, 'index']);
     Route::post('/organizations/{orgId}/scans', [ScansController::class, 'store']);
     Route::get('/scans/{scanId}', [ScansController::class, 'show']);

@@ -1,0 +1,54 @@
+{
+    "$schema": "tops/scan/tasks/schema.v1",
+    "name": "tasks.json",
+    "description": "Tasks for auditing AWS KMS resources",
+    "config": {
+        "service": "kms",
+        "start": "listKeys",
+        "defaults": {
+            "actions": {
+                "params": {
+                    "KeyId": "$item['KeyId']"
+                }
+            }
+        }
+    },
+    "tasks": [
+        {
+            "listKeys": {
+                "task": "listKeys",
+                "id": "key",
+                "key": "KeyId",
+                "description": "List all KMS keys",
+                "actions": [
+                    {
+                        "describeKey": {
+                            "params": {
+                                "KeyId": "$item['KeyId']"
+                            }
+                        }
+                    },
+                    {
+                        "getKeyRotationStatus": {
+                            "params": {
+                                "KeyId": "$item['KeyId']"
+                            }
+                        }
+                    }
+                ],
+                "items": {
+                    "Keys": [
+                        {
+                            "Name": "KeyId",
+                            "Type": "String"
+                        },
+                        {
+                            "Name": "KeyArn",
+                            "Type": "String"
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+}

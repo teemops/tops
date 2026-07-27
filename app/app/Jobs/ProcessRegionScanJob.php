@@ -99,8 +99,8 @@ class ProcessRegionScanJob implements ShouldQueue
             $findingsEngine = new FindingsEngine($conditionEvaluator);
             
             try {
-                // Evaluate findings using basic ruleset
-                $findingsEngine->evaluateScan($this->scan, ['basic']);
+                // Evaluate findings using the scan's ruleset(s) (defaults to basic)
+                $findingsEngine->evaluateScan($this->scan, $this->scan->rulesets ?? ['basic']);
                 
                 Log::info("{$this->service} region scan findings evaluation completed", [
                     'scan_id' => $this->scan->id,

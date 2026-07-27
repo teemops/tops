@@ -4,10 +4,14 @@ namespace App\Services\RulesEngine;
 
 use App\Models\Scan;
 use App\Models\ScanDetail;
+use App\Services\ScanTypesService;
 use App\Services\Scanners\IamScanner;
 use App\Services\Scanners\S3Scanner;
 use App\Services\Scanners\Ec2Scanner;
 use App\Services\Scanners\RdsScanner;
+use App\Services\Scanners\CloudTrailScanner;
+use App\Services\Scanners\LambdaScanner;
+use App\Services\Scanners\KmsScanner;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\File;
 
@@ -85,7 +89,7 @@ class RulesEngine
         try {
             // Execute the main task API call
             $params = [];
-            if (in_array($service, ['ec2', 'rds']) && $region) {
+            if (ScanTypesService::isRegionBased($service) && $region) {
                 $result = $scanner->executeApiCall($taskName, $credentials, $params, $region);
             } else {
                 $result = $scanner->executeApiCall($taskName, $credentials, $params);
@@ -161,12 +165,11 @@ class RulesEngine
                             'resource_id' => $resourceId,
                         ]);
                         
-                        if (in_array($service, ['ec2', 'rds']) && $region) {
+                        if (ScanTypesService::isRegionBased($service) && $region) {
                             $actionResult = $scanner->executeApiCall($actionName, $credentials, $actionParams, $region);
-                        } elseif ($service === 's3') {
-                            // S3 handles region automatically for bucket-specific calls
-                            $actionResult = $scanner->executeApiCall($actionName, $credentials, $actionParams);
                         } else {
+                            // Global services (e.g. S3 handles region automatically for
+                            // bucket-specific calls) run without an explicit region.
                             $actionResult = $scanner->executeApiCall($actionName, $credentials, $actionParams);
                         }
                         
@@ -222,6 +225,9 @@ class RulesEngine
             's3' => new S3Scanner($roleArn, $externalId, $region),
             'ec2' => new Ec2Scanner($roleArn, $externalId, $region),
             'rds' => new RdsScanner($roleArn, $externalId, $region),
+            'cloudtrail' => new CloudTrailScanner($roleArn, $externalId, $region),
+            'lambda' => new LambdaScanner($roleArn, $externalId, $region),
+            'kms' => new KmsScanner($roleArn, $externalId, $region),
             default => throw new \Exception("Unknown service: {$service}"),
         };
     }

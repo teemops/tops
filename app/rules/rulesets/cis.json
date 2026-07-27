@@ -1,6 +1,205 @@
 {
     "$schema": "tops/findings/ruleset/schema.v1",
     "name": "cis.json",
-    "description": "CIS AWS Foundations Benchmark rule set",
-    "rules": []
+    "description": "CIS AWS Foundations Benchmark v5.0 checks (subset evaluable from currently collected data)",
+    "rules": [
+        {
+            "rule": "cis-1.4",
+            "name": "CIS 1.4 - No root account access keys",
+            "service": "iam",
+            "method": "getAccountSummary",
+            "description": "Ensure no 'root' user account access key exists. Root access keys grant unrestricted access and cannot be scoped down.",
+            "severity": "critical",
+            "condition": "($data['SummaryMap']['AccountAccessKeysPresent'] ?? 0) > 0"
+        },
+        {
+            "rule": "cis-1.5",
+            "name": "CIS 1.5 - MFA enabled for root account",
+            "service": "iam",
+            "method": "getAccountSummary",
+            "description": "Ensure MFA is enabled for the 'root' user account.",
+            "severity": "critical",
+            "condition": "($data['SummaryMap']['AccountMFAEnabled'] ?? 0) == 0"
+        },
+        {
+            "rule": "cis-1.8",
+            "name": "CIS 1.8 - IAM password policy minimum length 14",
+            "service": "iam",
+            "method": "getAccountPasswordPolicy",
+            "description": "Ensure the IAM password policy requires a minimum password length of 14 or greater.",
+            "severity": "medium",
+            "condition": "$data === false || ($data['PasswordPolicy']['MinimumPasswordLength'] ?? 0) < 14"
+        },
+        {
+            "rule": "cis-1.9",
+            "name": "CIS 1.9 - IAM password policy prevents reuse",
+            "service": "iam",
+            "method": "getAccountPasswordPolicy",
+            "description": "Ensure the IAM password policy prevents reuse of the previous 24 passwords.",
+            "severity": "low",
+            "condition": "$data === false || ($data['PasswordPolicy']['PasswordReusePrevention'] ?? 0) < 24"
+        },
+        {
+            "rule": "cis-1.14",
+            "name": "CIS 1.14 - Access keys rotated within 90 days",
+            "service": "iam",
+            "method": "listAccessKeys",
+            "description": "Ensure IAM user access keys are rotated every 90 days or less.",
+            "severity": "medium",
+            "condition": "count(array_filter($data['AccessKeyMetadata'] ?? [], function($k){ return isset($k['CreateDate']) && (time() - strtotime((string)$k['CreateDate'])) > 7776000; })) > 0"
+        },
+        {
+            "rule": "cis-1.15",
+            "name": "CIS 1.15 - IAM users receive permissions only through groups",
+            "service": "iam",
+            "method": "listAttachedUserPolicies",
+            "description": "Ensure IAM users receive permissions only through groups; policies should not be attached directly to users.",
+            "severity": "low",
+            "condition": "count($data['AttachedPolicies'] ?? []) > 0"
+        },
+        {
+            "rule": "cis-1.16",
+            "name": "CIS 1.16 - Full administrative policies not attached to users",
+            "service": "iam",
+            "method": "listAttachedUserPolicies",
+            "description": "Ensure IAM policies that allow full '*:*' administrative privileges are not attached directly to users.",
+            "severity": "high",
+            "condition": "isset($data['AttachedPolicies']) && count(array_filter($data['AttachedPolicies'] ?? [], function($policy) { return ($policy['PolicyName'] ?? '') == 'AdministratorAccess' || strpos($policy['PolicyArn'] ?? '', 'AdministratorAccess') !== false; })) > 0"
+        },
+        {
+            "rule": "cis-2.1.1",
+            "name": "CIS 2.1.1 - S3 bucket server-side encryption",
+            "service": "s3",
+            "method": "getBucketEncryption",
+            "description": "Ensure S3 buckets employ encryption-at-rest via a default server-side encryption configuration.",
+            "severity": "medium",
+            "condition": "$data === false || empty($data['ServerSideEncryptionConfiguration']['Rules'] ?? [])"
+        },
+        {
+            "rule": "cis-2.1.4",
+            "name": "CIS 2.1.4 - S3 buckets block public access",
+            "service": "s3",
+            "method": "getPublicAccessBlock",
+            "description": "Ensure S3 buckets are configured with 'Block Public Access' fully enabled at the bucket level.",
+            "severity": "high",
+            "condition": "$data === false || !isset($data['PublicAccessBlockConfiguration']) || ($data['PublicAccessBlockConfiguration']['BlockPublicAcls'] ?? false) == false || ($data['PublicAccessBlockConfiguration']['BlockPublicPolicy'] ?? false) == false || ($data['PublicAccessBlockConfiguration']['IgnorePublicAcls'] ?? false) == false || ($data['PublicAccessBlockConfiguration']['RestrictPublicBuckets'] ?? false) == false"
+        },
+        {
+            "rule": "cis-2.3.1",
+            "name": "CIS 2.3.1 - RDS encryption at rest enabled",
+            "service": "rds",
+            "method": "describeDBInstances",
+            "description": "Ensure encryption at rest is enabled for RDS instances.",
+            "severity": "high",
+            "condition": "isset($data['DBInstanceIdentifier']) && ($data['StorageEncrypted'] ?? false) == false"
+        },
+        {
+            "rule": "cis-2.3.2",
+            "name": "CIS 2.3.2 - RDS auto minor version upgrade",
+            "service": "rds",
+            "method": "describeDBInstances",
+            "description": "Ensure the Auto Minor Version Upgrade feature is enabled for RDS instances.",
+            "severity": "low",
+            "condition": "isset($data['DBInstanceIdentifier']) && ($data['AutoMinorVersionUpgrade'] ?? false) == false"
+        },
+        {
+            "rule": "cis-2.3.3",
+            "name": "CIS 2.3.3 - RDS instances not publicly accessible",
+            "service": "rds",
+            "method": "describeDBInstances",
+            "description": "Ensure RDS instances are not publicly accessible.",
+            "severity": "high",
+            "condition": "isset($data['DBInstanceIdentifier']) && ($data['PubliclyAccessible'] ?? false) == true"
+        },
+        {
+            "rule": "cis-3.1",
+            "name": "CIS 3.1 - CloudTrail enabled in all regions",
+            "service": "cloudtrail",
+            "method": "describeTrails",
+            "description": "Ensure CloudTrail is enabled in all regions by using a multi-region trail.",
+            "severity": "high",
+            "condition": "isset($data['TrailARN']) && ($data['IsMultiRegionTrail'] ?? false) == false"
+        },
+        {
+            "rule": "cis-3.2",
+            "name": "CIS 3.2 - CloudTrail log file validation enabled",
+            "service": "cloudtrail",
+            "method": "describeTrails",
+            "description": "Ensure CloudTrail log file validation is enabled to detect tampering with log files.",
+            "severity": "high",
+            "condition": "isset($data['TrailARN']) && ($data['LogFileValidationEnabled'] ?? false) == false"
+        },
+        {
+            "rule": "cis-3.4",
+            "name": "CIS 3.4 - CloudTrail integrated with CloudWatch Logs",
+            "service": "cloudtrail",
+            "method": "describeTrails",
+            "description": "Ensure CloudTrail trails are integrated with CloudWatch Logs for real-time monitoring.",
+            "severity": "medium",
+            "condition": "isset($data['TrailARN']) && empty($data['CloudWatchLogsLogGroupArn'] ?? '')"
+        },
+        {
+            "rule": "cis-3.7",
+            "name": "CIS 3.7 - CloudTrail logs encrypted with KMS",
+            "service": "cloudtrail",
+            "method": "describeTrails",
+            "description": "Ensure CloudTrail logs are encrypted at rest using KMS customer managed keys.",
+            "severity": "medium",
+            "condition": "isset($data['TrailARN']) && empty($data['KmsKeyId'] ?? '')"
+        },
+        {
+            "rule": "cis-3.8",
+            "name": "CIS 3.8 - KMS customer key rotation enabled",
+            "service": "kms",
+            "method": "getKeyRotationStatus",
+            "description": "Ensure rotation for KMS customer managed keys is enabled.",
+            "severity": "medium",
+            "condition": "isset($data['KeyRotationEnabled']) && $data['KeyRotationEnabled'] === false"
+        },
+        {
+            "rule": "cis-3.9",
+            "name": "CIS 3.9 - VPC flow logging enabled",
+            "service": "ec2",
+            "method": "describeFlowLogs",
+            "description": "Ensure VPC flow logging is enabled in all VPCs.",
+            "severity": "medium",
+            "condition": "count($data['FlowLogs'] ?? []) == 0"
+        },
+        {
+            "rule": "cis-5.1",
+            "name": "CIS 5.1 - NACLs do not allow ingress to admin ports",
+            "service": "ec2",
+            "method": "describeNetworkAcls",
+            "description": "Ensure no Network ACL allows ingress from 0.0.0.0/0 to remote server administration ports (22, 3389).",
+            "severity": "high",
+            "condition": "isset($data['NetworkAcls']) && count(array_filter($data['NetworkAcls'] ?? [], function($nacl){ return count(array_filter($nacl['Entries'] ?? [], function($e){ $ingress = ($e['Egress'] ?? true) === false; $allow = ($e['RuleAction'] ?? '') === 'allow'; $open = ($e['CidrBlock'] ?? '') === '0.0.0.0/0'; $from = $e['PortRange']['From'] ?? null; $to = $e['PortRange']['To'] ?? null; $admin = ($from === null && $to === null) || ($from !== null && $to !== null && (($from <= 22 && $to >= 22) || ($from <= 3389 && $to >= 3389))); return $ingress && $allow && $open && $admin; })) > 0; })) > 0"
+        },
+        {
+            "rule": "cis-5.2",
+            "name": "CIS 5.2 - No security group allows ingress from 0.0.0.0/0 to port 22",
+            "service": "ec2",
+            "method": "describeSecurityGroups",
+            "description": "Ensure no security group allows ingress from 0.0.0.0/0 to port 22 (SSH).",
+            "severity": "high",
+            "condition": "isset($data['SecurityGroups']) && count(array_filter($data['SecurityGroups'] ?? [], function($sg){ return count(array_filter($sg['IpPermissions'] ?? [], function($p){ $open = count(array_filter($p['IpRanges'] ?? [], function($r){ return ($r['CidrIp'] ?? '') === '0.0.0.0/0'; })) > 0; $from = $p['FromPort'] ?? null; $to = $p['ToPort'] ?? null; $covers = ($from === null && $to === null) || ($from !== null && $to !== null && $from <= 22 && $to >= 22); return $open && $covers; })) > 0; })) > 0"
+        },
+        {
+            "rule": "cis-5.3",
+            "name": "CIS 5.3 - No security group allows ingress from 0.0.0.0/0 to port 3389",
+            "service": "ec2",
+            "method": "describeSecurityGroups",
+            "description": "Ensure no security group allows ingress from 0.0.0.0/0 to port 3389 (RDP).",
+            "severity": "high",
+            "condition": "isset($data['SecurityGroups']) && count(array_filter($data['SecurityGroups'] ?? [], function($sg){ return count(array_filter($sg['IpPermissions'] ?? [], function($p){ $open = count(array_filter($p['IpRanges'] ?? [], function($r){ return ($r['CidrIp'] ?? '') === '0.0.0.0/0'; })) > 0; $from = $p['FromPort'] ?? null; $to = $p['ToPort'] ?? null; $covers = ($from === null && $to === null) || ($from !== null && $to !== null && $from <= 3389 && $to >= 3389); return $open && $covers; })) > 0; })) > 0"
+        },
+        {
+            "rule": "cis-5.4",
+            "name": "CIS 5.4 - Default security group restricts all traffic",
+            "service": "ec2",
+            "method": "describeSecurityGroups",
+            "description": "Ensure the default security group of every VPC restricts all traffic (no inbound or outbound rules).",
+            "severity": "medium",
+            "condition": "isset($data['SecurityGroups']) && count(array_filter($data['SecurityGroups'] ?? [], function($sg){ return ($sg['GroupName'] ?? '') === 'default' && ((count($sg['IpPermissions'] ?? []) > 0) || (count($sg['IpPermissionsEgress'] ?? []) > 0)); })) > 0"
+        }
+    ]
 }

@@ -17,7 +17,7 @@ class S3Scanner extends AwsSecurityScanner
     {
         // For bucket-specific calls, get the bucket's region first
         // Note: getBucketLocation itself doesn't need region lookup (it works from any region)
-        $bucketSpecificMethods = ['getPublicAccessBlock', 'getBucketEncryption', 'getBucketVersioning', 'getBucketAcl'];
+        $bucketSpecificMethods = ['getPublicAccessBlock', 'getBucketEncryption', 'getBucketVersioning', 'getBucketAcl', 'getBucketLogging'];
         
         if (in_array($method, $bucketSpecificMethods) && isset($params['Bucket'])) {
             // Get the bucket's region
@@ -42,6 +42,7 @@ class S3Scanner extends AwsSecurityScanner
             'getBucketEncryption' => $s3Client->getBucketEncryption($params)->toArray(),
             'getBucketVersioning' => $s3Client->getBucketVersioning($params)->toArray(),
             'getBucketAcl' => $s3Client->getBucketAcl($params)->toArray(),
+            'getBucketLogging' => $s3Client->getBucketLogging($params)->toArray(),
             default => throw new \InvalidArgumentException("Unknown S3 method: {$method}"),
         }, ['region' => $region]);
     }

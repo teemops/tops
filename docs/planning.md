@@ -1586,12 +1586,15 @@ This roadmap is based on comprehensive research of:
 ### Current Implementation Status
 
 **Currently Implemented Services:**
-- ✅ S3 (4 checks)
-- ✅ IAM (10 checks)
-- ✅ EC2/VPC (5 checks)
-- ✅ RDS (6 checks)
+- ✅ S3 (5 checks)
+- ✅ IAM (13 checks)
+- ✅ EC2/VPC (7 checks)
+- ✅ RDS (9 checks)
+- ✅ CloudTrail (5 checks)
+- ✅ Lambda (4 checks)
+- ✅ KMS (3 checks)
 
-**Total Current Checks:** ~25 rules
+**Total Current Checks:** ~46 rules
 
 ---
 
@@ -1606,9 +1609,9 @@ Prioritized by enterprise adoption and security impact:
 | 3 | **EC2** | Compute Instances | ✅ Partial |
 | 4 | **VPC** | Network Security | ✅ Partial |
 | 5 | **RDS** | Relational Databases | ✅ Partial |
-| 6 | **CloudTrail** | Audit Logging | ❌ Not Implemented |
-| 7 | **Lambda** | Serverless Functions | ❌ Not Implemented |
-| 8 | **KMS** | Key Management | ❌ Not Implemented |
+| 6 | **CloudTrail** | Audit Logging | ✅ Partial |
+| 7 | **Lambda** | Serverless Functions | ✅ Partial |
+| 8 | **KMS** | Key Management | ✅ Partial |
 | 9 | **Secrets Manager** | Secrets Storage | ❌ Not Implemented |
 | 10 | **CloudWatch** | Monitoring & Logging | ❌ Not Implemented |
 | 11 | **EKS/ECS** | Container Services | ❌ Not Implemented |
@@ -1786,20 +1789,20 @@ Features are prioritized by:
 *Timeline: Sprint 1-2*
 
 **1.1 CloudTrail Security Scanner** ⭐ HIGHEST PRIORITY
-- [ ] Check CloudTrail enabled in all regions
-- [ ] Check CloudTrail log encryption enabled
-- [ ] Check CloudTrail log file validation enabled
-- [ ] Check CloudTrail integrated with CloudWatch
-- [ ] Check CloudTrail S3 bucket not publicly accessible
-- [ ] Check CloudTrail logging for global services
+- [x] Check CloudTrail actively logging (getTrailStatus)
+- [x] Check CloudTrail log encryption enabled (KMS)
+- [x] Check CloudTrail log file validation enabled
+- [x] Check CloudTrail integrated with CloudWatch
+- [x] Check CloudTrail multi-region trail
+- [ ] Check CloudTrail S3 bucket not publicly accessible (cross-resource, deferred)
 
 *Impact: Critical for audit compliance and incident response*
 *Complexity: Low - Simple API calls*
 
 **1.2 Enhanced IAM Scanner**
-- [ ] Root account MFA check
-- [ ] Root account access keys check
-- [ ] IAM password policy compliance
+- [x] Root account MFA check
+- [x] Root account access keys check
+- [x] IAM password policy compliance
 - [ ] Access key rotation check (90+ days)
 - [ ] Inactive user detection (90+ days)
 - [ ] Console password rotation check
@@ -1810,7 +1813,7 @@ Features are prioritized by:
 *Complexity: Low - Extends existing scanner*
 
 **1.3 Enhanced S3 Scanner**
-- [ ] S3 bucket logging enabled check
+- [x] S3 bucket logging enabled check
 - [ ] S3 bucket lifecycle policy check
 - [ ] S3 MFA delete enabled check
 - [ ] S3 object lock check for compliance data
@@ -1832,7 +1835,7 @@ Features are prioritized by:
 *Timeline: Sprint 3-4*
 
 **2.1 Enhanced VPC/Network Scanner**
-- [ ] VPC flow logs enabled check
+- [x] VPC flow logs enabled check
 - [ ] Security group SSH/RDP from 0.0.0.0/0 check
 - [ ] Security group all ports from 0.0.0.0/0 check
 - [ ] Network ACL unrestricted access check
@@ -1845,7 +1848,7 @@ Features are prioritized by:
 *Complexity: Medium - Multiple related checks*
 
 **2.2 EC2 Security Scanner Enhancements**
-- [ ] IMDSv2 enforcement check
+- [x] IMDSv2 enforcement check
 - [ ] EC2 detailed monitoring check
 - [ ] EC2 using default security group check
 - [ ] Auto Scaling health check configuration
@@ -1855,21 +1858,21 @@ Features are prioritized by:
 
 **2.3 Lambda Security Scanner** ⭐ NEW SERVICE
 - [ ] Lambda IAM role permissions check
-- [ ] Lambda VPC configuration check
-- [ ] Lambda environment variable secrets check
-- [ ] Lambda deprecated runtime check
-- [ ] Lambda public URL check
+- [x] Lambda VPC configuration check
+- [x] Lambda environment variable secrets check (heuristic on variable names)
+- [x] Lambda deprecated runtime check
+- [x] Lambda public URL check (function URL AuthType=NONE)
 - [ ] Lambda reserved concurrency check
 
 *Impact: Serverless security*
 *Complexity: Medium - New scanner implementation*
 
 **2.4 RDS/Database Scanner Enhancements**
-- [ ] RDS enhanced monitoring check
-- [ ] RDS deletion protection check
+- [x] RDS enhanced monitoring check
+- [x] RDS deletion protection check
 - [ ] RDS using default parameter group check
 - [ ] RDS Performance Insights check
-- [ ] RDS minor version auto-upgrade check
+- [x] RDS minor version auto-upgrade check
 
 *Impact: Database reliability and security*
 *Complexity: Low - Extends existing scanner*
@@ -1878,10 +1881,10 @@ Features are prioritized by:
 *Timeline: Sprint 5-6*
 
 **3.1 KMS Security Scanner** ⭐ NEW SERVICE
-- [ ] KMS key rotation enabled check
-- [ ] KMS key deletion scheduled check
+- [x] KMS key rotation enabled check
+- [x] KMS key deletion scheduled check
+- [x] KMS customer key disabled check
 - [ ] KMS key policy permissions check
-- [ ] Customer managed keys usage check
 - [ ] KMS key cross-account access check
 
 *Impact: Encryption key management*
@@ -2102,15 +2105,19 @@ Features are prioritized by:
 
 ### CIS AWS Foundations Benchmark v5.0 Alignment
 
-The roadmap aligns with CIS AWS Foundations Benchmark v5.0.0 sections:
+The roadmap aligns with CIS AWS Foundations Benchmark v5.0.0 sections. A first-pass
+`cis` ruleset (`rules/rulesets/cis.json`, 22 checks) is now authored and selectable
+as the **CIS** scan group. It covers the controls evaluable from currently collected
+data; controls needing data we don't yet collect (credential reports, IAM Access
+Analyzer, AWS Config, CloudWatch metric filters) are deferred.
 
-| CIS Section | Coverage | Implementation Stage |
-|-------------|----------|---------------------|
-| 1. IAM | Partial → Full | Stage 1 |
-| 2. Storage | Partial → Full | Stage 1 |
-| 3. Logging | Not Started | Stage 1 |
-| 4. Monitoring | Not Started | Stage 4 |
-| 5. Networking | Partial → Full | Stage 2 |
+| CIS Section | Controls Covered | Coverage | Notes |
+|-------------|------------------|----------|-------|
+| 1. IAM | 1.4, 1.5, 1.8, 1.9, 1.14, 1.15, 1.16 | Partial | Needs credential report for 1.7/1.10/1.12 |
+| 2. Storage | 2.1.1, 2.1.4, 2.3.1, 2.3.2, 2.3.3 | Partial | EBS/EFS not yet scanned |
+| 3. Logging | 3.1, 3.2, 3.4, 3.7, 3.8, 3.9 | Partial | 3.3/3.5/3.6 need cross-resource / Config |
+| 4. Monitoring | — | Not Started | Needs CloudWatch metric filters/alarms (Stage 4) |
+| 5. Networking | 5.1, 5.2, 5.3, 5.4 | Partial | 5.5 (peering routes) deferred |
 
 ---
 
