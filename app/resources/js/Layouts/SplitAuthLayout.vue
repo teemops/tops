@@ -10,9 +10,11 @@ import NotificationContainer from '@/Components/NotificationContainer.vue';
             <div class="max-w-md">
                 <div class="mb-8">
                     <Link href="/">
-                        <div class="h-12 w-auto mb-6 flex items-center">
-                            <span class="text-2xl font-bold text-white">Teemops</span>
-                        </div>
+                        <img
+                            src="/images/brand/teemops-logo.png"
+                            alt="Teemops"
+                            class="h-12 w-auto mb-6"
+                        />
                     </Link>
                     <h1 class="text-4xl font-bold text-white mb-4">Simplify Cloud</h1>
                     <p class="text-xl text-gray-300">Cloud security made simple for busy CTOs</p>
@@ -55,9 +57,11 @@ import NotificationContainer from '@/Components/NotificationContainer.vue';
                 <!-- Mobile Logo -->
                 <div class="lg:hidden mb-8 text-center">
                     <Link href="/">
-                        <div class="h-10 w-auto mx-auto mb-4 flex items-center justify-center">
-                            <span class="text-xl font-bold text-gray-900 dark:text-white">Teemops</span>
-                        </div>
+                        <img
+                            src="/images/brand/teemops-logo.png"
+                            alt="Teemops"
+                            class="h-10 w-auto mx-auto mb-4"
+                        />
                     </Link>
                     <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
                         <slot name="mobile-title">Welcome</slot>

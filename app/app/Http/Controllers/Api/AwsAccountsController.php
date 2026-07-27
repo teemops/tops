@@ -39,27 +39,34 @@ class AwsAccountsController extends Controller
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
+        $awsConfigError = $this->awsMessagingConfigError();
+        if ($awsConfigError !== null) {
+            return response()->json(['error' => $awsConfigError], 503);
+        }
+
         // Derive UniqueId from organization's orgId (does not change once org is created)
         $uniqueId = $organization->org_id;
 
-        // Create pending AWS account record
-        $account = AwsAccount::create([
-            'organization_id' => $organization->id,
-            'name' => 'Pending AWS Account', // Will be updated when CloudFormation completes
-            'status' => 'pending',
-            'unique_id' => $uniqueId, // Derived from orgId, same for all accounts in this org
-        ]);
+        // Reuse an existing pending account for this org rather than piling up
+        // orphan pending rows on every "Open AWS Console" click. The SQS callback
+        // matches on unique_id + external_id, so returning the same record is safe.
+        $account = AwsAccount::where('organization_id', $organization->id)
+            ->where('status', 'pending')
+            ->orderBy('created_at', 'desc')
+            ->first();
 
-        // Build CloudFormation URL
-        $parentAccountId = config('services.aws.parent_account_id');
-        $templateUrl = config('services.aws.cloudformation_template_url');
-        
-        $cloudFormationUrl = sprintf(
-            'https://console.aws.amazon.com/cloudformation/home?#/stacks/quickcreate?templateUrl=%s&stackName=tops-vendor-audit&param_ParentAWSAccountId=%s&param_ExternalId=%s&param_UniqueId=%s',
-            urlencode($templateUrl),
-            urlencode($parentAccountId),
-            urlencode($account->external_id),
-            urlencode($account->unique_id)
+        if (! $account) {
+            $account = AwsAccount::create([
+                'organization_id' => $organization->id,
+                'name' => 'Pending AWS Account', // Will be updated when CloudFormation completes
+                'status' => 'pending',
+                'unique_id' => $uniqueId, // Derived from orgId, same for all accounts in this org
+            ]);
+        }
+
+        $cloudFormationUrl = $this->buildInitCloudFormationUrl(
+            $account->external_id,
+            $account->unique_id,
         );
 
         return response()->json([
@@ -67,8 +74,46 @@ class AwsAccountsController extends Controller
             'uniqueId' => $account->unique_id,
             'externalId' => $account->external_id,
             'cloudFormationUrl' => $cloudFormationUrl,
+            'deploymentRegion' => config('services.aws.deployment_region'),
             'status' => $account->status,
         ]);
+    }
+
+    /**
+     * @return non-empty-string|null Error message when AWS messaging is not configured
+     */
+    private function awsMessagingConfigError(): ?string
+    {
+        if (! config('services.aws.parent_account_id')) {
+            return 'AWS messaging not configured (missing AWS_PARENT_ACCOUNT_ID). Run ./install.sh first.';
+        }
+
+        if (! config('services.aws.cloudformation_template_url')) {
+            return 'AWS messaging not configured (missing TOPS_CFN_TEMPLATE_URL). Run ./install.sh first.';
+        }
+
+        if (! config('services.aws.deployment_region')) {
+            return 'AWS messaging not configured (missing TOPS_DEPLOYMENT_REGION). Set it in .env and run ./install.sh.';
+        }
+
+        return null;
+    }
+
+    private function buildInitCloudFormationUrl(string $externalId, string $uniqueId): string
+    {
+        $deploymentRegion = config('services.aws.deployment_region');
+        $parentAccountId = config('services.aws.parent_account_id');
+        $templateUrl = config('services.aws.cloudformation_template_url');
+
+        return sprintf(
+            'https://console.aws.amazon.com/cloudformation/home?region=%s#/stacks/quickcreate?templateUrl=%s&stackName=tops-vendor-audit&param_ParentAWSAccountId=%s&param_ParentDeploymentRegion=%s&param_ExternalId=%s&param_UniqueId=%s',
+            urlencode($deploymentRegion),
+            urlencode($templateUrl),
+            urlencode($parentAccountId),
+            urlencode($deploymentRegion),
+            urlencode($externalId),
+            urlencode($uniqueId),
+        );
     }
 
     /**
@@ -272,8 +317,8 @@ class AwsAccountsController extends Controller
             ->where('organization_id', $organization->id)
             ->firstOrFail();
 
-        // Get region from config or default to us-east-1
-        $region = config('services.aws.region', config('services.ses.region', 'us-east-1'));
+        // Console region hint — child stacks may exist in any region; default to Teemops deployment region
+        $region = config('services.aws.deployment_region', config('services.aws.region', 'us-east-1'));
         
         // Build CloudFormation stacks URL
         // Note: AWS Console doesn't support direct filtering by stack name in URL

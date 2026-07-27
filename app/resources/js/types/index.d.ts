@@ -11,4 +11,7 @@ export type PageProps<
     auth: {
         user: User;
     };
+    features?: {
+        firebase_auth?: boolean;
+    };
 };

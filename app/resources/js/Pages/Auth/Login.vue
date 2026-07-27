@@ -13,6 +13,7 @@ import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import { Head, Link, useForm, usePage, router } from '@inertiajs/vue3';
 import { signInWithOAuth, signInWithEmailPassword } from '@/composables/useFirebase';
+import { useFirebaseAuthEnabled } from '@/composables/useFeatures';
 import { computed, ref, onMounted } from 'vue';
 import axios from 'axios';
 
@@ -22,6 +23,7 @@ defineProps<{
 }>();
 
 const page = usePage();
+const firebaseAuthEnabled = useFirebaseAuthEnabled();
 const authError = computed(() => (page.props as { errors?: Record<string, string> }).errors?.firebase);
 
 const form = useForm({
@@ -106,6 +108,12 @@ async function verifyToken(token: string): Promise<{ needVerification: boolean; 
 async function submitPassword() {
     form.clearErrors();
     oauthError.value = null;
+
+    if (!firebaseAuthEnabled.value) {
+        form.post(route('login'));
+        return;
+    }
+
     try {
         const user = await signInWithEmailPassword(form.email, form.password);
         const token = await user.getIdToken(true);
@@ -420,8 +428,8 @@ onMounted(() => {
             </PrimaryButton>
         </form>
 
-        <!-- OAuth (only on login step) -->
-        <template v-if="!isVerificationStep">
+        <!-- OAuth (only when Firebase auth is enabled) -->
+        <template v-if="!isVerificationStep && firebaseAuthEnabled">
             <div class="mt-6">
                 <div class="relative">
                     <div class="absolute inset-0 flex items-center">

@@ -1,0 +1,24 @@
+# Phase 2: AWS messaging installer (run via ./install.sh)
+services:
+  installer:
+    build:
+      context: .
+      dockerfile: docker/installer/Dockerfile
+    container_name: teemops-installer
+    profiles:
+      - install
+    working_dir: /workspace
+    environment:
+      TEEMOPS_ROOT: /workspace
+      TOPS_DEPLOYMENT_REGION: ${TOPS_DEPLOYMENT_REGION}
+      TOPS_ENVIRONMENT: ${TOPS_ENVIRONMENT:-test}
+      TOPS_INSTALL_TARGET: ${TOPS_INSTALL_TARGET:-docker}
+      AWS_PROFILE: ${AWS_PROFILE:-default}
+      AWS_DEFAULT_REGION: ${TOPS_DEPLOYMENT_REGION}
+      AWS_REGION: ${TOPS_DEPLOYMENT_REGION}
+      AWS_SDK_LOAD_CONFIG: "1"
+    volumes:
+      - .:/workspace
+      - ${HOME}/.aws:/root/.aws:ro
+    # On EC2, set TOPS_INSTALLER_NETWORK=host so the container can reach IMDS for instance credentials
+    network_mode: ${TOPS_INSTALLER_NETWORK:-bridge}

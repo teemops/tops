@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
-import { Link, router } from '@inertiajs/vue3';
+import { ref, computed, onMounted } from 'vue';
+import { Link, router, usePage } from '@inertiajs/vue3';
+import type { User } from '@/types';
 import Dropdown from '@/Components/Dropdown.vue';
 import DropdownLink from '@/Components/DropdownLink.vue';
 import MfaAlertBanner from '@/Components/MfaAlertBanner.vue';
@@ -9,12 +10,9 @@ import OrganizationSelector from '@/Components/OrganizationSelector.vue';
 import DarkModeToggle from '@/Components/DarkModeToggle.vue';
 import { useOrganizations } from '@/composables/useOrganizations';
 import { useOrganizationPermissions } from '@/composables/useOrganizationPermissions';
-import { useDarkMode } from '@/composables/useDarkMode';
-
 const showingNavigationDropdown = ref(false);
 const { fetchOrganizations, initCurrentOrganization } = useOrganizations();
 const { canViewAwsAccounts, canViewScans, canViewFindings } = useOrganizationPermissions();
-const { isDark } = useDarkMode();
 
 onMounted(async () => {
     // Initialize organization context on app load
@@ -33,6 +31,30 @@ onMounted(async () => {
 const logout = () => {
     router.post(route('logout'));
 };
+
+const page = usePage();
+const user = computed(() => (page.props.auth as { user: User | null })?.user ?? null);
+
+const displayName = computed(() => {
+    const name = user.value?.name?.trim();
+    if (name && name !== 'User') {
+        return name;
+    }
+    return user.value?.email ?? 'User';
+});
+
+const userInitials = computed(() => {
+    const name = user.value?.name?.trim();
+    if (name && name !== 'User') {
+        const parts = name.split(/\s+/).filter(Boolean);
+        if (parts.length >= 2) {
+            return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+        }
+        return parts[0].slice(0, 2).toUpperCase();
+    }
+    const email = user.value?.email ?? '';
+    return email ? email[0].toUpperCase() : '?';
+});
 </script>
 
 <template>
@@ -43,15 +65,8 @@ const logout = () => {
                 <div class="flex items-center flex-shrink-0 px-4 mb-8">
                     <Link :href="route('dashboard')" class="flex items-center">
                         <img
-                            v-if="isDark"
-                            src="/images/brand/tops-logo-darkmode.png"
-                            alt="Teem Logo"
-                            class="h-8 w-auto"
-                        />
-                        <img
-                            v-else
-                            src="/images/brand/tops-logo-lightmode.jpg"
-                            alt="Teem Logo"
+                            src="/images/brand/teemops-logo.png"
+                            alt="Teemops"
                             class="h-8 w-auto"
                         />
                     </Link>
@@ -164,15 +179,33 @@ const logout = () => {
                         <div class="relative">
                             <Dropdown align="right" width="48">
                                 <template #trigger>
-                                    <button class="flex items-center text-sm focus:outline-none">
+                                    <button
+                                        type="button"
+                                        class="flex items-center gap-2 text-sm focus:outline-none"
+                                        :aria-label="`Open user menu for ${displayName}`"
+                                    >
                                         <span class="sr-only">Open user menu</span>
-                                        <div class="h-8 w-8 rounded-full bg-blue-600 flex items-center justify-center">
-                                            <span class="text-white text-sm font-medium">JD</span>
+                                        <span class="hidden sm:inline text-gray-700 dark:text-gray-300 font-medium max-w-[10rem] truncate">
+                                            {{ displayName }}
+                                        </span>
+                                        <div class="h-8 w-8 rounded-full bg-blue-600 flex items-center justify-center shrink-0">
+                                            <span class="text-white text-sm font-medium">{{ userInitials }}</span>
                                         </div>
                                     </button>
                                 </template>
 
                                 <template #content>
+                                    <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-600">
+                                        <p class="text-sm font-medium text-gray-900 dark:text-white truncate">
+                                            {{ displayName }}
+                                        </p>
+                                        <p
+                                            v-if="user?.email"
+                                            class="text-xs text-gray-500 dark:text-gray-400 truncate"
+                                        >
+                                            {{ user.email }}
+                                        </p>
+                                    </div>
                                     <DropdownLink :href="route('profile.edit')"> Profile </DropdownLink>
                                     <button
                                         @click="logout"

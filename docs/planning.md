@@ -401,7 +401,7 @@ saas/
    - How should AWS credentials be stored? (AWS IAM roles, Access Keys, Cross-account roles)
    IAM Roles using Cross account roles. The workflow for that a user may add another AWS account to their account. When they do this, this will open
    a new window to the AWS Console to add the account. This will also create a new IAM Role for the user to use. This link is a CloudFormation link that looks like this:
-   https://console.aws.amazon.com/cloudformation/home?#/stacks/quickcreate?templateUrl=https%3A%2F%2Fs3.amazonaws.com%2Fstorage.auditaws.com%2Fiam.role.child.account.cfn.yaml&stackName=teemops-dontdelete&param_ParentAWSAccountId=${process.env.aws_parent_account}
+   https://console.aws.amazon.com/cloudformation/home?#/stacks/quickcreate?templateUrl=https%3A%2F%2Fs3.amazonaws.com%2Fstorage.teemops.com%2Fiam.role.child.account.cfn.yaml&stackName=teemops-dontdelete&param_ParentAWSAccountId=${process.env.aws_parent_account}
    The credentials will be stored as an IAM Role.
    - Should credentials be encrypted at rest?
    Yes.
@@ -800,7 +800,7 @@ AWS_SECRET_ACCESS_KEY=your-secret-key
 SNS_TOPIC_ARN=arn:aws:sns:us-west-2:account-id:teemops-sns
 
 # CloudFormation Template
-CLOUDFORMATION_TEMPLATE_URL=https://s3.amazonaws.com/storage.auditaws.com/iam.role.child.account.cfn.yaml
+CLOUDFORMATION_TEMPLATE_URL=https://s3.amazonaws.com/storage.teemops.com/iam.role.child.account.cfn.yaml
 
 # Queue Configuration
 QUEUE_CONNECTION=database  # Or 'sqs' for AWS SQS
@@ -857,7 +857,7 @@ VITE_FIREBASE_APP_ID=your-app-id
 
 ### CloudFormation Template
 - **S3 URL**: Configurable via environment variable `CLOUDFORMATION_TEMPLATE_URL`
-- **Default**: `https://s3.amazonaws.com/storage.auditaws.com/iam.role.child.account.cfn.yaml`
+- **Default**: `https://s3.amazonaws.com/storage.teemops.com/iam.role.child.account.cfn.yaml`
 - **Parameters**:
   - `ParentAWSAccountId` - From environment variable
   - `ExternalId` - Generated UUID

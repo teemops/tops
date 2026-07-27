@@ -65,14 +65,17 @@ export function useAwsAccounts() {
         try {
             const response = await axios.post(`/api/organizations/${orgIdToUse}/aws-accounts/init`);
             const initData = response.data;
-            
-            // Add pending account to list
-            accounts.value.unshift({
-                id: initData.accountId,
-                name: 'Pending AWS Account',
-                status: 'pending',
-                createdAt: new Date().toISOString(),
-            });
+
+            // Add pending account to list — the backend reuses an existing pending
+            // record, so avoid inserting a duplicate entry for the same id.
+            if (!accounts.value.some(acc => acc.id === initData.accountId)) {
+                accounts.value.unshift({
+                    id: initData.accountId,
+                    name: 'Pending AWS Account',
+                    status: 'pending',
+                    createdAt: new Date().toISOString(),
+                });
+            }
 
             return initData;
         } catch (err: any) {

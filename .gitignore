@@ -10,6 +10,7 @@ dist/
 
 # MySQL Data Files
 mysql-data/
+generated/
 *.sql
 *.sql.gz
 *.sqlite

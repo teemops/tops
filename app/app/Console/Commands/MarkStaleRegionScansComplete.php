@@ -31,8 +31,11 @@ class MarkStaleRegionScansComplete extends Command
         $minutes = (int) $this->option('minutes');
         $dryRun = $this->option('dry-run');
 
+        // 'pending' is included deliberately: if the orchestrator job died before
+        // flipping the scan to 'running', its region jobs still report in and
+        // nothing else would ever complete it.
         $cutoff = now()->subMinutes($minutes);
-        $scans = Scan::where('status', 'running')
+        $scans = Scan::whereIn('status', ['pending', 'running'])
             ->whereNotNull('started_at')
             ->where('started_at', '<=', $cutoff)
             ->get();

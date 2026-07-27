@@ -7,6 +7,7 @@ import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import { Head, Link, useForm, router } from '@inertiajs/vue3';
 import { signInWithOAuth, createUserWithEmailPassword, getIdToken } from '@/composables/useFirebase';
+import { useFirebaseAuthEnabled } from '@/composables/useFeatures';
 import { ref } from 'vue';
 
 defineProps<{
@@ -23,6 +24,7 @@ const form = useForm({
 
 const oauthLoading = ref<string | null>(null);
 const oauthError = ref<string | null>(null);
+const firebaseAuthEnabled = useFirebaseAuthEnabled();
 
 const submit = async () => {
     form.clearErrors();
@@ -65,6 +67,11 @@ const submit = async () => {
     // Validate terms acceptance
     if (!form.terms) {
         form.setError('terms', 'You must agree to the Terms of Service and Privacy Policy.');
+        return;
+    }
+
+    if (!firebaseAuthEnabled.value) {
+        form.post(route('register'));
         return;
     }
     
@@ -255,7 +262,7 @@ const handleOAuth = async (provider: 'google' | 'github' | 'microsoft') => {
         </form>
 
         <!-- Divider -->
-        <div class="mt-6">
+        <div v-if="firebaseAuthEnabled" class="mt-6">
             <div class="relative">
                 <div class="absolute inset-0 flex items-center">
                     <div class="w-full border-t border-gray-300 dark:border-gray-600"></div>
@@ -267,7 +274,7 @@ const handleOAuth = async (provider: 'google' | 'github' | 'microsoft') => {
         </div>
 
         <!-- OAuth Buttons -->
-        <div class="mt-6 grid grid-cols-3 gap-3">
+        <div v-if="firebaseAuthEnabled" class="mt-6 grid grid-cols-3 gap-3">
             <button
                 type="button"
                 @click="handleOAuth('google')"

@@ -1,0 +1,29 @@
+.git
+.github
+.cursor
+.topsbuild
+mysql-data
+generated
+**/node_modules
+# vendor and public/build are produced by docker/scripts/prepare-build.sh before image build
+
+# Never bake secrets into the image — runtime uses compose env + entrypoint (.env.example)
+.env
+.env.*
+app/.env
+app/.env.*
+app/.env.backup
+app/.env.production
+!app/.env.example
+app/storage/logs/*
+app/storage/framework/cache/*
+app/storage/framework/sessions/*
+app/storage/framework/views/*
+app/bootstrap/cache/*
+app/test-results
+app/playwright-report
+infra/local/state-data
+infra/local/s3-data
+design
+docs
+references

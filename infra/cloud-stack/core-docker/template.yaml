@@ -1,0 +1,78 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Teemops Docker messaging infrastructure — SQS queues and S3 deploy bucket (no VPC)
+
+Parameters:
+  S3DeploymentBucketName:
+    Type: String
+    Description: Suffix for the deployment bucket; full name is {Environment}-{AccountId}-{suffix}
+    Default: tops-deploy
+  Environment:
+    Type: String
+    Description: Environment label (used as bucket name prefix)
+    Default: test
+
+Resources:
+  SqsStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: sqs.cfn.yaml
+
+  S3DeploymentBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      # Account ID in the name — S3 bucket names are global across all AWS accounts
+      BucketName: !Sub ${Environment}-${AWS::AccountId}-${S3DeploymentBucketName}
+      VersioningConfiguration:
+        Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: false
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: false
+      Tags:
+        - Key: Name
+          Value: !Sub ${Environment}-${AWS::AccountId}-${S3DeploymentBucketName}
+        - Key: Environment
+          Value: !Ref Environment
+
+  S3DeploymentBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref S3DeploymentBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: PublicReadChildAccountTemplates
+            Effect: Allow
+            Principal: "*"
+            Action: s3:GetObject
+            Resource: !Sub
+              - ${BucketArn}/templates/*
+              - BucketArn: !GetAtt S3DeploymentBucket.Arn
+
+Outputs:
+  AwsAccountId:
+    Description: AWS account ID where resources were created
+    Value: !Ref AWS::AccountId
+  DeploymentBucketName:
+    Description: S3 bucket for Teemops deployment artifacts
+    Value: !Ref S3DeploymentBucket
+  TopsMainQueueName:
+    Description: Main SQS queue name
+    Value: !GetAtt SqsStack.Outputs.TopsMainQueueName
+  TopsMainQueueArn:
+    Description: Main SQS queue ARN
+    Value: !GetAtt SqsStack.Outputs.TopsMainQueueArn
+  TopsAuditQueueName:
+    Description: Audit scan queue name
+    Value: !GetAtt SqsStack.Outputs.TopsAuditQueueName
+  TopsAuditQueueArn:
+    Description: Audit scan queue ARN
+    Value: !GetAtt SqsStack.Outputs.TopsAuditQueueArn
+  TopsAuditRegionQueueName:
+    Description: Region audit scan queue name
+    Value: !GetAtt SqsStack.Outputs.TopsAuditRegionQueueName
+  TopsAuditRegionQueueArn:
+    Description: Region audit scan queue ARN
+    Value: !GetAtt SqsStack.Outputs.TopsAuditRegionQueueArn

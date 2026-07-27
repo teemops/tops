@@ -47,3 +47,27 @@ Resources:
       QueueName: teemops_audit_dlq
       VisibilityTimeout: 300
       MessageRetentionPeriod: 86400
+  TopsMainSQSPolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref TopsSQS
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: allow-sns-topsa
+            Effect: Allow
+            Principal: "*"
+            Action:
+              - SQS:SendMessage
+              - SQS:ReceiveMessage
+            Resource:
+              - !GetAtt TopsSQS.Arn
+            Condition:
+              ArnLike:
+                "aws:SourceArn":
+                  - Fn::Join:
+                      - ""
+                      - - "arn:aws:sns:*:"
+                        - !Ref "AWS::AccountId"
+                        - ":teemops-sns"
