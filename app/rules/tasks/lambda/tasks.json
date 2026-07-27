@@ -1,0 +1,63 @@
+{
+    "$schema": "tops/scan/tasks/schema.v1",
+    "name": "tasks.json",
+    "description": "Tasks for auditing AWS Lambda resources",
+    "config": {
+        "service": "lambda",
+        "start": "listFunctions",
+        "defaults": {
+            "actions": {
+                "params": {
+                    "FunctionName": "$item['FunctionName']"
+                }
+            }
+        }
+    },
+    "tasks": [
+        {
+            "listFunctions": {
+                "task": "listFunctions",
+                "id": "function",
+                "key": "FunctionName",
+                "description": "List all Lambda functions",
+                "actions": [
+                    {
+                        "getFunctionUrlConfig": {
+                            "params": {
+                                "FunctionName": "$item['FunctionName']"
+                            }
+                        }
+                    }
+                ],
+                "items": {
+                    "Functions": [
+                        {
+                            "Name": "FunctionName",
+                            "Type": "String"
+                        },
+                        {
+                            "Name": "FunctionArn",
+                            "Type": "String"
+                        },
+                        {
+                            "Name": "Runtime",
+                            "Type": "String"
+                        },
+                        {
+                            "Name": "Role",
+                            "Type": "String"
+                        },
+                        {
+                            "Name": "VpcConfig",
+                            "Type": "Object"
+                        },
+                        {
+                            "Name": "Environment",
+                            "Type": "Object"
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+}

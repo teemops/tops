@@ -9,6 +9,7 @@ use App\Models\Organization;
 use App\Models\Scan;
 use App\Models\ScanResult;
 use App\Services\OrganizationPermission;
+use App\Services\ScanProfilesService;
 use App\Services\ScanTypesService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -29,6 +30,17 @@ class ScansController extends Controller
     {
         return response()->json([
             'scanTypes' => ScanTypesService::getAllWithLabels(),
+        ]);
+    }
+
+    /**
+     * Get available scan profiles (groups). Only profiles whose rulesets have
+     * rules are returned, so empty compliance rulesets stay hidden from the modal.
+     */
+    public function scanProfiles(): JsonResponse
+    {
+        return response()->json([
+            'scanProfiles' => ScanProfilesService::getAvailableWithLabels(),
         ]);
     }
 
@@ -245,11 +257,25 @@ class ScansController extends Controller
             ->where('status', 'completed')
             ->firstOrFail();
 
+        // A scan can be requested either by profile (group) or by explicit
+        // services. Profiles expand to the same scan_types the rest of the app
+        // already understands, plus the ruleset(s) to evaluate. Direct scan_types
+        // (API back-compat) default to the basic ruleset.
+        $profiles = $validated['scan_profiles'] ?? [];
+        if (!empty($profiles)) {
+            $scanTypes = ScanProfilesService::servicesFor($profiles);
+            $rulesets = ScanProfilesService::rulesetsFor($profiles);
+        } else {
+            $scanTypes = $validated['scan_types'] ?? [];
+            $rulesets = ['basic'];
+        }
+
         // Create scan record
         $scan = Scan::create([
             'organization_id' => $organization->id,
             'aws_account_id' => $awsAccount->id,
-            'scan_types' => $validated['scan_types'],
+            'scan_types' => $scanTypes,
+            'rulesets' => $rulesets,
             'status' => 'pending',
         ]);
 

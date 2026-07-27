@@ -1,0 +1,71 @@
+{
+    "$schema": "tops/scan/tasks/schema.v1",
+    "name": "tasks.json",
+    "description": "Tasks for auditing AWS CloudTrail resources",
+    "config": {
+        "service": "cloudtrail",
+        "start": "describeTrails",
+        "defaults": {
+            "actions": {
+                "params": {
+                    "Name": "$item['TrailARN']"
+                }
+            }
+        }
+    },
+    "tasks": [
+        {
+            "describeTrails": {
+                "task": "describeTrails",
+                "id": "trail",
+                "key": "Name",
+                "description": "List all CloudTrail trails",
+                "actions": [
+                    {
+                        "getTrailStatus": {
+                            "params": {
+                                "Name": "$item['TrailARN']"
+                            }
+                        }
+                    }
+                ],
+                "items": {
+                    "trailList": [
+                        {
+                            "Name": "Name",
+                            "Type": "String"
+                        },
+                        {
+                            "Name": "TrailARN",
+                            "Type": "String"
+                        },
+                        {
+                            "Name": "S3BucketName",
+                            "Type": "String"
+                        },
+                        {
+                            "Name": "IsMultiRegionTrail",
+                            "Type": "Boolean"
+                        },
+                        {
+                            "Name": "LogFileValidationEnabled",
+                            "Type": "Boolean"
+                        },
+                        {
+                            "Name": "CloudWatchLogsLogGroupArn",
+                            "Type": "String"
+                        },
+                        {
+                            "Name": "KmsKeyId",
+                            "Type": "String"
+                        },
+                        {
+                            "Name": "HomeRegion",
+                            "Type": "String"
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+}

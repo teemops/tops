@@ -18,29 +18,29 @@ const emit = defineEmits<{
     created: [];
 }>();
 
-const { createScan, scanTypes, fetchScanTypes } = useScans();
+const { createScanFromProfiles, scanProfiles, fetchScanProfiles } = useScans();
 const { accounts } = useAwsAccounts();
 const { currentOrganization } = useOrganizations();
 const { showSuccess, showError } = useNotifications();
 
 const selectedAwsAccountId = ref('');
-const selectedScanTypes = ref<string[]>([]);
+const selectedScanProfiles = ref<string[]>([]);
 const creating = ref(false);
-const errors = ref<{ aws_account_id?: string[]; scan_types?: string[] }>({});
+const errors = ref<{ aws_account_id?: string[]; scan_profiles?: string[] }>({});
 
 const availableAccounts = computed(() => {
     return accounts.value.filter(acc => acc.status === 'completed');
 });
 
-// Fetch scan types on component mount
+// Fetch scan profiles (groups) on component mount
 onMounted(() => {
-    fetchScanTypes();
+    fetchScanProfiles();
 });
 
 watch(() => props.modelValue, (newValue) => {
     if (newValue) {
         selectedAwsAccountId.value = '';
-        selectedScanTypes.value = [];
+        selectedScanProfiles.value = [];
         errors.value = {};
     }
 });
@@ -56,8 +56,8 @@ const handleSubmit = async () => {
         return;
     }
 
-    if (selectedScanTypes.value.length === 0) {
-        errors.value = { scan_types: ['Please select at least one scan type'] };
+    if (selectedScanProfiles.value.length === 0) {
+        errors.value = { scan_profiles: ['Please select at least one scan group'] };
         return;
     }
 
@@ -65,10 +65,10 @@ const handleSubmit = async () => {
     errors.value = {};
 
     try {
-        await createScan(
+        await createScanFromProfiles(
             currentOrganization.value.org_id,
             selectedAwsAccountId.value,
-            selectedScanTypes.value
+            selectedScanProfiles.value
         );
         
         showSuccess('Scan started successfully');
@@ -107,7 +107,7 @@ const handleCancel = () => {
                                     Start New Scan
                                 </h3>
                                 <p class="text-sm text-gray-600 dark:text-gray-400 mb-6">
-                                    Select an AWS account and scan type to begin a security scan.
+                                    Select an AWS account and scan group to begin a security scan.
                                 </p>
 
                                 <div class="space-y-4">
@@ -135,25 +135,28 @@ const handleCancel = () => {
                                     </div>
 
                                     <div>
-                                        <InputLabel value="Scan Types" />
+                                        <InputLabel value="Scan Groups" />
                                         <div class="mt-2 space-y-2">
                                             <label
-                                                v-for="scanType in scanTypes"
-                                                :key="scanType.value"
-                                                class="flex items-center"
+                                                v-for="profile in scanProfiles"
+                                                :key="profile.value"
+                                                class="flex items-start"
                                             >
                                                 <input
                                                     type="checkbox"
-                                                    v-model="selectedScanTypes"
-                                                    :value="scanType.value"
-                                                    class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                                                    v-model="selectedScanProfiles"
+                                                    :value="profile.value"
+                                                    class="mt-0.5 rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
                                                 />
-                                                <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">{{ scanType.label }}</span>
+                                                <span class="ml-2">
+                                                    <span class="block text-sm text-gray-700 dark:text-gray-300">{{ profile.label }}</span>
+                                                    <span class="block text-xs text-gray-500 dark:text-gray-400">{{ profile.description }}</span>
+                                                </span>
                                             </label>
                                         </div>
-                                        <InputError :message="errors.scan_types?.[0]" class="mt-2" />
+                                        <InputError :message="errors.scan_profiles?.[0]" class="mt-2" />
                                         <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                            Select one or more scan types. EC2 and RDS scans will be processed per region.
+                                            Select one or more scan groups. EC2 and RDS checks are processed per region.
                                         </p>
                                     </div>
                                 </div>
@@ -163,7 +166,7 @@ const handleCancel = () => {
                     <div class="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
                         <PrimaryButton
                             type="submit"
-                            :disabled="creating || availableAccounts.length === 0 || selectedScanTypes.length === 0"
+                            :disabled="creating || availableAccounts.length === 0 || selectedScanProfiles.length === 0"
                             class="sm:ml-3 sm:w-auto sm:text-sm"
                         >
                             {{ creating ? 'Starting...' : 'Start Scan' }}

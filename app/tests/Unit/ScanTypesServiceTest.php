@@ -19,6 +19,36 @@ class ScanTypesServiceTest extends TestCase
         $this->assertContains('iam', $types);
         $this->assertContains('s3', $types);
         $this->assertContains('rds', $types);
+        $this->assertContains('cloudtrail', $types);
+        $this->assertContains('lambda', $types);
+        $this->assertContains('kms', $types);
+    }
+
+    /**
+     * Test newly added services are valid and region-based
+     */
+    public function test_new_services_are_valid_and_region_based(): void
+    {
+        foreach (['cloudtrail', 'lambda', 'kms'] as $service) {
+            $this->assertTrue(ScanTypesService::isValid($service), "{$service} should be valid");
+            $this->assertTrue(ScanTypesService::isRegionBased($service), "{$service} should be region-based");
+            $this->assertContains($service, ScanTypesService::getRegionBased());
+        }
+    }
+
+    /**
+     * Test new services expose their display labels
+     */
+    public function test_new_services_have_labels(): void
+    {
+        $typeMap = [];
+        foreach (ScanTypesService::getAllWithLabels() as $type) {
+            $typeMap[$type['value']] = $type['label'];
+        }
+
+        $this->assertEquals('CloudTrail', $typeMap['cloudtrail']);
+        $this->assertEquals('Lambda', $typeMap['lambda']);
+        $this->assertEquals('KMS', $typeMap['kms']);
     }
 
     /**
@@ -74,7 +104,7 @@ class ScanTypesServiceTest extends TestCase
     {
         $this->assertFalse(ScanTypesService::isValid('invalid'));
         $this->assertFalse(ScanTypesService::isValid(''));
-        $this->assertFalse(ScanTypesService::isValid('lambda'));
+        $this->assertFalse(ScanTypesService::isValid('azure')); // Unsupported provider
         $this->assertFalse(ScanTypesService::isValid('EC2')); // Case-sensitive
     }
 

@@ -123,7 +123,8 @@ Last Updated: January 11, 2026
   - Multiple scan types support (EC2, IAM, S3) per scan
   - EC2 region-specific scanning (dispatches jobs per region)
   - AWS Security Scanner service (AwsSecurityScanner)
-  - Security checks (S3, IAM, EC2, RDS)
+  - Security checks (S3, IAM, EC2, RDS, CloudTrail, Lambda, KMS) — ~46 rules across 7 services
+  - Scan groups/profiles (Basic, CIS) selectable in the New Scan modal; profiles expand to services + ruleset(s), stored per-scan on `scans.rulesets`. CIS ruleset = 22 CIS AWS Foundations v5.0 checks. PCI ruleset pending (hidden until authored).
   - Scan status management (pending → running → completed/failed/cancelled)
   - Frontend UI for scans:
     - Scans/Index.vue - List all scans with filtering
