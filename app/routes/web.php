@@ -81,6 +81,11 @@ Route::middleware(['auth', 'organization.context'])->group(function () {
     Route::get('/findings/{findingType}', function (string $findingType) {
         return Inertia::render('Findings/Show', ['findingType' => $findingType]);
     })->name('findings.show');
+
+    // Insights
+    Route::get('/insights', function () {
+        return Inertia::render('Insights/Index');
+    })->name('insights.index');
 });
 
 require __DIR__.'/auth.php';
