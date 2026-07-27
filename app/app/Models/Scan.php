@@ -79,8 +79,12 @@ class Scan extends Model
         $regionBasedServices = ScanTypesService::getRegionBased();
         $scanRegionServices = array_filter($this->scan_types ?? [], fn($type) => ScanTypesService::isRegionBased($type));
         
-        // Only check if scan includes region-based services and is still running
-        if (empty($scanRegionServices) || $this->status !== 'running') {
+        // Only check if scan includes region-based services and hasn't already
+        // reached a terminal state. 'pending' must be eligible too: a scan whose
+        // orchestrator job died before flipping it to 'running' still has region
+        // jobs reporting in, and if we ignored it here nothing would ever
+        // complete it (the stale-scan sweep uses this same method).
+        if (empty($scanRegionServices) || !in_array($this->status, ['pending', 'running'], true)) {
             return;
         }
 
@@ -163,6 +167,18 @@ class Scan extends Model
                 'processed_region_jobs' => $processedRegionJobs,
                 'expected_region_jobs' => $expectedRegionJobs,
                 'timed_out' => $timedOut,
+            ]);
+        } else {
+            // Without this, a scan that never reaches its expected count is silently
+            // stuck with no indication of why. If processed is plateauing below
+            // expected, expected_regions_count is likely inflated (e.g. the
+            // orchestrator job ran more than once).
+            \Illuminate\Support\Facades\Log::debug('Region-based scan not complete yet', [
+                'scan_id' => $this->id,
+                'status' => $this->status,
+                'processed_region_jobs' => $processedRegionJobs,
+                'expected_region_jobs' => $expectedRegionJobs,
+                'started_at' => $this->started_at,
             ]);
         }
     }

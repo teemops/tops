@@ -3,7 +3,6 @@
 namespace App\Services\Scanners;
 
 use App\Services\AwsSecurityScanner;
-use Aws\S3\S3Client;
 use Illuminate\Support\Facades\Log;
 
 class S3Scanner extends AwsSecurityScanner
@@ -36,24 +35,15 @@ class S3Scanner extends AwsSecurityScanner
         // Use provided region or default
         $s3Client = $this->createClient('s3', $credentials, $region);
 
-        try {
-            return match ($method) {
-                'listBuckets' => $s3Client->listBuckets($params)->toArray(),
-                'getBucketLocation' => $s3Client->getBucketLocation($params)->toArray(),
-                'getPublicAccessBlock' => $s3Client->getPublicAccessBlock($params)->toArray(),
-                'getBucketEncryption' => $s3Client->getBucketEncryption($params)->toArray(),
-                'getBucketVersioning' => $s3Client->getBucketVersioning($params)->toArray(),
-                'getBucketAcl' => $s3Client->getBucketAcl($params)->toArray(),
-                default => throw new \InvalidArgumentException("Unknown S3 method: {$method}"),
-            };
-        } catch (\Exception $e) {
-            Log::error("S3 API call failed: {$method}", [
-                'error' => $e->getMessage(),
-                'params' => $params,
-                'region' => $region,
-            ]);
-            throw $e;
-        }
+        return $this->callApi('S3', $method, $params, fn () => match ($method) {
+            'listBuckets' => $s3Client->listBuckets($params)->toArray(),
+            'getBucketLocation' => $s3Client->getBucketLocation($params)->toArray(),
+            'getPublicAccessBlock' => $s3Client->getPublicAccessBlock($params)->toArray(),
+            'getBucketEncryption' => $s3Client->getBucketEncryption($params)->toArray(),
+            'getBucketVersioning' => $s3Client->getBucketVersioning($params)->toArray(),
+            'getBucketAcl' => $s3Client->getBucketAcl($params)->toArray(),
+            default => throw new \InvalidArgumentException("Unknown S3 method: {$method}"),
+        }, ['region' => $region]);
     }
 
     /**

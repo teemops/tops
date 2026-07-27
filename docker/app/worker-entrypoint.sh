@@ -24,5 +24,11 @@ if [ -n "$TOPS_SQS_ARN" ]; then
     exec /usr/bin/supervisord -c /etc/supervisor/worker-supervisord.conf
 fi
 
+# No AWS messaging: everything (including scan + region jobs) runs on the
+# database queue. Region jobs are pushed to the 'teemops_audit_region' queue and
+# audit jobs to 'default', so this single worker must listen to all of them or
+# region scans are enqueued but never consumed (scan stays "running" forever).
 echo "Starting database queue worker..."
-exec php artisan queue:work database --sleep=3 --tries=3 --max-time=3600
+exec php artisan queue:work database \
+    --queue=default,teemops_audit,teemops_audit_region \
+    --sleep=3 --tries=3 --max-time=3600

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, computed } from 'vue';
+import { ref, onMounted, watch } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import SidebarAppLayout from '@/Layouts/SidebarAppLayout.vue';
 import { useFindings, type Finding, type Recommendation } from '@/composables/useFindings';
@@ -17,6 +17,13 @@ const selectedFindingType = ref<string>('');
 const selectedStatus = ref<string>('');
 const expandedId = ref<string | null>(null);
 
+// Options for the Type filter dropdown. Selecting a type filters the findings
+// list server-side, so it must NOT be derived from the (now-filtered) findings —
+// otherwise the dropdown collapses to only the selected type and you can't switch
+// back. Accumulate the union of types seen so the list only grows; reset on org
+// change (below).
+const allFindingTypes = ref<string[]>([]);
+
 const loadData = async () => {
     if (currentOrganization.value?.org_id) {
         await fetchAccounts();
@@ -32,8 +39,21 @@ const loadData = async () => {
 
 onMounted(() => loadData());
 
-watch(() => currentOrganization.value?.org_id, () => loadData());
+watch(() => currentOrganization.value?.org_id, () => {
+    // Different org has a different set of finding types.
+    allFindingTypes.value = [];
+    loadData();
+});
 watch([selectedAwsAccountId, selectedFindingType, selectedStatus], () => loadData());
+
+// Keep the Type dropdown's options as the union of all types seen, so it stays
+// stable while a type filter is active.
+watch(findings, (list) => {
+    if (!list.length) return;
+    const set = new Set(allFindingTypes.value);
+    list.forEach((f) => set.add(f.findingType));
+    allFindingTypes.value = Array.from(set).sort();
+}, { immediate: true });
 
 const getRecommendation = (finding: Finding): Recommendation | null => {
     return recommendationsMap.value[finding.findingType] ?? null;
@@ -85,11 +105,6 @@ const goToFindingType = (findingType: string) => {
     router.visit(route('findings.show', { findingType }));
 };
 
-const uniqueFindingTypes = computed(() => {
-    const set = new Set<string>();
-    findings.value.forEach((f) => set.add(f.findingType));
-    return Array.from(set).sort();
-});
 </script>
 
 <template>
@@ -155,7 +170,7 @@ const uniqueFindingTypes = computed(() => {
                         class="rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
                     >
                         <option value="">All types</option>
-                        <option v-for="ft in uniqueFindingTypes" :key="ft" :value="ft">{{ ft }}</option>
+                        <option v-for="ft in allFindingTypes" :key="ft" :value="ft">{{ ft }}</option>
                     </select>
                 </div>
                 <div>

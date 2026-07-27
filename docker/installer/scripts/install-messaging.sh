@@ -155,8 +155,14 @@ TOPS_AUDIT_REGION_SQS_ARN=${region_arn}
 TOPS_SNS_ARN=${sns_arn}
 TOPS_CFN_TEMPLATE_URL=${TOPS_CFN_TEMPLATE_URL}
 
-SCAN_QUEUE_CONNECTION=sqs-audit
-SCAN_REGION_QUEUE_CONNECTION=sqs-audit-region
+# Scan processing runs on the local database queue for the single-server Docker
+# deployment: the app (php-fpm) needs no AWS credentials to enqueue a scan, and
+# the worker consumes these queues on the 'database' connection. SQS is used only
+# for the account-linking callback (SNS -> teemops_main, polled by aws:process-sqs).
+# The teemops_audit* SQS queues above stay provisioned but idle; set these to
+# sqs-audit / sqs-audit-region if you ever want to move scans onto SQS.
+SCAN_QUEUE_CONNECTION=database
+SCAN_REGION_QUEUE_CONNECTION=database
 QUEUE_CONNECTION=database
 EOF
 
