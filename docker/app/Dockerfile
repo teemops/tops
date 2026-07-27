@@ -27,6 +27,7 @@ COPY docker/app/default-site.conf /etc/nginx/conf.d/default.conf
 COPY docker/app/supervisord.conf /etc/supervisor/supervisord.conf
 COPY docker/app/worker-supervisord.conf /etc/supervisor/worker-supervisord.conf
 COPY docker/app/php-overrides.ini /usr/local/etc/php/conf.d/99-teemops.ini
+COPY docker/app/php-fpm-clear-env.conf /usr/local/etc/php-fpm.d/zz-clear-env.conf
 COPY docker/app/entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY docker/app/worker-entrypoint.sh /usr/local/bin/worker-entrypoint.sh
 

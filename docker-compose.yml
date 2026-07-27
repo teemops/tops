@@ -57,9 +57,12 @@ services:
       DB_USERNAME: ${MYSQL_USER:-teem}
       DB_PASSWORD: ${MYSQL_PASSWORD:-teemops_dev_password}
       LOG_CHANNEL: ${LOG_CHANNEL:-stderr}
-      QUEUE_CONNECTION: ${QUEUE_CONNECTION:-database}
-      SCAN_QUEUE_CONNECTION: ${SCAN_QUEUE_CONNECTION:-database}
-      SCAN_REGION_QUEUE_CONNECTION: ${SCAN_REGION_QUEUE_CONNECTION:-database}
+      # NOTE: QUEUE_CONNECTION / SCAN_QUEUE_CONNECTION / SCAN_REGION_QUEUE_CONNECTION
+      # are deliberately NOT set here. `environment:` overrides `env_file:`, so
+      # setting them would clobber the sqs-* values that generated/teemops.env
+      # provides after ./install.sh, silently sending scan jobs to the database
+      # queue while the workers poll SQS. They come from env_file layering instead:
+      # .env (database, Phase 1) -> generated/teemops.env (sqs-*, Phase 2).
       MAIL_MAILER: smtp
       MAIL_HOST: maildev
       MAIL_PORT: "1025"
@@ -101,9 +104,9 @@ services:
       DB_USERNAME: ${MYSQL_USER:-teem}
       DB_PASSWORD: ${MYSQL_PASSWORD:-teemops_dev_password}
       LOG_CHANNEL: ${LOG_CHANNEL:-stderr}
-      QUEUE_CONNECTION: ${QUEUE_CONNECTION:-database}
-      SCAN_QUEUE_CONNECTION: ${SCAN_QUEUE_CONNECTION:-database}
-      SCAN_REGION_QUEUE_CONNECTION: ${SCAN_REGION_QUEUE_CONNECTION:-database}
+      # See the note on the app service: these queue-connection vars must come
+      # from env_file layering, not `environment:`, or generated/teemops.env's
+      # sqs-* values get overridden and jobs are dispatched to the wrong queue.
       FIREBASE_USER_AUTH: ${FIREBASE_USER_AUTH:-false}
       TOPS_DEPLOYMENT_REGION: ${TOPS_DEPLOYMENT_REGION:-}
       AWS_DEFAULT_REGION: ${TOPS_DEPLOYMENT_REGION:-}

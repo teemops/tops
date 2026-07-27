@@ -110,5 +110,24 @@ class AwsSecurityScanner
             ];
         }
     }
+
+    /**
+     * Run an AWS SDK call and apply the log-and-rethrow error handling shared by
+     * every Scanner's executeApiCall(). $call should perform the actual SDK
+     * invocation (including an "unknown method" throw for unmatched methods).
+     * $context is merged into the error log (e.g. ['region' => $region]).
+     */
+    protected function callApi(string $serviceLabel, string $method, array $params, callable $call, array $context = []): array
+    {
+        try {
+            return $call();
+        } catch (\Exception $e) {
+            Log::error("{$serviceLabel} API call failed: {$method}", $context + [
+                'error' => $e->getMessage(),
+                'params' => $params,
+            ]);
+            throw $e;
+        }
+    }
 }
 

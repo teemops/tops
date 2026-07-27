@@ -52,6 +52,13 @@ sync_env_from_compose AWS_PARENT_ACCOUNT_ID
 sync_env_from_compose TOPS_CFN_TEMPLATE_URL
 sync_env_from_compose TOPS_SQS_NAME
 sync_env_from_compose TOPS_SQS_ARN
+# Queue connections come from generated/teemops.env (env_file). Bake them into the
+# container .env too so the web tier (php-fpm) resolves them the same as CLI,
+# regardless of php-fpm's environment handling. Scans use the database queue;
+# only account linking uses SQS.
+sync_env_from_compose QUEUE_CONNECTION
+sync_env_from_compose SCAN_QUEUE_CONNECTION
+sync_env_from_compose SCAN_REGION_QUEUE_CONNECTION
 
 if [ -z "${APP_KEY:-}" ] || [ "${APP_KEY}" = "base64:" ]; then
     php artisan key:generate --force --no-interaction
