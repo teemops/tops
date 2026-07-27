@@ -7,6 +7,9 @@ use Aws\S3\S3Client;
 use Aws\Iam\IamClient;
 use Aws\Ec2\Ec2Client;
 use Aws\Rds\RdsClient;
+use Aws\CloudTrail\CloudTrailClient;
+use Aws\Lambda\LambdaClient;
+use Aws\Kms\KmsClient;
 use Aws\Sts\StsClient;
 use Illuminate\Support\Facades\Log;
 
@@ -74,6 +77,9 @@ class AwsSecurityScanner
             'iam' => new IamClient($config),
             'ec2' => new Ec2Client($config),
             'rds' => new RdsClient($config),
+            'cloudtrail' => new CloudTrailClient($config),
+            'lambda' => new LambdaClient($config),
+            'kms' => new KmsClient($config),
             default => throw new \InvalidArgumentException("Unknown service: {$service}"),
         };
     }

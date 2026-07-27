@@ -146,6 +146,18 @@
                     ]
                 }
             }
+        },
+        {
+            "getAccountSummary": {
+                "task": "getAccountSummary",
+                "description": "Get account-level IAM summary (root MFA, root access keys)"
+            }
+        },
+        {
+            "getAccountPasswordPolicy": {
+                "task": "getAccountPasswordPolicy",
+                "description": "Get the account password policy configuration"
+            }
         }
     ]
 }

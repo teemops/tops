@@ -14,6 +14,9 @@ class ScanTypesService
         ['value' => 'iam', 'label' => 'IAM', 'region' => false],
         ['value' => 's3', 'label' => 'S3', 'region' => false],  // S3 bucket list is global; can run from any region
         ['value' => 'rds', 'label' => 'RDS', 'region' => true],
+        ['value' => 'cloudtrail', 'label' => 'CloudTrail', 'region' => true],  // trails are per-region resources
+        ['value' => 'lambda', 'label' => 'Lambda', 'region' => true],
+        ['value' => 'kms', 'label' => 'KMS', 'region' => true],
     ];
 
     /**

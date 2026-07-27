@@ -3,6 +3,7 @@
 namespace App\Services\Scanners;
 
 use App\Services\AwsSecurityScanner;
+use Aws\Iam\Exception\IamException;
 use Illuminate\Support\Facades\Log;
 
 class IamScanner extends AwsSecurityScanner
@@ -42,7 +43,30 @@ class IamScanner extends AwsSecurityScanner
             'getRolePolicy' => $iamClient->getRolePolicy($params)->toArray(),
             'listRolePolicies' => $iamClient->listRolePolicies($params)->toArray(),
             'listAttachedRolePolicies' => $iamClient->listAttachedRolePolicies($params)->toArray(),
+            'getAccountSummary' => $iamClient->getAccountSummary($params)->toArray(),
+            'getAccountPasswordPolicy' => $this->getAccountPasswordPolicy($iamClient, $params),
             default => throw new \InvalidArgumentException("Unknown IAM method: {$method}"),
         });
+    }
+
+    /**
+     * Fetch the account password policy.
+     *
+     * IAM throws NoSuchEntity when no password policy is configured — which is
+     * itself the insecure condition we want to flag. Translate that specific case
+     * into the engine's error marker so the rule's "$data === false" branch fires
+     * (mirrors how RulesEngine stores failed per-item actions). Any other error is
+     * rethrown so callApi() can log and retry it as a genuine failure.
+     */
+    private function getAccountPasswordPolicy(\Aws\Iam\IamClient $iamClient, array $params): array
+    {
+        try {
+            return $iamClient->getAccountPasswordPolicy($params)->toArray();
+        } catch (IamException $e) {
+            if ($e->getAwsErrorCode() === 'NoSuchEntity') {
+                return ['__error__' => true, 'error_message' => 'No account password policy configured'];
+            }
+            throw $e;
+        }
     }
 }
