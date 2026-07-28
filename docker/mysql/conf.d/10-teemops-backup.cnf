@@ -1,0 +1,57 @@
+# Teemops — MySQL engine settings required by the backup scheduler.
+#
+# Mounted read-only into the mysql service at /etc/mysql/conf.d/, which the
+# official mysql:8.0 image pulls in via `!includedir /etc/mysql/conf.d/` at the
+# bottom of /etc/my.cnf.
+#
+# Everything here exists to make point-in-time recovery (PITR) correct:
+# the binary log is the transaction stream that `backup binlog` archives every
+# 15 minutes and that `restore pitr` replays on top of a physical backup.
+# See docs/backups.md.
+
+[mysqld]
+
+# --- Binary logging (the transactional backup tier) ------------------------
+#
+# log_bin is on by default in MySQL 8.0, but naming it explicitly pins the
+# file prefix the archiver globs for (binlog.NNNNNN inside the datadir) so a
+# future MySQL default change can't silently break binlog archiving.
+server_id                      = 1
+log_bin                        = binlog
+
+# ROW + FULL is the only combination that replays deterministically. STATEMENT
+# and MIXED can produce different results on replay when a statement uses
+# NOW(), UUID(), or an unsafe UDF, which silently corrupts a PITR restore.
+# binlog_row_image=FULL logs every column of before/after images, so a replay
+# does not depend on the target rows already matching.
+binlog_format                  = ROW
+binlog_row_image               = FULL
+
+# Rotate at 64M. Archiving already forces a rotation every 15 minutes via
+# FLUSH BINARY LOGS, so this only caps the size of a single busy interval.
+max_binlog_size                = 64M
+
+# The server purges its own binlogs after this window. It MUST stay longer
+# than TOPS_BACKUP_FULL_RETENTION_DAYS: a full backup with no binlogs covering
+# the time since it was taken can only be restored to its own instant, which
+# collapses the hourly and transactional recovery tiers into the daily one.
+# 14 days of binlogs against a 7 day full retention leaves a safe margin.
+binlog_expire_logs_seconds     = 1209600
+
+# --- Durability ------------------------------------------------------------
+#
+# Both of these are the MySQL 8.0 defaults; they are restated because the
+# backup guarantees depend on them. sync_binlog=1 fsyncs the binary log on
+# every commit and innodb_flush_log_at_trx_commit=1 fsyncs the redo log, so an
+# acknowledged transaction survives a host crash and is present in the binlog
+# the archiver later picks up. Relaxing either trades real RPO for write
+# throughput — don't, unless you accept losing committed transactions.
+sync_binlog                    = 1
+innodb_flush_log_at_trx_commit = 1
+
+# --- Physical backup (XtraBackup) ------------------------------------------
+#
+# Per-table tablespaces. Required for XtraBackup's incremental/differential
+# page tracking to work on a per-table basis rather than rewriting the whole
+# shared tablespace on every delta.
+innodb_file_per_table          = ON

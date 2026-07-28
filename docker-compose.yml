@@ -12,6 +12,9 @@ services:
       - "${MYSQL_PORT:-3306}:3306"
     volumes:
       - mysql-data:/var/lib/mysql
+      # Binary logging + durability settings the backup scheduler depends on.
+      # See docker/mysql/conf.d/10-teemops-backup.cnf and docs/backups.md.
+      - ./docker/mysql/conf.d:/etc/mysql/conf.d:ro
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-mysql}"]
       interval: 5s
@@ -122,6 +125,72 @@ services:
     depends_on:
       app:
         condition: service_started
+
+  # Database backup scheduler: daily full, hourly differential, 15-minute
+  # binary log archive. See docs/backups.md and ./backup.sh.
+  backup:
+    build:
+      context: .
+      dockerfile: docker/backup/Dockerfile
+    image: teemops-backup
+    container_name: teemops-backup
+    restart: unless-stopped
+    environment:
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-mysql}
+      TOPS_BACKUP_USER: ${TOPS_BACKUP_USER:-tops_backup}
+      TOPS_BACKUP_PASSWORD: ${TOPS_BACKUP_PASSWORD:-tops_backup_dev_password}
+      # Drives both the cron schedule and the backup directory names, so "5pm"
+      # means 5pm where you are rather than 5pm UTC.
+      TZ: ${TOPS_BACKUP_TZ:-UTC}
+      TOPS_BACKUP_FULL_CRON: ${TOPS_BACKUP_FULL_CRON:-0 17 * * *}
+      TOPS_BACKUP_DIFF_CRON: ${TOPS_BACKUP_DIFF_CRON:-10 * * * *}
+      TOPS_BACKUP_BINLOG_CRON: ${TOPS_BACKUP_BINLOG_CRON:-*/15 * * * *}
+      TOPS_BACKUP_PRUNE_CRON: ${TOPS_BACKUP_PRUNE_CRON:-30 3 * * *}
+      TOPS_BACKUP_FULL_RETENTION_DAYS: ${TOPS_BACKUP_FULL_RETENTION_DAYS:-7}
+      TOPS_BACKUP_BINLOG_RETENTION_DAYS: ${TOPS_BACKUP_BINLOG_RETENTION_DAYS:-14}
+      # Finished backups are chowned to this uid:gid so the host user owns
+      # ~/.tops/backups. setup-env.sh fills these in from `id -u` / `id -g`.
+      TOPS_BACKUP_UID: ${TOPS_BACKUP_UID:-1000}
+      TOPS_BACKUP_GID: ${TOPS_BACKUP_GID:-1000}
+    volumes:
+      # Read-only: the scheduler only ever reads the live datadir. The restore
+      # service below is the one that gets write access, and it only runs
+      # while MySQL is stopped.
+      - mysql-data:/var/lib/mysql:ro
+      - ${TOPS_BACKUP_DIR:-${HOME}/.tops/backups}:/backups
+    depends_on:
+      mysql:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+
+  # Same image, write access to the datadir, and never started automatically.
+  # `./backup.sh restore` runs it with `docker compose run --rm` while MySQL is
+  # stopped. Keeping it behind a profile means a stray `docker compose up`
+  # cannot bring up something that is able to overwrite the database.
+  db-restore:
+    build:
+      context: .
+      dockerfile: docker/backup/Dockerfile
+    image: teemops-backup
+    profiles: ["restore"]
+    environment:
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-mysql}
+      TOPS_BACKUP_USER: ${TOPS_BACKUP_USER:-tops_backup}
+      TOPS_BACKUP_PASSWORD: ${TOPS_BACKUP_PASSWORD:-tops_backup_dev_password}
+      TZ: ${TOPS_BACKUP_TZ:-UTC}
+      TOPS_BACKUP_UID: ${TOPS_BACKUP_UID:-1000}
+      TOPS_BACKUP_GID: ${TOPS_BACKUP_GID:-1000}
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ${TOPS_BACKUP_DIR:-${HOME}/.tops/backups}:/backups
+    entrypoint: ["/usr/local/bin/entrypoint.sh", "restore"]
 
 volumes:
   mysql-data:

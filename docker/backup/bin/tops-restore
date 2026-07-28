@@ -1,0 +1,279 @@
+#!/usr/bin/env bash
+#
+# tops-restore — the in-container half of recovery. The host wrapper
+# (./backup.sh restore ...) drives it, because the sequence spans the MySQL
+# container's lifecycle and nothing inside a container can stop its sibling:
+#
+#   1. host: stop app, worker, mysql
+#   2.       tops-restore datadir   <- mysqld MUST be down (rewrites the datadir)
+#   3. host: start mysql, wait healthy
+#   4.       tops-restore replay    <- mysqld MUST be up   (applies binlogs)
+#   5. host: start app, worker
+#
+# Splitting it this way is what makes all three recovery scenarios one code
+# path: scenario 1 runs step 2 with a full only, scenario 2 runs step 2 with a
+# full plus one differential, scenario 3 adds step 4 on top of either.
+
+# shellcheck source=../lib/common.sh
+source /opt/tops-backup/lib/common.sh
+
+# Restore runs as root, not as the least-privilege backup user. Replaying a
+# binary log applies whatever the application did — DDL, GRANTs, writes to any
+# schema — so the backup user's read-only grants are structurally insufficient.
+if [[ -f /run/tops-backup/root.cnf ]]; then
+    DEFAULTS_FILE=/run/tops-backup/root.cnf
+else
+    warn "MYSQL_ROOT_PASSWORD was not provided; falling back to the backup user."
+    warn "Binary log replay will fail on any statement it lacks privileges for."
+fi
+
+STAGE="$WORK_DIR/stage"
+RESTORE_POINT="$WORK_DIR/restore-point"
+
+# ---------------------------------------------------------------------------
+# Step 2 — rebuild the datadir from a full (+ optional differential)
+# ---------------------------------------------------------------------------
+
+cmd_datadir() {
+    LOG_TAG=restore
+    local full_stamp="" diff_stamp=""
+
+    while (( $# )); do
+        case "$1" in
+            --full) full_stamp="$2"; shift 2 ;;
+            --diff) diff_stamp="$2"; shift 2 ;;
+            *) die "unknown argument: $1" ;;
+        esac
+    done
+
+    [[ -n $full_stamp ]] || full_stamp=$(basename "$(latest_backup full)" 2>/dev/null || true)
+    [[ -n $full_stamp ]] || die "no full backup available to restore from"
+
+    local full_src="$FULL_DIR/$full_stamp"
+    backup_is_complete "$full_src" || die "full backup '$full_stamp' is missing or incomplete"
+
+    local diff_src=""
+    if [[ -n $diff_stamp ]]; then
+        diff_src="$DIFF_DIR/$diff_stamp"
+        backup_is_complete "$diff_src" || die "differential '$diff_stamp' is missing or incomplete"
+        local diff_base
+        diff_base=$(meta_get "$diff_src" base || true)
+        [[ $diff_base == "$full_stamp" ]] || die \
+            "differential '$diff_stamp' is based on full '$diff_base', not '$full_stamp'. A differential can only be applied to its own base."
+    fi
+
+    # Refuse to touch the datadir while a server could be writing to it.
+    # Copy-back into a live datadir corrupts the running instance and produces
+    # a backup-shaped datadir that MySQL then refuses to open.
+    if mysqladmin --defaults-file="$DEFAULTS_FILE" ping --silent >/dev/null 2>&1; then
+        die "MySQL at $DB_HOST:$DB_PORT is still accepting connections. Stop it before restoring."
+    fi
+
+    # --- Prepare on a throwaway copy ---------------------------------------
+    #
+    # `xtrabackup --prepare` rewrites the backup in place (it replays the redo
+    # log into the data files). Running it against the archived backup would
+    # consume it: a second restore attempt from the same full would fail, and
+    # any differential based on it would no longer apply. Always prepare a
+    # copy.
+    log "staging $full_stamp${diff_stamp:+ + $diff_stamp} into $STAGE"
+    rm -rf "$STAGE"
+    mkdir -p "$STAGE"
+    cp -a "$full_src/." "$STAGE/"
+
+    if [[ -n $diff_src ]]; then
+        # --apply-log-only stops short of rolling back uncommitted
+        # transactions. It has to: rolling back now would discard transactions
+        # that the differential is about to complete.
+        log "preparing base (apply-log-only)"
+        xtrabackup --prepare --apply-log-only --target-dir="$STAGE" \
+            || die "prepare of base full failed"
+
+        local diff_stage="$WORK_DIR/stage-diff"
+        rm -rf "$diff_stage"; mkdir -p "$diff_stage"
+        cp -a "$diff_src/." "$diff_stage/"
+
+        log "applying differential $diff_stamp"
+        # No --apply-log-only on the final delta: this pass performs the
+        # rollback and leaves a consistent datadir.
+        xtrabackup --prepare --target-dir="$STAGE" --incremental-dir="$diff_stage" \
+            || die "applying differential failed"
+        rm -rf "$diff_stage"
+    else
+        log "preparing full backup"
+        xtrabackup --prepare --target-dir="$STAGE" || die "prepare failed"
+    fi
+
+    # --- Record where the transaction stream resumes -----------------------
+    #
+    # Written before the datadir is touched so that a replay can still be
+    # driven by hand if the copy-back step is interrupted.
+    local applied="${diff_src:-$full_src}" binlog_file binlog_pos
+    binlog_file=$(meta_get "$applied" binlog_file || true)
+    binlog_pos=$(meta_get "$applied" binlog_pos || true)
+    {
+        echo "restored_full=$full_stamp"
+        echo "restored_diff=${diff_stamp:-}"
+        echo "binlog_file=$binlog_file"
+        echo "binlog_pos=$binlog_pos"
+    } >"$RESTORE_POINT"
+    reown "$RESTORE_POINT"
+    log "restore point: binlog $binlog_file position $binlog_pos"
+
+    # --- Swap in the datadir ------------------------------------------------
+    #
+    # Only now, with a fully prepared datadir in hand, is it safe to destroy
+    # the current one. Ordering it this way means a failed prepare leaves the
+    # existing database untouched.
+    local owner
+    owner=$(datadir_owner)
+    log "clearing $DATADIR"
+    find "$DATADIR" -mindepth 1 -delete
+
+    log "copying prepared datadir into place"
+    xtrabackup --move-back --target-dir="$STAGE" --datadir="$DATADIR" \
+        || die "copy into datadir failed — the datadir is now EMPTY; re-run the restore"
+
+    chown -R "$owner" "$DATADIR"
+    rm -rf "$STAGE"
+    log "datadir restored (owner $owner). Start MySQL, then run 'tops-restore replay' for point-in-time recovery."
+}
+
+# MySQL refuses to start on a datadir it does not own. Read the uid:gid off the
+# datadir before wiping it rather than hardcoding 999:999, so this keeps
+# working if the mysql image ever renumbers its user.
+datadir_owner() {
+    local owner
+    owner=$(stat -c '%u:%g' "$DATADIR" 2>/dev/null || true)
+    if [[ -z $owner || $owner == "0:0" ]]; then
+        echo "999:999"
+    else
+        echo "$owner"
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# Step 4 — replay archived binary logs on top of the restored datadir
+# ---------------------------------------------------------------------------
+
+cmd_replay() {
+    LOG_TAG=replay
+    local stop_datetime="" stop_position="" from_file="" from_pos="" dry_run=0
+
+    while (( $# )); do
+        case "$1" in
+            --stop-datetime) stop_datetime="$2"; shift 2 ;;
+            --stop-position) stop_position="$2"; shift 2 ;;
+            --from-file)     from_file="$2";     shift 2 ;;
+            --from-position) from_pos="$2";      shift 2 ;;
+            --dry-run)       dry_run=1;          shift   ;;
+            *) die "unknown argument: $1" ;;
+        esac
+    done
+
+    if [[ -z $from_file ]]; then
+        [[ -f $RESTORE_POINT ]] || die "no restore point recorded; pass --from-file/--from-position explicitly"
+        # shellcheck disable=SC1090
+        from_file=$(awk -F= '$1=="binlog_file"{print $2}' "$RESTORE_POINT")
+        from_pos=$(awk -F= '$1=="binlog_pos"{print $2}' "$RESTORE_POINT")
+    fi
+    [[ -n $from_file ]] || die "restore point has no binlog coordinates"
+    from_pos="${from_pos:-4}"
+
+    wait_for_mysql 120
+
+    local -a files=()
+    mapfile -t files < <(archived_binlogs_from "$from_file")
+    if (( ${#files[@]} == 0 )); then
+        log "no archived binary logs at or after $from_file; nothing to replay"
+        log "(the datadir restore already brought the database to the backup's own instant)"
+        return 0
+    fi
+
+    local -a args=( --start-position="$from_pos" )
+    [[ -n $stop_datetime ]] && args+=( --stop-datetime="$stop_datetime" )
+    [[ -n $stop_position ]] && args+=( --stop-position="$stop_position" )
+
+    log "replaying ${#files[@]} binary log file(s) from $from_file:$from_pos"
+    [[ -n $stop_datetime ]] && log "stopping at $stop_datetime (interpreted in ${TZ:-UTC})"
+    [[ -n $stop_position ]] && log "stopping at position $stop_position"
+    log "files: $(printf '%s ' "${files[@]##*/}")"
+
+    # --start-position applies to the first file only, which is exactly right:
+    # the backup left off partway through that file, and every later file
+    # replays in full.
+    if (( dry_run )); then
+        log "dry run — statements that would be applied:"
+        mysqlbinlog --defaults-file="$DEFAULTS_FILE" "${args[@]}" "${files[@]}" \
+            | grep -cE '^(INSERT|UPDATE|DELETE|### )' \
+            | xargs -I{} echo "  {} row/DML lines"
+        return 0
+    fi
+
+    # PIPESTATUS, not `set -o pipefail` alone: a mysql failure mid-stream makes
+    # mysqlbinlog exit on SIGPIPE, and reporting only the tail of the pipeline
+    # would hide which side actually broke.
+    local status
+    set +e
+    mysqlbinlog --defaults-file="$DEFAULTS_FILE" "${args[@]}" "${files[@]}" \
+        | mysql --defaults-file="$DEFAULTS_FILE"
+    status=("${PIPESTATUS[@]}")
+    set -e
+    (( ${status[0]} == 0 )) || die "mysqlbinlog failed (exit ${status[0]})"
+    (( ${status[1]} == 0 )) || die "applying binary logs failed (exit ${status[1]})"
+
+    log "point-in-time recovery complete"
+}
+
+# ---------------------------------------------------------------------------
+# Inspection — what timeline is actually recoverable?
+# ---------------------------------------------------------------------------
+
+cmd_window() {
+    local first last
+    first=$(ls -1 "$BINLOG_DIR" 2>/dev/null | grep -E '\.[0-9]{6,}$' | sort -t. -k2,2n | head -n1 || true)
+    last=$(ls -1 "$BINLOG_DIR" 2>/dev/null | grep -E '\.[0-9]{6,}$' | sort -t. -k2,2n | tail -n1 || true)
+    [[ -n $first ]] || { echo "no archived binary logs — recovery is limited to backup instants"; return 0; }
+
+    echo "Recoverable point-in-time window (times shown in ${TZ:-UTC}):"
+    printf '  earliest : %s\n' "$(binlog_first_event_time "$BINLOG_DIR/$first")"
+    printf '  latest   : %s\n' "$(binlog_last_event_time  "$BINLOG_DIR/$last")"
+    echo
+    echo "Anything inside that window can be targeted with:"
+    echo "  ./backup.sh restore pitr --to 'YYYY-MM-DD HH:MM:SS'"
+}
+
+binlog_first_event_time() {
+    mysqlbinlog --defaults-file="$DEFAULTS_FILE" "$1" 2>/dev/null \
+        | awk '/^#[0-9]{6} /{print; exit}' | sed -E 's/^#([0-9]{2})([0-9]{2})([0-9]{2}) +([0-9:]+).*/20\1-\2-\3 \4/'
+}
+binlog_last_event_time() {
+    mysqlbinlog --defaults-file="$DEFAULTS_FILE" "$1" 2>/dev/null \
+        | awk '/^#[0-9]{6} /{t=$0} END{print t}' | sed -E 's/^#([0-9]{2})([0-9]{2})([0-9]{2}) +([0-9:]+).*/20\1-\2-\3 \4/'
+}
+
+# ---------------------------------------------------------------------------
+
+ensure_layout
+
+case "${1:-}" in
+    datadir) shift; cmd_datadir "$@" ;;
+    replay)  shift; cmd_replay  "$@" ;;
+    window)  shift; cmd_window  "$@" ;;
+    *)
+        cat >&2 <<'USAGE'
+usage: tops-restore <command>
+
+  datadir --full STAMP [--diff STAMP]   rebuild the datadir (MySQL must be STOPPED)
+  replay  [--stop-datetime T]           replay archived binlogs (MySQL must be RUNNING)
+          [--stop-position P]
+          [--from-file F --from-position N]
+          [--dry-run]
+  window                                show the recoverable point-in-time range
+
+Normally driven by ./backup.sh restore on the host, which sequences the
+container stops and starts around these commands.
+USAGE
+        exit 64
+        ;;
+esac
