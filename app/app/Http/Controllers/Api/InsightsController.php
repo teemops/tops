@@ -35,8 +35,7 @@ class InsightsController extends Controller
             ->join('scans', 'scan_results.scan_id', '=', 'scans.id')
             ->where('scans.organization_id', $organization->id)
             ->where('scans.status', 'completed')
-            ->where('scan_results.created_at', '>=', $since)
-            ->select('scan_results.*');
+            ->where('scan_results.created_at', '>=', $since);
 
         $bySeverity = [
             'critical' => (clone $baseQuery)->where('scan_results.severity', 'critical')->count(),
@@ -94,8 +93,7 @@ class InsightsController extends Controller
             ->where('scans.status', 'completed')
             ->where('scan_results.status', 'resolved')
             ->whereNotNull('scan_results.resolved_at')
-            ->where('scan_results.resolved_at', '>=', $since)
-            ->select('scan_results.*');
+            ->where('scan_results.resolved_at', '>=', $since);
 
         $resolvedFindingsByDay = (clone $resolvedBaseQuery)
             ->selectRaw('DATE(scan_results.resolved_at) as date')

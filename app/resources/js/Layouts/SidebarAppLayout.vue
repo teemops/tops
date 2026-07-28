@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
+import { route as ziggyRoute } from '../../../vendor/tightenco/ziggy';
 import type { User } from '@/types';
 import Dropdown from '@/Components/Dropdown.vue';
 import DropdownLink from '@/Components/DropdownLink.vue';
@@ -73,9 +74,9 @@ const userInitials = computed(() => {
                 </div>
                 <nav class="flex-1 px-3 space-y-1">
                     <Link
-                        :href="route('dashboard')"
+                        :href="ziggyRoute('dashboard')"
                         :class="[
-                            route().current('dashboard')
+                            ziggyRoute().current('dashboard')
                                 ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
                                 : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700',
                             'group flex items-center px-3 py-2 text-sm font-medium rounded-md'
@@ -87,9 +88,9 @@ const userInitials = computed(() => {
                         Dashboard
                     </Link>
                     <Link
-                        :href="route('organizations.index')"
+                        :href="ziggyRoute('organizations.index')"
                         :class="[
-                            route().current('organizations.*')
+                            ziggyRoute().current('organizations.*')
                                 ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
                                 : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700',
                             'group flex items-center px-3 py-2 text-sm font-medium rounded-md'
@@ -102,9 +103,9 @@ const userInitials = computed(() => {
                     </Link>
                     <Link
                         v-if="canViewAwsAccounts"
-                        :href="route('aws-accounts.index')"
+                        :href="ziggyRoute('aws-accounts.index')"
                         :class="[
-                            route().current('aws-accounts.*')
+                            ziggyRoute().current('aws-accounts.*')
                                 ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
                                 : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700',
                             'group flex items-center px-3 py-2 text-sm font-medium rounded-md'
@@ -117,9 +118,9 @@ const userInitials = computed(() => {
                     </Link>
                     <Link
                         v-if="canViewScans"
-                        :href="route('scans.index')"
+                        :href="ziggyRoute('scans.index')"
                         :class="[
-                            route().current('scans.*')
+                            ziggyRoute().current('scans.*')
                                 ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
                                 : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700',
                             'group flex items-center px-3 py-2 text-sm font-medium rounded-md'
@@ -132,9 +133,9 @@ const userInitials = computed(() => {
                     </Link>
                     <Link
                         v-if="canViewFindings"
-                        :href="route('findings.index')"
+                        :href="ziggyRoute('findings.index')"
                         :class="[
-                            route().current('findings.*')
+                            ziggyRoute().current('findings.*')
                                 ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white'
                                 : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700',
                             'group flex items-center px-3 py-2 text-sm font-medium rounded-md'
@@ -147,9 +148,9 @@ const userInitials = computed(() => {
                     </Link>
                     <Link
                         v-if="canViewInsights"
-                        :href="route('insights.index')"
+                        :href="ziggyRoute('insights.index')"
                         :class="[
-                            route().current('insights.*')
+                            ziggyRoute().current('insights.*')
                                 ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
                                 : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700',
                             'group flex items-center px-3 py-2 text-sm font-medium rounded-md'
