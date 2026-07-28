@@ -189,8 +189,10 @@ class OrganizationsController extends Controller
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
-        // Business rules: Cannot delete if it's the only organization
-        $totalOrgs = $user->ownedOrganizations()->count() + $user->memberOrganizations()->count();
+        // Business rules: Cannot delete if it's the only organization.
+        // organizations() deduplicates: an owner also holds a member record, so
+        // summing the two relations counts their own org twice.
+        $totalOrgs = $user->organizations()->count();
         if ($totalOrgs === 1) {
             return response()->json([
                 'error' => 'Cannot delete the last organization'

@@ -2,10 +2,20 @@
 
 namespace Tests\Feature\Auth;
 
+use Kreait\Firebase\Contract\Auth as FirebaseAuth;
 use Tests\TestCase;
 
 class FirebaseMfaTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // The controller depends on the Firebase client; these tests only exercise
+        // request validation, which runs before any Firebase call is made.
+        $this->instance(FirebaseAuth::class, $this->createMock(FirebaseAuth::class));
+    }
+
     /**
      * POST as web form (no Accept: application/json) so SetOrganizationContext allows
      * unauthenticated requests through; validation then returns 302 with session errors.

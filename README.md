@@ -1,6 +1,12 @@
 # Teemops - Cloud Security Scanning Application
 
-A cloud security scanning application built with Laravel 11 and Vue 3, providing AWS security scanning and compliance monitoring.
+[![Tests](https://github.com/teemops/saas/actions/workflows/tests.yml/badge.svg?branch=develop)](https://github.com/teemops/saas/actions/workflows/tests.yml)
+[![PHP](https://img.shields.io/badge/PHP-8.2%2B-777BB4?logo=php&logoColor=white)](https://www.php.net/)
+[![Laravel](https://img.shields.io/badge/Laravel-12-FF2D20?logo=laravel&logoColor=white)](https://laravel.com/)
+[![Vue](https://img.shields.io/badge/Vue-3-4FC08D?logo=vue.js&logoColor=white)](https://vuejs.org/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
+
+A cloud security scanning application built with Laravel 12 and Vue 3, providing AWS security scanning and compliance monitoring.
 
 ## Project Structure
 
@@ -56,6 +62,24 @@ php artisan test --filter=test_can_create_scan_with_scan_types
 php artisan test --filter="ScanModelTest|StoreScanRequestTest|ScansControllerTest|ProcessAuditScanJobTest|ProcessRegionScanJobTest|AwsSecurityScannerTest"
 
 ```
+
+The suite runs against an in-memory SQLite database (see `app/phpunit.xml`), so it
+needs the `pdo_sqlite` PHP extension and no database server. If your PHP is missing
+it, `app/scripts/run-tests-docker.sh` runs the same suite inside a Docker PHP image.
+
+Coverage (requires the `pcov` or `xdebug` extension):
+
+```bash
+cd app
+php artisan test --coverage
+```
+
+### Continuous integration
+
+[`.github/workflows/tests.yml`](./.github/workflows/tests.yml) runs the PHP suite on
+every pull request and on pushes to `develop`, and writes a coverage table to the
+workflow run summary. It is **informational only** — it reports build status via the
+badge above and should not be added to the branch-protection required-checks list.
 
 ### Development
 
@@ -121,7 +145,7 @@ Visit: http://localhost:8000
 
 ## Technology Stack
 
-- **Backend**: Laravel 11 (PHP 8.2+)
+- **Backend**: Laravel 12 (PHP 8.2+)
 - **Frontend**: Vue 3 + TypeScript + Inertia.js
 - **Styling**: Tailwind CSS v4
 - **Components**: shadcn-vue

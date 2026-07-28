@@ -442,7 +442,9 @@ class FindingsEngineTest extends TestCase
     }
 
     /**
-     * Test that evaluateScan handles access key age calculations
+     * Titles are built from the rule name and the resource id. The access-key-id
+     * variant only applies to rules whose id contains "access_key" — see
+     * test_evaluate_scan_puts_the_access_key_id_in_the_title.
      */
     public function test_evaluate_scan_handles_access_key_age_calculation(): void
     {
@@ -502,11 +504,116 @@ class FindingsEngineTest extends TestCase
         // Execute
         $engine->evaluateScan($scan, ['basic']);
 
-        // Assert finding was created with access key ID in title
         $finding = ScanResult::where('scan_id', $scan->id)->first();
         $this->assertNotNull($finding);
-        echo($finding->title);
-        $this->assertStringContainsString('AKIAIOSFODNN7EXAMPLE', $finding->title);
+        $this->assertEquals('IAM User Access Keys - test-user-keys', $finding->title);
+        $this->assertEquals('medium', $finding->severity);
+        $this->assertEquals(
+            'Remove access keys and use IAM Identity Center for Single Sign-on.',
+            $finding->remediation
+        );
+    }
+
+    /**
+     * Rules whose id contains "access_key" get the offending key id in the title
+     * instead of the resource id.
+     */
+    public function test_evaluate_scan_puts_the_access_key_id_in_the_title(): void
+    {
+        $scan = Scan::factory()->create();
+
+        ScanDetail::create([
+            'scan_id' => $scan->id,
+            'service' => 'iam',
+            'resource_type' => 'user',
+            'resource_id' => 'test-user-keys',
+            'api_method' => 'listAccessKeys',
+            'raw_data' => [
+                'AccessKeyMetadata' => [
+                    [
+                        'AccessKeyId' => 'AKIAIOSFODNN7EXAMPLE',
+                        'CreateDate' => now()->subDays(100)->toIso8601String(),
+                    ],
+                ],
+            ],
+        ]);
+
+        $mockRules = [
+            'rules' => [
+                [
+                    'rule' => 'tops-iam-access_key-age',
+                    'name' => 'Old Access Key',
+                    'service' => 'iam',
+                    'method' => 'listAccessKeys',
+                    'description' => 'Access keys should be rotated.',
+                    'severity' => 'high',
+                    'condition' => "count(\$data['AccessKeyMetadata'] ?? []) > 0",
+                ],
+            ],
+        ];
+
+        File::shouldReceive('exists')->once()->andReturn(true);
+        File::shouldReceive('get')->once()->andReturn(json_encode($mockRules));
+
+        $mockEvaluator = Mockery::mock(ConditionEvaluator::class);
+        $mockEvaluator->shouldReceive('evaluate')->once()->andReturn(true);
+
+        (new FindingsEngine($mockEvaluator))->evaluateScan($scan, ['basic']);
+
+        $finding = ScanResult::where('scan_id', $scan->id)->first();
+        $this->assertNotNull($finding);
+        $this->assertEquals('Old Access Key - AKIAIOSFODNN7EXAMPLE', $finding->title);
+    }
+
+    /**
+     * Rules that also mention "days" get the key's age appended to the description.
+     */
+    public function test_evaluate_scan_appends_access_key_age_to_the_description(): void
+    {
+        $scan = Scan::factory()->create();
+
+        ScanDetail::create([
+            'scan_id' => $scan->id,
+            'service' => 'iam',
+            'resource_type' => 'user',
+            'resource_id' => 'test-user-keys',
+            'api_method' => 'listAccessKeys',
+            'raw_data' => [
+                'AccessKeyMetadata' => [
+                    [
+                        'AccessKeyId' => 'AKIAIOSFODNN7EXAMPLE',
+                        'CreateDate' => now()->subDays(100)->toIso8601String(),
+                    ],
+                ],
+            ],
+        ]);
+
+        $mockRules = [
+            'rules' => [
+                [
+                    'rule' => 'tops-iam-access_key-age',
+                    'name' => 'Old Access Key',
+                    'service' => 'iam',
+                    'method' => 'listAccessKeys',
+                    'description' => 'Access key for {resource} is stale.',
+                    'severity' => 'high',
+                    'condition' => "\$data['days'] > 90",
+                ],
+            ],
+        ];
+
+        File::shouldReceive('exists')->once()->andReturn(true);
+        File::shouldReceive('get')->once()->andReturn(json_encode($mockRules));
+
+        $mockEvaluator = Mockery::mock(ConditionEvaluator::class);
+        $mockEvaluator->shouldReceive('evaluate')->once()->andReturn(true);
+
+        (new FindingsEngine($mockEvaluator))->evaluateScan($scan, ['basic']);
+
+        $finding = ScanResult::where('scan_id', $scan->id)->first();
+        $this->assertNotNull($finding);
+        $this->assertStringContainsString('Access key for test-user-keys is stale.', $finding->description);
+        $this->assertStringContainsString('days old.', $finding->description);
     }
 
     /**
