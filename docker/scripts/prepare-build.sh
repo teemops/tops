@@ -24,6 +24,26 @@ else
   echo "WARNING: $ENV_FILE not found — copy .env.docker.example to .env so a shared APP_KEY can be generated." >&2
 fi
 
+# The backup container runs as root (MySQL's datadir is 0640 mysql:mysql and
+# unreadable otherwise) and chowns finished backups back to this uid:gid, so
+# ~/.tops/backups stays readable and deletable from the host shell without
+# sudo. Detected here rather than hardcoded to 1000 because macOS, WSL and
+# multi-user hosts all disagree about that.
+if [[ -f "$ENV_FILE" ]]; then
+  for pair in "TOPS_BACKUP_UID=$(id -u)" "TOPS_BACKUP_GID=$(id -g)" "TOPS_BACKUP_TZ=$(
+        cat /etc/timezone 2>/dev/null \
+        || (readlink -f /etc/localtime 2>/dev/null | sed 's|.*/zoneinfo/||') \
+        || echo UTC)"; do
+    key="${pair%%=*}"
+    if grep -qE "^${key}=" "$ENV_FILE"; then
+      sed -i "s|^${key}=.*|${pair}|" "$ENV_FILE"
+    else
+      echo "$pair" >>"$ENV_FILE"
+    fi
+  done
+  echo "Set TOPS_BACKUP_UID/GID/TZ in $ENV_FILE for the backup scheduler"
+fi
+
 cd "$ROOT/app"
 
 echo "Installing PHP dependencies..."

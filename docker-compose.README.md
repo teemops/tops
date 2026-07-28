@@ -74,6 +74,35 @@ Once messaging is installed, connecting a customer AWS account works without any
 | `mysql` | Application database |
 | `maildev` | Captures outbound mail in dev |
 | `worker` | Database queue worker; after Phase 2 install, also SQS scan + account workers |
+| `backup` | Database backup scheduler — daily full, hourly differential, 15-min binlog archive |
+| `db-restore` | Restore worker; behind the `restore` profile, only run by `./backup.sh restore` |
+
+## Database backups
+
+The `backup` service starts with the stack and needs no setup. Three tiers:
+
+| Tier | Schedule | What it captures |
+|------|----------|------------------|
+| Full | daily 17:00 local | Complete physical copy of the datadir |
+| Differential | hourly at :10 | Pages changed since the latest full |
+| Transactional | every 15 min | Binary logs — the transaction stream, for point-in-time recovery |
+
+Backups land in `~/.tops/backups` on the host (`TOPS_BACKUP_DIR`), outside the
+repo. Manage them with `./backup.sh`:
+
+```bash
+./backup.sh status
+```
+
+Verify recovery actually works — this runs all three restore scenarios against
+a throwaway MySQL instance and never touches your development database:
+
+```bash
+./backup.sh test
+```
+
+Full reference, including the three restore procedures and the MySQL engine
+settings they depend on: [docs/backups.md](docs/backups.md).
 
 ## Logs
 

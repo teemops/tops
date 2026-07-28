@@ -11,6 +11,13 @@ dist/
 # MySQL Data Files
 mysql-data/
 generated/
+
+# Database backups. These default to ~/.tops/backups (outside the repo) — see
+# TOPS_BACKUP_DIR in .env.docker.example — but a physical MySQL backup is a
+# byte-for-byte copy of the database, so cover the in-repo paths too in case
+# anyone points TOPS_BACKUP_DIR at a relative directory.
+backups/
+.tops/
 *.sql
 *.sql.gz
 *.sqlite
