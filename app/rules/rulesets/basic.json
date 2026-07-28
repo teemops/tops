@@ -190,7 +190,7 @@
             "method": "describeDBInstances",
             "description": "RDS Instances should have encryption enabled",
             "severity": "high",
-            "condition": "($data['StorageEncrypted'] ?? false) == false"
+            "condition": "isset($data['DBInstanceIdentifier']) && ($data['StorageEncrypted'] ?? false) == false"
         },
         {
             "rule": "tops-rds-003",
@@ -199,7 +199,7 @@
             "method": "describeDBInstances",
             "description": "RDS Instances should have Multi-AZ enabled for production workloads",
             "severity": "medium",
-            "condition": "($data['MultiAZ'] ?? false) == false"
+            "condition": "isset($data['DBInstanceIdentifier']) && ($data['MultiAZ'] ?? false) == false"
         },
         {
             "rule": "tops-rds-004",
@@ -208,7 +208,7 @@
             "method": "describeDBInstances",
             "description": "RDS Instances should have automated backups enabled with appropriate retention period",
             "severity": "medium",
-            "condition": "($data['BackupRetentionPeriod'] ?? 0) < 7"
+            "condition": "isset($data['DBInstanceIdentifier']) && ($data['BackupRetentionPeriod'] ?? 0) < 7"
         },
         {
             "rule": "tops-rds-005",
@@ -217,7 +217,7 @@
             "method": "describeDBClusters",
             "description": "RDS Clusters should have encryption enabled",
             "severity": "high",
-            "condition": "($data['StorageEncrypted'] ?? false) == false"
+            "condition": "isset($data['DBClusterIdentifier']) && ($data['StorageEncrypted'] ?? false) == false"
         },
         {
             "rule": "tops-rds-006",
@@ -226,7 +226,196 @@
             "method": "describeDBClusters",
             "description": "RDS Clusters should have automated backups enabled with appropriate retention period",
             "severity": "medium",
-            "condition": "($data['BackupRetentionPeriod'] ?? 0) < 7"
+            "condition": "isset($data['DBClusterIdentifier']) && ($data['BackupRetentionPeriod'] ?? 0) < 7"
+        },
+        {
+            "rule": "tops-rds-007",
+            "name": "RDS Instance Without Deletion Protection",
+            "service": "rds",
+            "method": "describeDBInstances",
+            "description": "RDS Instances should have deletion protection enabled for production workloads",
+            "severity": "medium",
+            "condition": "isset($data['DBInstanceIdentifier']) && ($data['DeletionProtection'] ?? false) == false"
+        },
+        {
+            "rule": "tops-rds-008",
+            "name": "RDS Instance Without Enhanced Monitoring",
+            "service": "rds",
+            "method": "describeDBInstances",
+            "description": "RDS Instances should have enhanced monitoring enabled for OS-level metrics",
+            "severity": "low",
+            "condition": "isset($data['DBInstanceIdentifier']) && ($data['MonitoringInterval'] ?? 0) == 0"
+        },
+        {
+            "rule": "tops-rds-009",
+            "name": "RDS Instance Without Auto Minor Version Upgrade",
+            "service": "rds",
+            "method": "describeDBInstances",
+            "description": "RDS Instances should enable automatic minor version upgrades to receive security patches",
+            "severity": "low",
+            "condition": "isset($data['DBInstanceIdentifier']) && ($data['AutoMinorVersionUpgrade'] ?? false) == false"
+        },
+        {
+            "rule": "tops-ec2-006",
+            "name": "EC2 Instance Metadata Service v1 Enabled",
+            "service": "ec2",
+            "method": "describeInstances",
+            "description": "EC2 Instances should enforce IMDSv2 (HttpTokens=required) to mitigate SSRF-based credential theft",
+            "severity": "high",
+            "condition": "isset($data['InstanceId']) && ($data['MetadataOptions']['HttpTokens'] ?? 'required') != 'required'"
+        },
+        {
+            "rule": "tops-ec2-007",
+            "name": "VPC Without Flow Logs",
+            "service": "ec2",
+            "method": "describeFlowLogs",
+            "description": "Every VPC should have flow logs enabled to record network traffic for security analysis",
+            "severity": "medium",
+            "condition": "count($data['FlowLogs'] ?? []) == 0"
+        },
+        {
+            "rule": "tops-s3-005",
+            "name": "S3 Bucket Access Logging Disabled",
+            "service": "s3",
+            "method": "getBucketLogging",
+            "description": "S3 Buckets should have server access logging enabled for audit and investigation",
+            "severity": "low",
+            "condition": "empty($data['LoggingEnabled'] ?? null)"
+        },
+        {
+            "rule": "tops-iam-011",
+            "name": "Root Account MFA Disabled",
+            "service": "iam",
+            "method": "getAccountSummary",
+            "description": "The AWS root account must have multi-factor authentication (MFA) enabled",
+            "severity": "critical",
+            "condition": "($data['SummaryMap']['AccountMFAEnabled'] ?? 0) == 0"
+        },
+        {
+            "rule": "tops-iam-012",
+            "name": "Root Account Access Keys Present",
+            "service": "iam",
+            "method": "getAccountSummary",
+            "description": "The AWS root account should not have access keys; remove them and use IAM roles or users instead",
+            "severity": "critical",
+            "condition": "($data['SummaryMap']['AccountAccessKeysPresent'] ?? 0) > 0"
+        },
+        {
+            "rule": "tops-iam-013",
+            "name": "IAM Password Policy Weak Or Missing",
+            "service": "iam",
+            "method": "getAccountPasswordPolicy",
+            "description": "The account should enforce a strong IAM password policy with a minimum length of at least 14 characters",
+            "severity": "medium",
+            "condition": "$data === false || ($data['PasswordPolicy']['MinimumPasswordLength'] ?? 0) < 14"
+        },
+        {
+            "rule": "tops-cloudtrail-001",
+            "name": "CloudTrail Trail Not Logging",
+            "service": "cloudtrail",
+            "method": "getTrailStatus",
+            "description": "CloudTrail trails should be actively logging to capture account activity",
+            "severity": "high",
+            "condition": "($data['IsLogging'] ?? false) == false"
+        },
+        {
+            "rule": "tops-cloudtrail-002",
+            "name": "CloudTrail Log File Validation Disabled",
+            "service": "cloudtrail",
+            "method": "describeTrails",
+            "description": "CloudTrail log file validation should be enabled to detect tampering with log files",
+            "severity": "high",
+            "condition": "isset($data['TrailARN']) && ($data['LogFileValidationEnabled'] ?? false) == false"
+        },
+        {
+            "rule": "tops-cloudtrail-003",
+            "name": "CloudTrail Trail Not Multi-Region",
+            "service": "cloudtrail",
+            "method": "describeTrails",
+            "description": "CloudTrail trails should be multi-region to capture activity across all regions",
+            "severity": "medium",
+            "condition": "isset($data['TrailARN']) && ($data['IsMultiRegionTrail'] ?? false) == false"
+        },
+        {
+            "rule": "tops-cloudtrail-004",
+            "name": "CloudTrail Not Integrated With CloudWatch Logs",
+            "service": "cloudtrail",
+            "method": "describeTrails",
+            "description": "CloudTrail should deliver logs to CloudWatch Logs for real-time monitoring and alerting",
+            "severity": "medium",
+            "condition": "isset($data['TrailARN']) && empty($data['CloudWatchLogsLogGroupArn'] ?? '')"
+        },
+        {
+            "rule": "tops-cloudtrail-005",
+            "name": "CloudTrail Logs Not Encrypted With KMS",
+            "service": "cloudtrail",
+            "method": "describeTrails",
+            "description": "CloudTrail log files should be encrypted at rest using a KMS customer managed key",
+            "severity": "medium",
+            "condition": "isset($data['TrailARN']) && empty($data['KmsKeyId'] ?? '')"
+        },
+        {
+            "rule": "tops-lambda-001",
+            "name": "Lambda Function URL Without Authentication",
+            "service": "lambda",
+            "method": "getFunctionUrlConfig",
+            "description": "Lambda function URLs should require IAM authentication; AuthType NONE exposes the function publicly",
+            "severity": "high",
+            "condition": "($data['AuthType'] ?? '') == 'NONE'"
+        },
+        {
+            "rule": "tops-lambda-002",
+            "name": "Lambda Deprecated Runtime",
+            "service": "lambda",
+            "method": "listFunctions",
+            "description": "Lambda functions should not use deprecated runtimes, which no longer receive security updates",
+            "severity": "medium",
+            "condition": "isset($data['FunctionName']) && in_array($data['Runtime'] ?? '', ['nodejs4.3','nodejs6.10','nodejs8.10','nodejs10.x','nodejs12.x','nodejs14.x','python2.7','python3.6','python3.7','ruby2.5','ruby2.7','dotnetcore1.0','dotnetcore2.0','dotnetcore2.1','dotnetcore3.1','go1.x','java8'])"
+        },
+        {
+            "rule": "tops-lambda-003",
+            "name": "Lambda Function Without VPC Configuration",
+            "service": "lambda",
+            "method": "listFunctions",
+            "description": "Sensitive Lambda functions should run inside a VPC to restrict network access",
+            "severity": "low",
+            "condition": "isset($data['FunctionName']) && empty($data['VpcConfig']['VpcId'] ?? '')"
+        },
+        {
+            "rule": "tops-lambda-004",
+            "name": "Lambda Environment Variable May Contain Secret",
+            "service": "lambda",
+            "method": "listFunctions",
+            "description": "Lambda environment variables named like secrets may store credentials in plaintext; use AWS Secrets Manager instead",
+            "severity": "low",
+            "condition": "isset($data['FunctionName']) && isset($data['Environment']['Variables']) && count(array_filter(array_keys($data['Environment']['Variables']), function($k){ return preg_match('/SECRET|PASSWORD|TOKEN|APIKEY|ACCESS_KEY/i', $k); })) > 0"
+        },
+        {
+            "rule": "tops-kms-001",
+            "name": "KMS Key Scheduled For Deletion",
+            "service": "kms",
+            "method": "describeKey",
+            "description": "KMS keys pending deletion will permanently destroy the ability to decrypt data encrypted under them",
+            "severity": "high",
+            "condition": "($data['KeyMetadata']['KeyState'] ?? '') == 'PendingDeletion'"
+        },
+        {
+            "rule": "tops-kms-002",
+            "name": "KMS Key Rotation Disabled",
+            "service": "kms",
+            "method": "getKeyRotationStatus",
+            "description": "Customer managed KMS keys should have automatic annual key rotation enabled",
+            "severity": "medium",
+            "condition": "isset($data['KeyRotationEnabled']) && $data['KeyRotationEnabled'] === false"
+        },
+        {
+            "rule": "tops-kms-003",
+            "name": "KMS Customer Key Disabled",
+            "service": "kms",
+            "method": "describeKey",
+            "description": "Disabled customer managed KMS keys cannot be used and may indicate misconfiguration",
+            "severity": "low",
+            "condition": "($data['KeyMetadata']['KeyManager'] ?? '') == 'CUSTOMER' && ($data['KeyMetadata']['KeyState'] ?? '') == 'Disabled'"
         }
     ]
 }

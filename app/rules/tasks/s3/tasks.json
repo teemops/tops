@@ -24,7 +24,8 @@
                     "getPublicAccessBlock",
                     "getBucketEncryption",
                     "getBucketVersioning",
-                    "getBucketAcl"
+                    "getBucketAcl",
+                    "getBucketLogging"
                 ],
                 "items": {
                     "Buckets": [

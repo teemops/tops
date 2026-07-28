@@ -55,4 +55,26 @@ class RulesEngineActionParamsTest extends TestCase
         $listBucketsTaskConfig = $tasks['tasks'][0]['listBuckets'];
         $this->assertArrayNotHasKey('defaults', $listBucketsTaskConfig);
     }
+
+    /**
+     * Smoke test: the new service tasks.json files load and declare the expected
+     * start call, so RulesEngine can drive data collection for them.
+     */
+    public function test_new_service_tasks_json_files_load_with_expected_start(): void
+    {
+        $rulesEngine = new RulesEngine();
+
+        $expectedStarts = [
+            'cloudtrail' => 'describeTrails',
+            'lambda' => 'listFunctions',
+            'kms' => 'listKeys',
+        ];
+
+        foreach ($expectedStarts as $service => $start) {
+            $tasks = $rulesEngine->loadTasks($service);
+            $this->assertSame($service, $tasks['config']['service']);
+            $this->assertSame($start, $tasks['config']['start']);
+            $this->assertNotEmpty($tasks['tasks']);
+        }
+    }
 }

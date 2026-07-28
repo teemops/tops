@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\OrganizationMembersController;
 use App\Http\Controllers\Api\AwsAccountsController;
 use App\Http\Controllers\Api\ScansController;
 use App\Http\Controllers\Api\FindingsController;
+use App\Http\Controllers\Api\InsightsController;
 use App\Http\Controllers\Test\E2ETestController;
 use Illuminate\Support\Facades\Route;
 
@@ -49,6 +50,7 @@ Route::middleware(['api', 'firebase.auth', 'organization.context'])->group(funct
 
     // Scans
     Route::get('/scan-types', [ScansController::class, 'scanTypes']);
+    Route::get('/scan-profiles', [ScansController::class, 'scanProfiles']);
     Route::get('/organizations/{orgId}/scans', [ScansController::class, 'index']);
     Route::post('/organizations/{orgId}/scans', [ScansController::class, 'store']);
     Route::get('/scans/{scanId}', [ScansController::class, 'show']);
@@ -61,6 +63,9 @@ Route::middleware(['api', 'firebase.auth', 'organization.context'])->group(funct
     Route::get('/recommendations', [FindingsController::class, 'recommendations']);
     Route::get('/results/{findingId}', [FindingsController::class, 'show']);
     Route::put('/results/{findingId}', [FindingsController::class, 'update']);
+
+    // Insights
+    Route::get('/organizations/{orgId}/insights', [InsightsController::class, 'index']);
 });
 
 // Accept invitation (requires auth but not organization context)
