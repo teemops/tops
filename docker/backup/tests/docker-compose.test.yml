@@ -1,0 +1,85 @@
+# Throwaway stack for the restore test suite.
+#
+# Deliberately isolated from docker-compose.yml — its own project name, its own
+# named volume, its own backups directory under /tmp. Verifying a restore means
+# destroying a database, and that must never be the one you are developing
+# against. Run it with docker/backup/tests/run-tests.sh (or ./backup.sh test).
+#
+# The service names match the real stack (mysql, backup, db-restore) so that
+# backup.sh's restore orchestration runs against this project unmodified — the
+# tests exercise the production code path rather than a copy of it.
+
+services:
+  mysql:
+    image: mysql:8.0
+    restart: "no"
+    environment:
+      MYSQL_ROOT_PASSWORD: test_root
+      MYSQL_DATABASE: teemops_test
+      MYSQL_USER: teem
+      MYSQL_PASSWORD: test_password
+      TZ: ${TOPS_BACKUP_TZ:-UTC}
+    volumes:
+      - test-mysql-data:/var/lib/mysql
+      # The same engine config the real stack uses. Testing against different
+      # settings than production runs would prove nothing about PITR.
+      - ../../mysql/conf.d:/etc/mysql/conf.d:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-ptest_root"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    command: --default-authentication-plugin=mysql_native_password
+
+  backup:
+    build:
+      context: ../../..
+      dockerfile: docker/backup/Dockerfile
+    image: teemops-backup
+    restart: "no"
+    environment:
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      MYSQL_ROOT_PASSWORD: test_root
+      TOPS_BACKUP_USER: tops_backup
+      TOPS_BACKUP_PASSWORD: tops_backup_test
+      TZ: ${TOPS_BACKUP_TZ:-UTC}
+      TOPS_BACKUP_UID: ${TOPS_BACKUP_UID:-1000}
+      TOPS_BACKUP_GID: ${TOPS_BACKUP_GID:-1000}
+      # The suite drives every backup explicitly so each step lands in a known
+      # order; a cron tick firing mid-scenario would make assertions racy.
+      TOPS_BACKUP_ON_START: "false"
+      # A real date that is simply far away. An impossible one (31 February)
+      # makes supercronic decide the job is permanently overdue and spin,
+      # flooding the log with "job took too long to run" warnings.
+      TOPS_BACKUP_FULL_CRON: "0 5 1 1 *"
+      TOPS_BACKUP_DIFF_CRON: "0 5 1 1 *"
+      TOPS_BACKUP_BINLOG_CRON: "0 5 1 1 *"
+      TOPS_BACKUP_PRUNE_CRON: "0 5 1 1 *"
+    volumes:
+      - test-mysql-data:/var/lib/mysql:ro
+      - ${TOPS_BACKUP_DIR:?TOPS_BACKUP_DIR must be set by run-tests.sh}:/backups
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  db-restore:
+    image: teemops-backup
+    profiles: ["restore"]
+    environment:
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      MYSQL_ROOT_PASSWORD: test_root
+      TOPS_BACKUP_USER: tops_backup
+      TOPS_BACKUP_PASSWORD: tops_backup_test
+      TZ: ${TOPS_BACKUP_TZ:-UTC}
+      TOPS_BACKUP_UID: ${TOPS_BACKUP_UID:-1000}
+      TOPS_BACKUP_GID: ${TOPS_BACKUP_GID:-1000}
+    volumes:
+      - test-mysql-data:/var/lib/mysql
+      - ${TOPS_BACKUP_DIR:?TOPS_BACKUP_DIR must be set by run-tests.sh}:/backups
+    entrypoint: ["/usr/local/bin/entrypoint.sh", "restore"]
+
+volumes:
+  test-mysql-data:
