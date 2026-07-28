@@ -113,7 +113,11 @@ class ScansControllerTest extends TestCase
     }
 
     /**
-     * Test validation requires scan_types
+     * Test a scan request must select something to scan
+     *
+     * Since scan profiles were introduced, both scan_profiles and scan_types are
+     * individually optional; the cross-field check reports a missing selection
+     * against scan_profiles.
      */
     public function test_validation_requires_scan_types(): void
     {
@@ -131,7 +135,7 @@ class ScansControllerTest extends TestCase
             ]);
 
         $response->assertStatus(422)
-            ->assertJsonValidationErrors(['scan_types']);
+            ->assertJsonValidationErrors(['scan_profiles']);
     }
 
     /**
@@ -154,7 +158,57 @@ class ScansControllerTest extends TestCase
             ]);
 
         $response->assertStatus(422)
-            ->assertJsonValidationErrors(['scan_types']);
+            ->assertJsonValidationErrors(['scan_profiles']);
+    }
+
+    /**
+     * Test a scan can be created from a scan profile, which expands to services
+     */
+    public function test_can_create_scan_from_a_scan_profile(): void
+    {
+        $user = User::factory()->create();
+        $organization = Organization::factory()->create([
+            'user_id' => $user->id,
+        ]);
+        $awsAccount = AwsAccount::factory()->completed()->create([
+            'organization_id' => $organization->id,
+        ]);
+
+        $response = $this->actingAs($user)
+            ->postJson("/api/organizations/{$organization->org_id}/scans", [
+                'aws_account_id' => $awsAccount->id,
+                'scan_profiles' => ['basic'],
+            ]);
+
+        $response->assertStatus(201);
+
+        $scan = Scan::where('aws_account_id', $awsAccount->id)->firstOrFail();
+        $this->assertEqualsCanonicalizing(
+            \App\Services\ScanProfilesService::servicesFor(['basic']),
+            $scan->scan_types
+        );
+    }
+
+    /**
+     * Test an unknown scan profile is rejected
+     */
+    public function test_validation_rejects_an_unknown_scan_profile(): void
+    {
+        $user = User::factory()->create();
+        $organization = Organization::factory()->create([
+            'user_id' => $user->id,
+        ]);
+        $awsAccount = AwsAccount::factory()->completed()->create([
+            'organization_id' => $organization->id,
+        ]);
+
+        $this->actingAs($user)
+            ->postJson("/api/organizations/{$organization->org_id}/scans", [
+                'aws_account_id' => $awsAccount->id,
+                'scan_profiles' => ['not-a-profile'],
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['scan_profiles.0']);
     }
 
     /**
