@@ -92,9 +92,9 @@ class AwsSecurityScannerTest extends TestCase
         $scanner = new ExposedAwsSecurityScanner(self::ROLE_ARN, 'external-id');
 
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Unknown service: lambda');
+        $this->expectExceptionMessage('Unknown service: dynamodb');
 
-        $scanner->exposedCreateClient('lambda', self::CREDENTIALS);
+        $scanner->exposedCreateClient('dynamodb', self::CREDENTIALS);
     }
 
     /**

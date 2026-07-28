@@ -39,7 +39,10 @@ class StoreScanRequestTest extends TestCase
      */
     private function validate(array $data): \Illuminate\Contracts\Validation\Validator
     {
-        $request = new StoreScanRequest();
+        // The request must carry the payload too: withValidator()'s after-hook reads
+        // it back via $this->input(), so an empty request would always report
+        // "Select at least one scan group" no matter what was passed in.
+        $request = StoreScanRequest::create('/api/scans', 'POST', $data);
         $validator = Validator::make($data, $request->rules());
         $request->withValidator($validator);
         return $validator;

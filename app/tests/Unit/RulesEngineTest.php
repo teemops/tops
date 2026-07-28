@@ -251,9 +251,9 @@ class RulesEngineTest extends TestCase
         $scan = Scan::factory()->create();
 
         $this->expectException(\Exception::class);
-        $this->expectExceptionMessage('Unknown service: lambda');
+        $this->expectExceptionMessage('Unknown service: dynamodb');
 
-        $this->invoke('getScanner', ['lambda', $scan]);
+        $this->invoke('getScanner', ['dynamodb', $scan]);
     }
 
     /**
