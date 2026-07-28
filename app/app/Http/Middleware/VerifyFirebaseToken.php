@@ -5,8 +5,7 @@ namespace App\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
-use Kreait\Firebase\Auth;
-use Kreait\Firebase\Factory;
+use Kreait\Firebase\Contract\Auth;
 use Symfony\Component\HttpFoundation\Response;
 
 class VerifyFirebaseToken
@@ -80,27 +79,9 @@ class VerifyFirebaseToken
 
     protected function firebaseAuth(): Auth
     {
-        if ($this->auth !== null) {
-            return $this->auth;
-        }
-
-        $config = config('services.firebase');
-
-        $factory = (new Factory)
-            ->withServiceAccount([
-                'type' => 'service_account',
-                'project_id' => $config['project_id'],
-                'private_key_id' => $config['private_key_id'],
-                'private_key' => $config['private_key'],
-                'client_email' => $config['client_email'],
-                'client_id' => $config['client_id'],
-                'auth_uri' => 'https://accounts.google.com/o/oauth2/auth',
-                'token_uri' => 'https://oauth2.googleapis.com/token',
-                'auth_provider_x509_cert_url' => 'https://www.googleapis.com/oauth2/v1/certs',
-                'client_x509_cert_url' => $config['client_x509_cert_url'],
-            ]);
-
-        return $this->auth = $factory->createAuth();
+        // Resolved on demand (and only when a bearer token is present) from the
+        // binding registered in AppServiceProvider, so tests can supply a double.
+        return $this->auth ??= app(Auth::class);
     }
 
     protected function extractBearerToken(Request $request): ?string

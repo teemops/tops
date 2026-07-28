@@ -61,7 +61,7 @@ class FindingsController extends Controller
         $total = $query->count();
 
         $results = (clone $query)
-            ->orderByRaw("FIELD(scan_results.severity, 'critical', 'high', 'medium', 'low')")
+            ->orderBySeverity('scan_results.severity')
             ->orderBy('scan_results.created_at', 'asc')
             ->offset($offset)
             ->limit($limit)
@@ -235,7 +235,7 @@ class FindingsController extends Controller
         $results = ScanResult::with(['scan.awsAccount'])
             ->whereHas('scan', fn ($q) => $q->where('organization_id', $organization->id)->where('status', 'completed'))
             ->where('finding_type', $findingType)
-            ->orderByRaw("FIELD(severity, 'critical', 'high', 'medium', 'low')")
+            ->orderBySeverity()
             ->orderBy('created_at', 'asc')
             ->get();
 
