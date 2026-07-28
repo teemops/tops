@@ -92,6 +92,28 @@ class ScanProfilesService
     }
 
     /**
+     * Display metadata keyed by ruleset rather than profile, for consumers that
+     * work in ruleset terms (compliance scoring reads Scan::rulesets, not profiles).
+     * Where several profiles share a ruleset the first one's labels win.
+     *
+     * @return array<string, array{label: string, description: string}>
+     */
+    public static function rulesetLabels(): array
+    {
+        $labels = [];
+        foreach (self::$profiles as $profile) {
+            foreach ($profile['rulesets'] as $ruleset) {
+                $labels[$ruleset] ??= [
+                    'label' => $profile['label'],
+                    'description' => $profile['description'],
+                ];
+            }
+        }
+
+        return $labels;
+    }
+
+    /**
      * Laravel validation rule restricting input to available profiles.
      */
     public static function getValidationRule(): string
