@@ -203,4 +203,44 @@ class ScanResultModelTest extends TestCase
         $this->assertEquals('resolved', $scanResult->status);
         $this->assertNotNull($scanResult->resolved_at);
     }
+
+    /**
+     * Test findings sort most-severe-first
+     */
+    public function test_order_by_severity_sorts_critical_first(): void
+    {
+        $scan = Scan::factory()->create();
+
+        foreach (['low', 'critical', 'medium', 'high'] as $severity) {
+            ScanResult::factory()->create([
+                'scan_id' => $scan->id,
+                'severity' => $severity,
+            ]);
+        }
+
+        $ordered = ScanResult::where('scan_id', $scan->id)->orderBySeverity()->pluck('severity')->all();
+
+        $this->assertEquals(['critical', 'high', 'medium', 'low'], $ordered);
+    }
+
+    /**
+     * Test the scope accepts a qualified column for joined queries
+     */
+    public function test_order_by_severity_accepts_a_qualified_column(): void
+    {
+        $scan = Scan::factory()->create();
+
+        ScanResult::factory()->create(['scan_id' => $scan->id, 'severity' => 'low']);
+        ScanResult::factory()->create(['scan_id' => $scan->id, 'severity' => 'critical']);
+
+        $ordered = ScanResult::query()
+            ->join('scans', 'scan_results.scan_id', '=', 'scans.id')
+            ->where('scans.id', $scan->id)
+            ->select('scan_results.*')
+            ->orderBySeverity('scan_results.severity')
+            ->pluck('severity')
+            ->all();
+
+        $this->assertEquals(['critical', 'low'], $ordered);
+    }
 }

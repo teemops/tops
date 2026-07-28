@@ -14,32 +14,17 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
-use Kreait\Firebase\Auth as FirebaseAuth;
-use Kreait\Firebase\Factory;
+use Kreait\Firebase\Contract\Auth as FirebaseAuth;
 
 class FirebaseAuthController extends Controller
 {
-    protected FirebaseAuth $firebaseAuth;
-
     protected MfaApiService $mfaApi;
 
-    public function __construct(MfaApiService $mfaApi)
+    /**
+     * The Firebase client is bound in AppServiceProvider so it can be faked in tests.
+     */
+    public function __construct(MfaApiService $mfaApi, protected FirebaseAuth $firebaseAuth)
     {
-        $factory = (new Factory)
-            ->withServiceAccount([
-                'type' => 'service_account',
-                'project_id' => config('services.firebase.project_id'),
-                'private_key_id' => config('services.firebase.private_key_id'),
-                'private_key' => config('services.firebase.private_key'),
-                'client_email' => config('services.firebase.client_email'),
-                'client_id' => config('services.firebase.client_id'),
-                'auth_uri' => 'https://accounts.google.com/o/oauth2/auth',
-                'token_uri' => 'https://oauth2.googleapis.com/token',
-                'auth_provider_x509_cert_url' => 'https://www.googleapis.com/oauth2/v1/certs',
-                'client_x509_cert_url' => config('services.firebase.client_x509_cert_url'),
-            ]);
-
-        $this->firebaseAuth = $factory->createAuth();
         $this->mfaApi = $mfaApi;
     }
 

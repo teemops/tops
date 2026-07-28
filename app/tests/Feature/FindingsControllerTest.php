@@ -1,0 +1,341 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\AwsAccount;
+use App\Models\Organization;
+use App\Models\OrganizationMember;
+use App\Models\Scan;
+use App\Models\ScanResult;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class FindingsControllerTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private User $user;
+
+    private Organization $organization;
+
+    private AwsAccount $awsAccount;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->user = User::factory()->create();
+        $this->organization = Organization::factory()->create(['user_id' => $this->user->id]);
+        $this->awsAccount = AwsAccount::factory()->completed()->create([
+            'organization_id' => $this->organization->id,
+        ]);
+    }
+
+    /**
+     * Only findings from completed scans show up in the org-wide list.
+     */
+    private function completedScan(): Scan
+    {
+        return Scan::factory()->create([
+            'organization_id' => $this->organization->id,
+            'aws_account_id' => $this->awsAccount->id,
+            'status' => 'completed',
+        ]);
+    }
+
+    private function finding(Scan $scan, array $attributes = []): ScanResult
+    {
+        return ScanResult::factory()->create(array_merge([
+            'scan_id' => $scan->id,
+        ], $attributes));
+    }
+
+    private function findingsUrl(array $query = []): string
+    {
+        $url = "/api/organizations/{$this->organization->org_id}/findings";
+
+        return $query ? $url.'?'.http_build_query($query) : $url;
+    }
+
+    public function test_listing_findings_requires_authentication(): void
+    {
+        $this->getJson($this->findingsUrl())->assertStatus(401);
+    }
+
+    public function test_a_non_member_cannot_list_findings(): void
+    {
+        $this->actingAs(User::factory()->create())
+            ->getJson($this->findingsUrl())
+            ->assertStatus(403);
+    }
+
+    /**
+     * Findings are visible to every role, including viewers.
+     */
+    public function test_a_viewer_can_list_findings(): void
+    {
+        $viewer = User::factory()->create();
+        OrganizationMember::factory()->create([
+            'organization_id' => $this->organization->id,
+            'user_id' => $viewer->id,
+            'role' => 'viewer',
+        ]);
+        $this->finding($this->completedScan());
+
+        $this->actingAs($viewer)->getJson($this->findingsUrl())->assertOk();
+    }
+
+    public function test_it_returns_findings_with_their_aws_account(): void
+    {
+        $scan = $this->completedScan();
+        $finding = $this->finding($scan, ['title' => 'Bucket is public']);
+
+        $response = $this->actingAs($this->user)->getJson($this->findingsUrl());
+
+        $response->assertOk();
+        $this->assertEquals(1, $response->json('total'));
+        $this->assertEquals($finding->id, $response->json('findings.0.id'));
+        $this->assertEquals('Bucket is public', $response->json('findings.0.title'));
+        $this->assertEquals($this->awsAccount->id, $response->json('findings.0.awsAccountId'));
+        $this->assertEquals($this->awsAccount->name, $response->json('findings.0.awsAccountName'));
+    }
+
+    public function test_findings_from_incomplete_scans_are_excluded(): void
+    {
+        $running = Scan::factory()->create([
+            'organization_id' => $this->organization->id,
+            'aws_account_id' => $this->awsAccount->id,
+            'status' => 'running',
+        ]);
+        $this->finding($running);
+
+        $response = $this->actingAs($this->user)->getJson($this->findingsUrl());
+
+        $this->assertEquals(0, $response->json('total'));
+    }
+
+    public function test_findings_from_other_organizations_are_excluded(): void
+    {
+        $this->finding(Scan::factory()->create(['status' => 'completed']));
+
+        $response = $this->actingAs($this->user)->getJson($this->findingsUrl());
+
+        $this->assertEquals(0, $response->json('total'));
+    }
+
+    public function test_findings_are_sorted_most_severe_first(): void
+    {
+        $scan = $this->completedScan();
+        foreach (['low', 'critical', 'medium', 'high'] as $severity) {
+            $this->finding($scan, ['severity' => $severity]);
+        }
+
+        $response = $this->actingAs($this->user)->getJson($this->findingsUrl());
+
+        $this->assertEquals(
+            ['critical', 'high', 'medium', 'low'],
+            array_column($response->json('findings'), 'severity')
+        );
+    }
+
+    public function test_findings_can_be_filtered(): void
+    {
+        $scan = $this->completedScan();
+        $this->finding($scan, ['service' => 's3', 'finding_type' => 'tops-s3-001', 'status' => 'open']);
+        $this->finding($scan, ['service' => 'iam', 'finding_type' => 'tops-iam-001', 'status' => 'resolved']);
+
+        $byService = $this->actingAs($this->user)->getJson($this->findingsUrl(['service' => 's3']));
+        $this->assertEquals(1, $byService->json('total'));
+        $this->assertEquals('s3', $byService->json('findings.0.service'));
+
+        $byType = $this->actingAs($this->user)->getJson($this->findingsUrl(['finding_type' => 'tops-iam-001']));
+        $this->assertEquals(1, $byType->json('total'));
+
+        $byStatus = $this->actingAs($this->user)->getJson($this->findingsUrl(['status' => 'resolved']));
+        $this->assertEquals(1, $byStatus->json('total'));
+
+        $byAccount = $this->actingAs($this->user)
+            ->getJson($this->findingsUrl(['aws_account_id' => $this->awsAccount->id]));
+        $this->assertEquals(2, $byAccount->json('total'));
+    }
+
+    public function test_findings_are_paginated(): void
+    {
+        $scan = $this->completedScan();
+        ScanResult::factory()->count(10)->create(['scan_id' => $scan->id]);
+
+        $response = $this->actingAs($this->user)->getJson($this->findingsUrl(['limit' => 4, 'offset' => 2]));
+
+        $this->assertEquals(10, $response->json('total'));
+        $this->assertEquals(4, $response->json('limit'));
+        $this->assertEquals(2, $response->json('offset'));
+        $this->assertCount(4, $response->json('findings'));
+    }
+
+    public function test_the_page_size_is_capped(): void
+    {
+        $response = $this->actingAs($this->user)->getJson($this->findingsUrl(['limit' => 5000]));
+
+        $this->assertEquals(200, $response->json('limit'));
+    }
+
+    /**
+     * A clean organization scores 100.
+     */
+    public function test_the_security_score_is_perfect_with_no_findings(): void
+    {
+        $response = $this->actingAs($this->user)->getJson($this->findingsUrl());
+
+        $this->assertEquals(100, $response->json('summary.securityScore'));
+        $this->assertEquals(0, $response->json('summary.total'));
+    }
+
+    /**
+     * Score deducts 10 per critical, 5 per high, 2 per medium and 1 per low.
+     */
+    public function test_the_security_score_is_weighted_by_severity(): void
+    {
+        $scan = $this->completedScan();
+        $this->finding($scan, ['severity' => 'critical']);
+        $this->finding($scan, ['severity' => 'high']);
+        $this->finding($scan, ['severity' => 'medium']);
+        $this->finding($scan, ['severity' => 'low']);
+
+        $response = $this->actingAs($this->user)->getJson($this->findingsUrl());
+
+        $this->assertEquals(100 - (10 + 5 + 2 + 1), $response->json('summary.securityScore'));
+        $this->assertEquals(4, $response->json('summary.total'));
+        $this->assertEquals(
+            ['critical' => 1, 'high' => 1, 'medium' => 1, 'low' => 1],
+            $response->json('summary.bySeverity')
+        );
+    }
+
+    public function test_the_security_score_never_goes_below_zero(): void
+    {
+        $scan = $this->completedScan();
+        ScanResult::factory()->count(15)->create([
+            'scan_id' => $scan->id,
+            'severity' => 'critical',
+        ]);
+
+        $response = $this->actingAs($this->user)->getJson($this->findingsUrl());
+
+        $this->assertEquals(0, $response->json('summary.securityScore'));
+    }
+
+    public function test_it_shows_a_single_finding_with_its_recommendation(): void
+    {
+        $finding = $this->finding($this->completedScan(), ['finding_type' => 'tops-s3-001']);
+
+        $response = $this->actingAs($this->user)
+            ->withHeader('X-Organization-Id', $this->organization->org_id)
+            ->getJson("/api/results/{$finding->id}");
+
+        $response->assertOk()
+            ->assertJson(['id' => $finding->id, 'findingType' => 'tops-s3-001']);
+        $this->assertNotNull($response->json('recommendation'));
+    }
+
+    public function test_a_finding_from_another_organization_is_not_found(): void
+    {
+        $finding = $this->finding(Scan::factory()->create(['status' => 'completed']));
+
+        $this->actingAs($this->user)
+            ->withHeader('X-Organization-Id', $this->organization->org_id)
+            ->getJson("/api/results/{$finding->id}")
+            ->assertStatus(404);
+    }
+
+    public function test_a_finding_can_be_resolved(): void
+    {
+        $finding = $this->finding($this->completedScan(), ['status' => 'open']);
+
+        $this->actingAs($this->user)
+            ->withHeader('X-Organization-Id', $this->organization->org_id)
+            ->putJson("/api/results/{$finding->id}", ['status' => 'resolved'])
+            ->assertOk()
+            ->assertJson(['status' => 'resolved']);
+
+        $finding->refresh();
+        $this->assertEquals('resolved', $finding->status);
+        $this->assertNotNull($finding->resolved_at);
+    }
+
+    public function test_reopening_a_finding_clears_the_resolved_timestamp(): void
+    {
+        $finding = $this->finding($this->completedScan(), [
+            'status' => 'resolved',
+            'resolved_at' => now(),
+        ]);
+
+        $this->actingAs($this->user)
+            ->withHeader('X-Organization-Id', $this->organization->org_id)
+            ->putJson("/api/results/{$finding->id}", ['status' => 'open'])
+            ->assertOk();
+
+        $this->assertNull($finding->fresh()->resolved_at);
+    }
+
+    public function test_an_unknown_finding_status_is_rejected(): void
+    {
+        $finding = $this->finding($this->completedScan());
+
+        $this->actingAs($this->user)
+            ->withHeader('X-Organization-Id', $this->organization->org_id)
+            ->putJson("/api/results/{$finding->id}", ['status' => 'wontfix'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('status');
+    }
+
+    public function test_it_groups_findings_by_type(): void
+    {
+        $scan = $this->completedScan();
+        $this->finding($scan, [
+            'finding_type' => 'tops-s3-001',
+            'title' => 'Bucket allows public access',
+            'severity' => 'high',
+        ]);
+        $this->finding($scan, ['finding_type' => 'tops-s3-001', 'severity' => 'critical']);
+        $this->finding($scan, ['finding_type' => 'tops-iam-001']);
+
+        $response = $this->actingAs($this->user)
+            ->getJson("/api/organizations/{$this->organization->org_id}/findings/by-type/tops-s3-001");
+
+        $response->assertOk();
+        $this->assertEquals('tops-s3-001', $response->json('findingType'));
+        $this->assertEquals(2, $response->json('total'));
+        $this->assertEquals('critical', $response->json('findings.0.severity'));
+        $this->assertNotNull($response->json('recommendation'));
+    }
+
+    public function test_grouping_by_an_unknown_type_returns_an_empty_set(): void
+    {
+        $response = $this->actingAs($this->user)
+            ->getJson("/api/organizations/{$this->organization->org_id}/findings/by-type/tops-nope-999");
+
+        $response->assertOk();
+        $this->assertEquals(0, $response->json('total'));
+        $this->assertEquals('tops-nope-999', $response->json('title'));
+        $this->assertNull($response->json('recommendation'));
+    }
+
+    public function test_it_returns_the_recommendations_catalogue(): void
+    {
+        $response = $this->actingAs($this->user)
+            ->withHeader('X-Organization-Id', $this->organization->org_id)
+            ->getJson('/api/recommendations');
+
+        $response->assertOk();
+        $this->assertNotEmpty($response->json('recommendations'));
+    }
+
+    public function test_a_non_member_cannot_read_the_recommendations_catalogue(): void
+    {
+        $this->actingAs(User::factory()->create())
+            ->withHeader('X-Organization-Id', $this->organization->org_id)
+            ->getJson('/api/recommendations')
+            ->assertStatus(403);
+    }
+}

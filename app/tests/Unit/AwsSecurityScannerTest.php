@@ -3,90 +3,196 @@
 namespace Tests\Unit;
 
 use App\Services\AwsSecurityScanner;
+use Aws\Ec2\Ec2Client;
+use Aws\Iam\IamClient;
+use Aws\Rds\RdsClient;
+use Aws\Result;
+use Aws\S3\S3Client;
 use Tests\TestCase;
+
+/**
+ * Exposes the protected client/call helpers so they can be exercised directly.
+ */
+class ExposedAwsSecurityScanner extends AwsSecurityScanner
+{
+    public function exposedCreateClient(string $service, array $credentials, ?string $region = null): mixed
+    {
+        return $this->createClient($service, $credentials, $region);
+    }
+
+    public function exposedCallApi(string $serviceLabel, string $method, array $params, callable $call, array $context = []): array
+    {
+        return $this->callApi($serviceLabel, $method, $params, $call, $context);
+    }
+}
+
+/**
+ * Returns a canned describeRegions() response instead of calling AWS.
+ */
+class StubRegionsScanner extends AwsSecurityScanner
+{
+    public array $regionNames = ['us-east-1', 'eu-west-2'];
+
+    protected function createClient(string $service, array $credentials, ?string $region = null): mixed
+    {
+        return new class ($this->regionNames) {
+            public function __construct(private array $regionNames)
+            {
+            }
+
+            public function describeRegions(array $params = []): Result
+            {
+                return new Result([
+                    'Regions' => array_map(fn ($name) => ['RegionName' => $name], $this->regionNames),
+                ]);
+            }
+        };
+    }
+}
+
+/**
+ * Fails on client creation, to exercise the fallback region list.
+ */
+class FailingScanner extends AwsSecurityScanner
+{
+    protected function createClient(string $service, array $credentials, ?string $region = null): mixed
+    {
+        throw new \RuntimeException('STS unavailable');
+    }
+}
 
 class AwsSecurityScannerTest extends TestCase
 {
+    private const ROLE_ARN = 'arn:aws:iam::123456789012:role/TestRole';
+
+    private const CREDENTIALS = [
+        'AccessKeyId' => 'AKIAEXAMPLE',
+        'SecretAccessKey' => 'secret',
+        'SessionToken' => 'token',
+    ];
+
     /**
-     * Test that scanEc2InRegion method exists and is public
+     * Each supported service maps to its matching AWS SDK client.
      */
-    public function test_scan_ec2_in_region_method_exists(): void
+    public function test_create_client_returns_the_client_for_each_service(): void
     {
-        $scanner = new AwsSecurityScanner('arn:aws:iam::123456789012:role/TestRole', 'test-external-id');
-        
-        $this->assertTrue(method_exists($scanner, 'scanEc2InRegion'));
-        
-        $reflection = new \ReflectionMethod($scanner, 'scanEc2InRegion');
-        $this->assertTrue($reflection->isPublic());
+        $scanner = new ExposedAwsSecurityScanner(self::ROLE_ARN, 'external-id');
+
+        $this->assertInstanceOf(S3Client::class, $scanner->exposedCreateClient('s3', self::CREDENTIALS));
+        $this->assertInstanceOf(IamClient::class, $scanner->exposedCreateClient('iam', self::CREDENTIALS));
+        $this->assertInstanceOf(Ec2Client::class, $scanner->exposedCreateClient('ec2', self::CREDENTIALS));
+        $this->assertInstanceOf(RdsClient::class, $scanner->exposedCreateClient('rds', self::CREDENTIALS));
     }
 
     /**
-     * Test that getAvailableRegions method exists and is public
+     * An unknown service name is rejected rather than silently returning null.
      */
-    public function test_get_available_regions_method_exists(): void
+    public function test_create_client_rejects_unknown_service(): void
     {
-        $scanner = new AwsSecurityScanner('arn:aws:iam::123456789012:role/TestRole', 'test-external-id');
-        
-        $this->assertTrue(method_exists($scanner, 'getAvailableRegions'));
-        
-        $reflection = new \ReflectionMethod($scanner, 'getAvailableRegions');
-        $this->assertTrue($reflection->isPublic());
-        $this->assertEquals('array', $reflection->getReturnType()->getName());
+        $scanner = new ExposedAwsSecurityScanner(self::ROLE_ARN, 'external-id');
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Unknown service: lambda');
+
+        $scanner->exposedCreateClient('lambda', self::CREDENTIALS);
     }
 
     /**
-     * Test that assumeRole method is public
+     * The constructor region is used when no per-call region is given.
      */
-    public function test_assume_role_is_public(): void
+    public function test_create_client_uses_the_constructor_region_by_default(): void
     {
-        $scanner = new AwsSecurityScanner('arn:aws:iam::123456789012:role/TestRole', 'test-external-id');
-        
-        $this->assertTrue(method_exists($scanner, 'assumeRole'));
-        
-        $reflection = new \ReflectionMethod($scanner, 'assumeRole');
-        $this->assertTrue($reflection->isPublic());
+        $scanner = new ExposedAwsSecurityScanner(self::ROLE_ARN, 'external-id', 'ap-southeast-2');
+
+        $client = $scanner->exposedCreateClient('ec2', self::CREDENTIALS);
+
+        $this->assertEquals('ap-southeast-2', $client->getRegion());
     }
 
     /**
-     * Test that scanEc2 delegates to scanEc2InRegion
+     * A per-call region overrides the constructor region.
      */
-    public function test_scan_ec2_delegates_to_scan_ec2_in_region(): void
+    public function test_create_client_prefers_the_per_call_region(): void
     {
-        $scanner = new AwsSecurityScanner('arn:aws:iam::123456789012:role/TestRole', 'test-external-id', 'us-east-1');
-        
-        // Verify scanEc2 method exists
-        $this->assertTrue(method_exists($scanner, 'scanEc2'));
-        
-        // Verify it calls scanEc2InRegion with the instance region
-        // This is tested by checking the method implementation
-        $reflection = new \ReflectionMethod($scanner, 'scanEc2');
-        $this->assertTrue($reflection->isPublic());
+        $scanner = new ExposedAwsSecurityScanner(self::ROLE_ARN, 'external-id', 'ap-southeast-2');
+
+        $client = $scanner->exposedCreateClient('ec2', self::CREDENTIALS, 'eu-central-1');
+
+        $this->assertEquals('eu-central-1', $client->getRegion());
     }
 
     /**
-     * Test scanner constructor accepts region parameter
+     * The default region is us-east-1 when the constructor omits it.
      */
-    public function test_scanner_constructor_accepts_region(): void
+    public function test_scanner_defaults_to_us_east_1(): void
     {
-        $scanner = new AwsSecurityScanner(
-            'arn:aws:iam::123456789012:role/TestRole',
-            'test-external-id',
-            'us-west-2'
-        );
-        
-        $this->assertInstanceOf(AwsSecurityScanner::class, $scanner);
+        $scanner = new ExposedAwsSecurityScanner(self::ROLE_ARN, 'external-id');
+
+        $client = $scanner->exposedCreateClient('ec2', self::CREDENTIALS);
+
+        $this->assertEquals('us-east-1', $client->getRegion());
     }
 
     /**
-     * Test scanner uses default region when not specified
+     * callApi passes through the wrapped call's result untouched.
      */
-    public function test_scanner_uses_default_region(): void
+    public function test_call_api_returns_the_wrapped_result(): void
     {
-        $scanner = new AwsSecurityScanner(
-            'arn:aws:iam::123456789012:role/TestRole',
-            'test-external-id'
-        );
-        
-        $this->assertInstanceOf(AwsSecurityScanner::class, $scanner);
+        $scanner = new ExposedAwsSecurityScanner(self::ROLE_ARN, 'external-id');
+
+        $result = $scanner->exposedCallApi('EC2', 'describeInstances', [], fn () => ['Reservations' => []]);
+
+        $this->assertEquals(['Reservations' => []], $result);
+    }
+
+    /**
+     * callApi logs and rethrows so callers still see AWS failures.
+     */
+    public function test_call_api_rethrows_the_underlying_exception(): void
+    {
+        $scanner = new ExposedAwsSecurityScanner(self::ROLE_ARN, 'external-id');
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('AccessDenied');
+
+        $scanner->exposedCallApi('IAM', 'listUsers', [], function () {
+            throw new \RuntimeException('AccessDenied');
+        });
+    }
+
+    /**
+     * getAvailableRegions flattens the API response to region names.
+     */
+    public function test_get_available_regions_returns_region_names(): void
+    {
+        $scanner = new StubRegionsScanner(self::ROLE_ARN, 'external-id');
+
+        $this->assertEquals(['us-east-1', 'eu-west-2'], $scanner->getAvailableRegions(self::CREDENTIALS));
+    }
+
+    /**
+     * A failed describeRegions call falls back to the hardcoded region list.
+     */
+    public function test_get_available_regions_falls_back_when_the_call_fails(): void
+    {
+        $scanner = new FailingScanner(self::ROLE_ARN, 'external-id');
+
+        $regions = $scanner->getAvailableRegions(self::CREDENTIALS);
+
+        $this->assertContains('us-east-1', $regions);
+        $this->assertContains('ap-southeast-2', $regions);
+        $this->assertCount(8, $regions);
+    }
+
+    /**
+     * assumeRole logs and rethrows when STS rejects the request.
+     */
+    public function test_assume_role_rethrows_sts_failures(): void
+    {
+        $scanner = new AwsSecurityScanner('not-a-valid-arn', 'external-id');
+
+        $this->expectException(\Exception::class);
+
+        $scanner->assumeRole();
     }
 }
