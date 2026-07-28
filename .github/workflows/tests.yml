@@ -1,0 +1,91 @@
+name: Tests
+
+# Informational only. These jobs report build status on PRs and on develop; they
+# are not intended to be added to the branch-protection "required checks" list.
+on:
+  pull_request:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+concurrency:
+  group: tests-${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: app
+
+jobs:
+  phpunit:
+    name: PHP tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          # pdo_sqlite backs the in-memory test database configured in phpunit.xml;
+          # pcov is the coverage driver.
+          extensions: bcmath, mbstring, pdo_sqlite, sqlite3, sockets, zip
+          coverage: pcov
+          ini-values: memory_limit=512M
+
+      - name: Cache Composer packages
+        uses: actions/cache@v4
+        with:
+          path: app/vendor
+          key: composer-${{ runner.os }}-php8.3-${{ hashFiles('app/composer.lock') }}
+          restore-keys: composer-${{ runner.os }}-php8.3-
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Run tests
+        run: php artisan test --coverage-clover=coverage.xml
+
+      - name: Coverage summary
+        if: always()
+        run: |
+          if [ ! -f coverage.xml ]; then
+            echo "No coverage report produced." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          php -r '
+            $xml = simplexml_load_file("coverage.xml");
+            $m = $xml->project->metrics;
+            $lines = (int) $m["statements"];
+            $covered = (int) $m["coveredstatements"];
+            $methods = (int) $m["methods"];
+            $coveredMethods = (int) $m["coveredmethods"];
+            $pct = fn ($c, $t) => $t > 0 ? round($c / $t * 100, 2) : 0;
+            $summary = "## Coverage\n\n"
+              . "| Metric | Covered | Total | % |\n"
+              . "| --- | ---: | ---: | ---: |\n"
+              . "| Lines | {$covered} | {$lines} | " . $pct($covered, $lines) . "% |\n"
+              . "| Methods | {$coveredMethods} | {$methods} | " . $pct($coveredMethods, $methods) . "% |\n";
+            file_put_contents(getenv("GITHUB_STEP_SUMMARY"), $summary, FILE_APPEND);
+          '
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-clover
+          path: app/coverage.xml
+          if-no-files-found: ignore
+          retention-days: 14
+
+  # A frontend build job is deliberately not included yet: `npm ci` currently
+  # fails on a clean checkout because @vitejs/plugin-vue@5 peer-depends on
+  # vite ^5 || ^6 while the project is on vite 7. Add the job once that is
+  # resolved, otherwise the badge is red for reasons unrelated to any change.

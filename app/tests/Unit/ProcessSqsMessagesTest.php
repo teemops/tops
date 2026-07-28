@@ -466,7 +466,12 @@ class ProcessSqsMessagesTest extends TestCase
             'Body' => $sqsMessageBody,
         ];
 
-        // Process the message (should not delete from queue due to error)
+        // A malformed ARN is a permanent failure: CloudFormation is told FAILED and the
+        // message is removed from the queue rather than redelivered forever.
+        $sqsClient->shouldReceive('deleteMessage')
+            ->once()
+            ->andReturn(null);
+
         $method->invoke($command, $message, $sqsClient, $queueUrl);
 
         // Assert HTTP request was made to CloudFormation with FAILED status

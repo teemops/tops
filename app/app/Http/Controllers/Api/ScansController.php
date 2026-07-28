@@ -347,7 +347,7 @@ class ScansController extends Controller
         $offset = max($request->input('offset', 0), 0);
 
         $total = $query->count();
-        $findings = $query->orderByRaw("FIELD(severity, 'critical', 'high', 'medium', 'low')")
+        $findings = $query->orderBySeverity()
             ->orderBy('created_at', 'desc')
             ->offset($offset)
             ->limit($limit)

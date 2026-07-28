@@ -12,6 +12,16 @@ class PasswordResetTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Laravel's password broker is only used when Firebase auth is switched off;
+        // with Firebase enabled the reset happens client-side. See
+        // test_forgot_password_defers_to_firebase_when_firebase_auth_is_enabled.
+        config(['features.firebase_auth' => false]);
+    }
+
     public function test_reset_password_link_screen_can_be_rendered(): void
     {
         $response = $this->get('/forgot-password');
@@ -69,5 +79,43 @@ class PasswordResetTest extends TestCase
 
             return true;
         });
+    }
+
+    public function test_password_reset_rejects_an_invalid_token(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->post('/reset-password', [
+            'token' => 'not-a-real-token',
+            'email' => $user->email,
+            'password' => 'new-password',
+            'password_confirmation' => 'new-password',
+        ]);
+
+        $response->assertSessionHasErrors('email');
+    }
+
+    public function test_reset_password_link_requires_a_valid_email(): void
+    {
+        $response = $this->post('/forgot-password', ['email' => 'not-an-email']);
+
+        $response->assertSessionHasErrors('email');
+    }
+
+    /**
+     * With Firebase auth on, the Laravel reset link is never sent — the UI drives
+     * the reset through Firebase instead.
+     */
+    public function test_forgot_password_defers_to_firebase_when_firebase_auth_is_enabled(): void
+    {
+        config(['features.firebase_auth' => true]);
+        Notification::fake();
+
+        $user = User::factory()->create();
+
+        $response = $this->post('/forgot-password', ['email' => $user->email]);
+
+        $response->assertSessionHas('status');
+        Notification::assertNothingSent();
     }
 }
