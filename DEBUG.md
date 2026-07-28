@@ -244,6 +244,45 @@ specific org/account, and a custom `--response-url`.
 
 ---
 
+## The dead-letter queue (messages that never got processed)
+
+`teemops_main` has `maxReceiveCount: 5`. After five failed deliveries a message moves to
+**`teemops_main_dlq`** — silently. Nothing polls that queue and nothing logs the move, so the
+only symptom is a child-account stack sitting in `DELETE_IN_PROGRESS` (or `CREATE_IN_PROGRESS`)
+forever while the app shows no trace of the callback.
+
+**Always look here when a stack hangs and the worker logs are clean.**
+
+```bash
+docker compose exec app php artisan aws:redrive-dlq --peek
+```
+
+`--peek` reports each message's `RequestType`, stack name, `RequestId` and `TopsUniqueId` without
+moving anything. To put them back on `teemops_main` for `aws:process-sqs` to retry:
+
+```bash
+docker compose exec app php artisan aws:redrive-dlq --limit=10
+```
+
+Sends to the destination *before* deleting from the DLQ, so a failed move leaves the message in
+place rather than losing it. CloudFormation callbacks are idempotent, so a duplicate is harmless.
+
+**Time limit:** the `ResponseURL` in a CloudFormation callback is a presigned S3 URL that expires
+**2 hours** after CloudFormation sent it (`X-Amz-Expires=7200`). Redriving after that window
+delivers the message but the response PUT is rejected — the stack has to be unstuck from the
+CloudFormation side instead. Check the age before redriving.
+
+To exercise the redrive path without touching real messages, seed a synthetic one into a scratch
+queue and redrive from there:
+
+```bash
+docker compose exec -e TOPS_SQS_DLQ_NAME=teemops_audit_dlq app \
+  php artisan aws:test-callback --target=dlq --request-type=Delete
+docker compose exec app php artisan aws:redrive-dlq --source=teemops_audit_dlq --destination=teemops_main
+```
+
+---
+
 ## Common issues we've hit (and what fixed them)
 
 | Symptom | Cause | Fix |
@@ -283,6 +322,10 @@ docker compose exec app php artisan scans:mark-stale-region-complete --minutes=0
 
 # Test account-linking without CloudFormation
 docker compose exec app php artisan aws:test-callback --target=sns --create-account --wait=30
+
+# What's stuck in the dead-letter queue (and put it back)
+docker compose exec app php artisan aws:redrive-dlq --peek
+docker compose exec app php artisan aws:redrive-dlq --limit=10
 
 # Inspect a scan's progress directly
 docker compose exec app php artisan tinker --execute="

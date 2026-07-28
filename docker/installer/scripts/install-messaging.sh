@@ -115,10 +115,12 @@ upload_child_account_template() {
 
 write_env_file() {
   local environment="${TOPS_ENVIRONMENT:-test}"
-  local main_name main_arn audit_name audit_arn region_name region_arn bucket_name sns_arn
+  local main_name main_arn main_dlq_name main_dlq_arn audit_name audit_arn region_name region_arn bucket_name sns_arn
 
   main_name="$(cf_output "$CORE_STACK" TopsMainQueueName)"
   main_arn="$(cf_output "$CORE_STACK" TopsMainQueueArn)"
+  main_dlq_name="$(cf_output "$CORE_STACK" TopsMainDlqName)"
+  main_dlq_arn="$(cf_output "$CORE_STACK" TopsMainDlqArn)"
   audit_name="$(cf_output "$CORE_STACK" TopsAuditQueueName)"
   audit_arn="$(cf_output "$CORE_STACK" TopsAuditQueueArn)"
   region_name="$(cf_output "$CORE_STACK" TopsAuditRegionQueueName)"
@@ -126,7 +128,7 @@ write_env_file() {
   bucket_name="$(cf_output "$CORE_STACK" DeploymentBucketName)"
   sns_arn="$(cf_output "$SNS_STACK" TopicArn)"
 
-  for var_name in main_name main_arn audit_name audit_arn region_name region_arn bucket_name sns_arn; do
+  for var_name in main_name main_arn main_dlq_name main_dlq_arn audit_name audit_arn region_name region_arn bucket_name sns_arn; do
     if [[ -z "${!var_name}" || "${!var_name}" == "None" ]]; then
       die "Missing CloudFormation output: ${var_name}"
     fi
@@ -147,6 +149,8 @@ TOPS_DEPLOY_BUCKET=${bucket_name}
 
 TOPS_SQS_NAME=${main_name}
 TOPS_SQS_ARN=${main_arn}
+TOPS_SQS_DLQ_NAME=${main_dlq_name}
+TOPS_SQS_DLQ_ARN=${main_dlq_arn}
 TOPS_AUDIT_SQS_NAME=${audit_name}
 TOPS_AUDIT_SQS_ARN=${audit_arn}
 TOPS_AUDIT_REGION_SQS_NAME=${region_name}

@@ -11,10 +11,25 @@ export interface InsightPoint {
 
 export interface InsightSummary {
     totalFindings: number;
+    previousTotalFindings: number;
+    /** Percent change vs. the preceding window; null when there is no baseline to compare against. */
+    findingsChangePercent: number | null;
     openFindings: number;
     criticalOpen: number;
     remediationRate: number;
-    averageCompliance: number;
+    /** Null until at least one framework has actually been evaluated. */
+    averageCompliance: number | null;
+    scanCount: number;
+}
+
+export interface ComplianceFramework {
+    key: string;
+    label: string;
+    description: string;
+    totalRules: number;
+    failingRules: number;
+    score: number | null;
+    evaluated: boolean;
 }
 
 export interface InsightItem {
@@ -30,12 +45,18 @@ export interface TopService {
 
 export interface InsightsResponse {
     period: string;
+    /** Trend bucket size the API chose for this period: day (30d), week (90d), month (1y). */
+    granularity: 'day' | 'week' | 'month';
     summary: InsightSummary;
     severityDistribution: {
         critical: number;
         high: number;
         medium: number;
         low: number;
+    };
+    compliance: {
+        average: number | null;
+        frameworks: ComplianceFramework[];
     };
     trend: InsightPoint[];
     topServices: TopService[];
