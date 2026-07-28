@@ -40,9 +40,17 @@ class ProcessSqsMessages extends Command
 
         $region = config('services.aws.region', config('services.ses.region', 'us-east-1'));
         
+        // The SDK's default 'legacy' defaults_mode sets no HTTP timeouts at all, so a
+        // long-poll whose TCP connection is silently dropped blocks this process forever
+        // (supervisord can't detect it — the process stays alive and never logs again).
+        // 'timeout' must exceed WaitTimeSeconds below or every long-poll aborts.
         $sqsClient = new SqsClient([
             'version' => 'latest',
             'region' => $region,
+            'http' => [
+                'connect_timeout' => 5,
+                'timeout' => 35,
+            ],
         ]);
 
         $queueUrl = $this->getQueueUrl($sqsClient, $sqsName);

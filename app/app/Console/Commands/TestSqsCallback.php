@@ -21,7 +21,7 @@ use Illuminate\Support\Str;
 class TestSqsCallback extends Command
 {
     protected $signature = 'aws:test-callback
-        {--target=sns : Where to inject the message: "sns" (tests topic->queue->worker) or "sqs" (worker only)}
+        {--target=sns : Where to inject the message: "sns" (tests topic->queue->worker), "sqs" (worker only), or "dlq" (seeds the dead-letter queue to exercise aws:redrive-dlq)}
         {--request-type=Create : CloudFormation request type: Create, Update, or Delete}
         {--org= : Existing organization org_id to target (used as TopsUniqueId). Defaults to the latest org when --create-account is set}
         {--external-id= : TopsExternalId to match an existing pending account; generated when --create-account is set}
@@ -35,8 +35,8 @@ class TestSqsCallback extends Command
     public function handle(): int
     {
         $target = strtolower((string) $this->option('target'));
-        if (! in_array($target, ['sns', 'sqs'], true)) {
-            $this->error('--target must be "sns" or "sqs".');
+        if (! in_array($target, ['sns', 'sqs', 'dlq'], true)) {
+            $this->error('--target must be "sns", "sqs", or "dlq".');
             return self::FAILURE;
         }
 
@@ -74,7 +74,10 @@ class TestSqsCallback extends Command
                 $this->publishToSns($topicArn, $cfnRequest, $region);
                 $this->info("Published to SNS topic: {$topicArn}");
             } else {
-                $queueUrl = $this->sendToSqs($cfnRequest, $topicArn, $region);
+                $queueName = $target === 'dlq'
+                    ? config('services.aws.sqs_dlq_name')
+                    : config('services.aws.sqs_name');
+                $queueUrl = $this->sendToSqs($cfnRequest, $topicArn, $region, $queueName);
                 $this->info("Sent to SQS queue: {$queueUrl}");
             }
         } catch (\Throwable $e) {
@@ -83,6 +86,14 @@ class TestSqsCallback extends Command
         }
 
         $wait = (int) $this->option('wait');
+
+        // Nothing polls the DLQ, so there is no worker result to wait for — the
+        // message sits there until aws:redrive-dlq puts it back on teemops_main.
+        if ($target === 'dlq') {
+            $this->comment('Seeded the DLQ. Inspect with: php artisan aws:redrive-dlq --peek');
+            return self::SUCCESS;
+        }
+
         if ($wait > 0 && $account !== null) {
             return $this->waitForResult($uniqueId, $externalId, $requestType, $wait);
         }
@@ -199,11 +210,10 @@ class TestSqsCallback extends Command
     /**
      * @param array<string, mixed> $cfnRequest
      */
-    private function sendToSqs(array $cfnRequest, string $topicArn, string $region): string
+    private function sendToSqs(array $cfnRequest, string $topicArn, string $region, ?string $sqsName): string
     {
-        $sqsName = config('services.aws.sqs_name');
         if (! $sqsName) {
-            throw new \RuntimeException('TOPS_SQS_NAME not configured. Run ./install.sh first.');
+            throw new \RuntimeException('Queue name not configured (TOPS_SQS_NAME / TOPS_SQS_DLQ_NAME). Run ./install.sh first.');
         }
 
         $client = new SqsClient(['version' => 'latest', 'region' => $region]);

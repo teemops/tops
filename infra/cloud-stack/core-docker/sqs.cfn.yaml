@@ -79,6 +79,12 @@ Outputs:
   TopsMainQueueArn:
     Description: ARN of teemops_main queue
     Value: !GetAtt TopsSQS.Arn
+  TopsMainDlqName:
+    Description: Dead-letter queue for teemops_main (redrive with aws:redrive-dlq)
+    Value: !GetAtt TopsSQSDLQ.QueueName
+  TopsMainDlqArn:
+    Description: ARN of teemops_main_dlq
+    Value: !GetAtt TopsSQSDLQ.Arn
   TopsAuditQueueName:
     Description: Audit scan job queue name
     Value: !GetAtt TopsAuditSQS.QueueName
