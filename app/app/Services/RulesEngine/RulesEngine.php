@@ -5,13 +5,8 @@ namespace App\Services\RulesEngine;
 use App\Models\Scan;
 use App\Models\ScanDetail;
 use App\Services\ScanTypesService;
-use App\Services\Scanners\IamScanner;
-use App\Services\Scanners\S3Scanner;
-use App\Services\Scanners\Ec2Scanner;
-use App\Services\Scanners\RdsScanner;
-use App\Services\Scanners\CloudTrailScanner;
-use App\Services\Scanners\LambdaScanner;
-use App\Services\Scanners\KmsScanner;
+use App\Services\Scanners\GenericAwsScanner;
+use App\Services\ServiceRegistry;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\File;
 
@@ -97,13 +92,9 @@ class RulesEngine
             
             // Store the main task result
             $this->storeScanDetail($scan, $service, null, null, $taskName, $result, null, $region);
-            
-            // Get items from the result (e.g., Users, Roles, Buckets, Reservations)
-            $itemsKey = $this->getItemsKey($taskConfig);
-            $items = $result[$itemsKey] ?? [];
-            
-            // Handle nested structures (e.g., EC2 Reservations -> Instances)
-            $items = $this->extractItems($items, $taskConfig, $service);
+
+            // Get items from the result (e.g., Users, Roles, Buckets, Reservations.Instances)
+            $items = $this->extractItems($result, $taskConfig);
             
             // Execute actions for each item
             $actions = $taskConfig['actions'] ?? [];
@@ -111,11 +102,11 @@ class RulesEngine
             $keyField = $taskConfig['key'] ?? null;
             
             foreach ($items as $item) {
-                $resourceId = $this->getResourceId($item, $keyField, $idKey);
+                $resourceId = $this->getResourceId($item, $keyField);
                 $resourceType = $idKey ?? 'resource';
-                
+
                 // Store the item itself
-                $this->storeScanDetail($scan, $service, $resourceType, $resourceId, $taskName, $item, null, $region);
+                $this->storeScanDetail($scan, $service, $resourceType, $resourceId, $taskName, $this->itemRawData($item), null, $region);
                 
                 // Execute actions for this item
                 // Actions can be either:
@@ -158,10 +149,8 @@ class RulesEngine
                         Log::debug("Executing action with params", [
                             'action' => $actionName,
                             'params' => $actionParams,
-                            'params_type' => gettype($actionParams),
-                            'params_is_array' => is_array($actionParams),
-                            'params_count' => is_array($actionParams) ? count($actionParams) : 0,
-                            'item_keys' => array_keys($item),
+                            'params_count' => count($actionParams),
+                            'item_keys' => is_array($item) ? array_keys($item) : null,
                             'resource_id' => $resourceId,
                         ]);
                         
@@ -211,69 +200,112 @@ class RulesEngine
     }
 
     /**
-     * Get scanner instance for a service
+     * Build the scanner for a service from its registry definition.
+     *
+     * Almost every service uses GenericAwsScanner; the handful with behaviour the API
+     * model cannot express name their own class in tasks.json ("scanner").
      */
     private function getScanner(string $service, Scan $scan): object
     {
+        $definition = ServiceRegistry::get($service);
+
+        if (!$definition) {
+            throw new \Exception("Unknown service: {$service}");
+        }
+
         $awsAccount = $scan->awsAccount;
         $roleArn = $awsAccount->iam_role_arn;
         $externalId = $awsAccount->external_id;
         $region = $scan->region ?? 'us-east-1';
-        
-        return match ($service) {
-            'iam' => new IamScanner($roleArn, $externalId, $region),
-            's3' => new S3Scanner($roleArn, $externalId, $region),
-            'ec2' => new Ec2Scanner($roleArn, $externalId, $region),
-            'rds' => new RdsScanner($roleArn, $externalId, $region),
-            'cloudtrail' => new CloudTrailScanner($roleArn, $externalId, $region),
-            'lambda' => new LambdaScanner($roleArn, $externalId, $region),
-            'kms' => new KmsScanner($roleArn, $externalId, $region),
-            default => throw new \Exception("Unknown service: {$service}"),
-        };
-    }
 
-    /**
-     * Get items key from task config (e.g., "Users", "Roles", "Buckets")
-     */
-    private function getItemsKey(array $taskConfig): ?string
-    {
-        if (isset($taskConfig['items'])) {
-            $items = array_keys($taskConfig['items']);
-            return $items[0] ?? null;
-        }
-        return null;
-    }
+        $scannerClass = $definition['scanner'] ?? null;
 
-    /**
-     * Get resource ID from item
-     */
-    private function getResourceId(array $item, ?string $keyField, ?string $idKey): ?string
-    {
-        if ($keyField && isset($item[$keyField])) {
-            return $item[$keyField];
-        }
-        
-        // Try common ID fields
-        $commonFields = ['UserName', 'RoleName', 'BucketName', 'InstanceId', 'DBInstanceIdentifier'];
-        foreach ($commonFields as $field) {
-            if (isset($item[$field])) {
-                return $item[$field];
+        if ($scannerClass) {
+            if (!class_exists($scannerClass) || !is_subclass_of($scannerClass, GenericAwsScanner::class)) {
+                throw new \Exception("Service {$service} declares an unusable scanner: {$scannerClass}");
             }
+
+            return new $scannerClass($roleArn, $externalId, $region);
         }
-        
+
+        return new GenericAwsScanner(
+            $roleArn,
+            $externalId,
+            $region,
+            $definition['client'],
+            $definition['label']
+        );
+    }
+
+    /**
+     * Where a task's items live in its response, as a dot path.
+     *
+     * Taken from the task's "itemsPath" when it declares one, otherwise from the first
+     * key of its "items" block — which is how every single-level task already reads
+     * (Users, Roles, Buckets). Nested responses declare the full path explicitly, e.g.
+     * "Reservations.Instances".
+     */
+    private function getItemsPath(array $taskConfig): ?string
+    {
+        if (!empty($taskConfig['itemsPath']) && is_string($taskConfig['itemsPath'])) {
+            return $taskConfig['itemsPath'];
+        }
+
+        if (isset($taskConfig['items']) && is_array($taskConfig['items'])) {
+            return array_key_first($taskConfig['items']);
+        }
+
         return null;
+    }
+
+    /**
+     * Identify a resource within its task's item list.
+     *
+     * Scalar items (SQS queue URLs, DynamoDB table names) are their own identifier.
+     * Everything else uses the "key" the task declares. There is deliberately no
+     * guessing from well-known field names any more: the old fallback list quietly
+     * covered for tasks whose declared key was simply wrong, which meant a genuinely
+     * mis-declared key in a new service produced findings against a null resource id
+     * instead of an error anybody would notice.
+     */
+    private function getResourceId(mixed $item, ?string $keyField): ?string
+    {
+        if (!is_array($item)) {
+            return $item === null ? null : (string) $item;
+        }
+
+        if ($keyField && isset($item[$keyField]) && is_scalar($item[$keyField])) {
+            return (string) $item[$keyField];
+        }
+
+        Log::warning('Could not identify resource; check the task\'s "key" in tasks.json', [
+            'declared_key' => $keyField,
+            'item_keys' => is_array($item) ? array_keys($item) : null,
+        ]);
+
+        return null;
+    }
+
+    /**
+     * Scan details store JSON objects, so a scalar item is wrapped to keep the column
+     * shape uniform. Rules matching a task's per-item rows read $data['Value'].
+     */
+    private function itemRawData(mixed $item): array
+    {
+        return is_array($item) ? $item : ['Value' => $item];
     }
 
     /**
      * Build parameters for action API call
      * 
-     * @param array $item The item from the list operation (e.g., user, role)
+     * @param mixed $item The item from the list operation (an object, or a scalar for
+     *                    list operations that return bare strings)
      * @param array $taskConfig The task configuration
      * @param string $actionName The action name (e.g., "getUser", "listMFADevices")
      * @param array|null $actionParamsConfig Params config from the action object (new format) or null
      * @return array Parameters array for the API call
      */
-    private function buildActionParams(array $item, array $taskConfig, string $actionName, ?array $actionParamsConfig = null): array
+    private function buildActionParams(mixed $item, array $taskConfig, string $actionName, ?array $actionParamsConfig = null): array
     {
         // First, check if params are provided directly in the action config (new format)
         if ($actionParamsConfig !== null && is_array($actionParamsConfig)) {
@@ -314,41 +346,18 @@ class RulesEngine
             ]);
             
             return $params;
-        } elseif ($defaults && is_string($defaults)) {
-            // Legacy format: defaults might be a function string (for backward compatibility)
-            Log::debug('Legacy defaults format detected, using fallback logic', [
-                'action' => $actionName,
-            ]);
         }
-        
-        // Final fallback: try to infer params from item structure
-        if (isset($item['UserName'])) {
-            return ['UserName' => $item['UserName']];
-        }
-        if (isset($item['RoleName'])) {
-            return ['RoleName' => $item['RoleName']];
-        }
-        if (isset($item['BucketName'])) {
-            return ['Bucket' => $item['BucketName']];
-        }
-        if (isset($item['Name'])) {
-            // Try to determine the parameter name based on action
-            if (strpos($actionName, 'User') !== false) {
-                return ['UserName' => $item['Name']];
-            }
-            if (strpos($actionName, 'Role') !== false) {
-                return ['RoleName' => $item['Name']];
-            }
-            if (strpos($actionName, 'Bucket') !== false || strpos($actionName, 'S3') !== false) {
-                return ['Bucket' => $item['Name']];
-            }
-        }
-        
-        // Default: return empty array (safer than returning item as-is)
-        Log::warning("Could not determine params for action", [
+
+        // No params anywhere. This used to guess from well-known field names
+        // (UserName, RoleName, Bucket...), which only ever worked for the handful of
+        // services those names came from and silently produced a wrong or empty call for
+        // anything else. Actions now declare their params, per action or via the task's
+        // defaults, and a missing declaration is reported rather than papered over.
+        Log::warning('Action has no params declared, calling it with none', [
             'action' => $actionName,
-            'item_keys' => array_keys($item),
+            'item_keys' => is_array($item) ? array_keys($item) : null,
         ]);
+
         return [];
     }
 
@@ -365,8 +374,12 @@ class RulesEngine
      * - { "UserName": "$item['UserName']" } - PHP expression
      * - { "Bucket": "$item['Name']" } - PHP expression using Name field
      * - { "MaxItems": 100 } - Direct value
+     * - { "AttributeNames": ["All"] } - Direct list value
+     *
+     * $item may be a scalar, for list operations returning bare strings; "$item" then
+     * refers to the value itself.
      */
-    private function evaluateParams(array $paramsConfig, array $item): array
+    private function evaluateParams(array $paramsConfig, mixed $item): array
     {
         $params = [];
         
@@ -389,7 +402,7 @@ class RulesEngine
                             Log::warning("Param expression evaluated to null", [
                                 'param' => $paramName,
                                 'expression' => $paramValue,
-                                'item_keys' => array_keys($item),
+                                'item_keys' => is_array($item) ? array_keys($item) : null,
                             ]);
                         } else {
                             // Ensure we store the actual value, not the expression string
@@ -400,7 +413,7 @@ class RulesEngine
                             'param' => $paramName,
                             'expression' => $paramValue,
                             'error' => $e->getMessage(),
-                            'item_keys' => array_keys($item),
+                            'item_keys' => is_array($item) ? array_keys($item) : null,
                             'trace' => $e->getTraceAsString(),
                         ]);
                         // Try simple field access as fallback
@@ -418,7 +431,7 @@ class RulesEngine
                         Log::warning("Field not found in item", [
                             'param' => $paramName,
                             'field' => $paramValue,
-                            'item_keys' => array_keys($item),
+                            'item_keys' => is_array($item) ? array_keys($item) : null,
                         ]);
                     }
                 }
@@ -448,7 +461,7 @@ class RulesEngine
         if (empty($params)) {
             Log::warning("No params evaluated, returning empty array", [
                 'params_config' => $paramsConfig,
-                'item_keys' => array_keys($item),
+                'item_keys' => is_array($item) ? array_keys($item) : null,
             ]);
         }
         
@@ -458,7 +471,7 @@ class RulesEngine
     /**
      * Evaluate PHP expression for parameter value
      */
-    private function evaluatePhpExpression(string $expression, array $item): mixed
+    private function evaluatePhpExpression(string $expression, mixed $item): mixed
     {
         // Evaluate PHP expression with $item available in scope
         // Example: "$item['UserName']" -> evaluates to the actual UserName value
@@ -486,7 +499,7 @@ class RulesEngine
             Log::error("PHP expression evaluation failed", [
                 'expression' => $expression,
                 'error' => $e->getMessage(),
-                'item_keys' => array_keys($item),
+                'item_keys' => is_array($item) ? array_keys($item) : null,
                 'trace' => $e->getTraceAsString(),
             ]);
             throw $e;
@@ -496,7 +509,7 @@ class RulesEngine
     /**
      * Get field value from item using dot notation or array access
      */
-    private function getFieldValue(string $fieldPath, array $item): mixed
+    private function getFieldValue(string $fieldPath, mixed $item): mixed
     {
         // Handle dot notation: "item.RoleName" -> item['RoleName']
         $fieldPath = str_replace('item.', '', $fieldPath);
@@ -518,25 +531,52 @@ class RulesEngine
     }
 
     /**
-     * Extract items from nested structures (e.g., EC2 Reservations -> Instances)
+     * Pull a task's items out of its API response by walking the declared dot path,
+     * flattening every list encountered along the way.
+     *
+     * This used to hardcode EC2's Reservations -> Instances shape, so any other nested
+     * response needed PHP. The walk handles arbitrary depth, which is what lets services
+     * like ELBv2 (LoadBalancers -> Listeners) be added as JSON alone. Items may be
+     * objects or scalars; callers must not assume either.
+     *
+     * @return array<int, mixed>
      */
-    private function extractItems(array $items, array $taskConfig, string $service): array
+    private function extractItems(array $result, array $taskConfig): array
     {
-        // For EC2, handle Reservations -> Instances structure
-        if ($service === 'ec2' && isset($taskConfig['items']['Reservations'])) {
-            $extracted = [];
-            foreach ($items as $reservation) {
-                if (isset($reservation['Instances']) && is_array($reservation['Instances'])) {
-                    foreach ($reservation['Instances'] as $instance) {
-                        $extracted[] = $instance;
-                    }
-                }
-            }
-            return $extracted;
+        $path = $this->getItemsPath($taskConfig);
+
+        if (!$path) {
+            return [];
         }
-        
-        // For other services, return items as-is
-        return $items;
+
+        $current = [$result];
+
+        foreach (explode('.', $path) as $segment) {
+            $next = [];
+
+            foreach ($current as $container) {
+                if (!is_array($container) || !array_key_exists($segment, $container)) {
+                    continue;
+                }
+
+                $value = $container[$segment];
+
+                // A list at this level fans out into the next; a single object is
+                // carried through so paths can descend into non-list keys too.
+                if (is_array($value) && array_is_list($value)) {
+                    foreach ($value as $entry) {
+                        $next[] = $entry;
+                    }
+                    continue;
+                }
+
+                $next[] = $value;
+            }
+
+            $current = $next;
+        }
+
+        return $current;
     }
 
     /**

@@ -3,6 +3,7 @@
 namespace Tests\Unit;
 
 use App\Services\ScanProfilesService;
+use App\Services\ServiceRegistry;
 use Tests\TestCase;
 
 class ScanProfilesServiceTest extends TestCase
@@ -48,12 +49,23 @@ class ScanProfilesServiceTest extends TestCase
         $this->assertStringNotContainsString('pci', $rule);
     }
 
-    public function test_basic_expands_to_all_seven_services_and_basic_ruleset(): void
+    /**
+     * Profile membership is declared per service in its tasks.json, so this asserts the
+     * set rather than a literal list — a new service joining the Basic profile is the
+     * expected way to add one, not a reason for this test to fail.
+     */
+    public function test_basic_expands_to_every_service_declaring_it_and_the_basic_ruleset(): void
     {
-        $this->assertSame(
-            ['s3', 'iam', 'ec2', 'rds', 'cloudtrail', 'lambda', 'kms'],
-            ScanProfilesService::servicesFor(['basic'])
+        $services = ScanProfilesService::servicesFor(['basic']);
+
+        $this->assertEqualsCanonicalizing(
+            ServiceRegistry::namesForProfile('basic'),
+            $services
         );
+        // The original seven are all in Basic and must stay there.
+        foreach (['s3', 'iam', 'ec2', 'rds', 'cloudtrail', 'lambda', 'kms'] as $service) {
+            $this->assertContains($service, $services);
+        }
         $this->assertSame(['basic'], ScanProfilesService::rulesetsFor(['basic']));
     }
 

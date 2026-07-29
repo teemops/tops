@@ -224,6 +224,9 @@ class ScansController extends Controller
             'awsAccountId' => $scan->aws_account_id,
             'awsAccountName' => $scan->awsAccount->name ?? 'Unknown',
             'status' => $scan->status,
+            // A scan can be 'completed' yet have missed regions. Surfacing that lets the
+            // UI say so instead of presenting partial results as a full picture.
+            'isPartial' => (bool) $scan->is_partial,
             'findingsCount' => $scan->results()->count(),
             'createdAt' => $scan->created_at->toISOString(),
             'startedAt' => $scan->started_at?->toISOString(),

@@ -4,6 +4,14 @@
     "description": "Tasks for auditing AWS EC2 resources",
     "config": {
         "service": "ec2",
+        "label": "EC2",
+        "client": "ec2",
+        "regional": true,
+        "profiles": [
+            "basic",
+            "cis",
+            "pci"
+        ],
         "start": "describeInstances",
         "defaults": {
             "actions": {
@@ -19,6 +27,7 @@
                 "task": "describeInstances",
                 "id": "instance",
                 "key": "InstanceId",
+                "itemsPath": "Reservations.Instances",
                 "description": "List all EC2 instances",
                 "actions": [
                     {

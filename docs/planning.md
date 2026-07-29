@@ -1593,8 +1593,19 @@ This roadmap is based on comprehensive research of:
 - ✅ CloudTrail (5 checks)
 - ✅ Lambda (4 checks)
 - ✅ KMS (3 checks)
+- ✅ DynamoDB (2 checks)
+- ✅ SQS (1 check)
+- ✅ SNS (1 check)
+- ✅ ELBv2 (2 checks)
 
-**Total Current Checks:** ~46 rules
+**Total Current Checks:** 52 rules in `basic.json`, 22 in `cis.json`
+
+The last four were added as `tasks.json` files alone, with no PHP, which is now the way
+every service is added — see `app/rules/README.md`. Rule coverage for them is
+deliberately thin: the point of adding them was to prove the JSON contract handles the
+awkward response shapes (bare-string lists, two-step list-then-describe, nested lists,
+and SDK/ARN names that differ from the service name) before more services are written
+against it.
 
 ---
 
@@ -2165,33 +2176,37 @@ These checks can be added to existing scanners with minimal effort:
 
 ### Architecture Considerations
 
-For the new scanners, follow the existing Laravel pattern:
+**Adding a service no longer requires PHP.** Create one file —
+`app/rules/tasks/{service}/tasks.json` — and validate it:
 
-1. **Create Scanner Class**: `app/app/Services/Scanners/{Service}Scanner.php`
-2. **Create Tasks File**: `app/rules/tasks/{service}/tasks.json`
-3. **Add Rules**: `app/rules/rulesets/basic.json` (and `cis.json`, `pci.json` as needed)
-4. **Register Scanner**: Update `app/app/Services/ScanTypesService.php`
+```bash
+php artisan scan:validate-rules
+```
 
-Each new scanner should:
-- Extend the base scanner pattern (see `S3Scanner.php`, `IamScanner.php`)
-- Use AWS SDK PHP v3 (`aws/aws-sdk-php`)
-- Follow the existing task/action pattern defined in tasks.json
-- Support regional and global resources appropriately
-- Include proper error handling for missing IAM permissions
-- Return data in format compatible with RulesEngine/FindingsEngine
+Its `config` block declares everything the app needs: the SDK client key, whether the
+service is regional, which scan profiles include it, and where its items live in each
+response. `ServiceRegistry` discovers it from there, and `GenericAwsScanner` validates
+every method name against the AWS SDK's own API model and walks paginated operations to
+the end. Rules go in `app/rules/rulesets/*.json` and carry their own remediation text.
+
+The full contract, including the three item shapes and the two conditions traps, is
+documented in **`app/rules/README.md`** — read that before adding a service or a rule.
+
+A service only needs a PHP class when the SDK model cannot express its behaviour, which
+so far means two: `S3Scanner` (resolve each bucket's region before signing) and
+`IamScanner` (treat a missing password policy as the finding rather than an error). Both
+subclass `GenericAwsScanner` and override a single method; a service opts in by naming
+the class in its `config.scanner`.
 
 #### Scanner Architecture:
 ```
-ProcessScanJob (main orchestrator)
-    └── ProcessRegionScanJob (per-region)
-            └── ProcessAuditScanJob (individual scan tasks)
-                    └── AwsSecurityScanner
-                            ├── S3Scanner
-                            ├── IamScanner
-                            ├── Ec2Scanner
-                            └── RdsScanner
-                                    └── RulesEngine
-                                            ├── ConditionEvaluator
-                                            └── FindingsEngine
+ProcessAuditScanJob (orchestrator: global services inline, region jobs fanned out)
+    └── ProcessRegionScanJob (per service, per region)
+            └── RulesEngine (reads tasks.json, walks items, stores scan_details)
+                    └── GenericAwsScanner (any AWS service, from the SDK API model)
+                            ├── S3Scanner    (bucket region resolution)
+                            └── IamScanner   (absent password policy)
+            └── FindingsEngine (reads rulesets, writes scan_results)
+                    └── ConditionEvaluator
 ```
 

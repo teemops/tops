@@ -2,23 +2,16 @@
 
 namespace App\Services;
 
+/**
+ * The services a scan can collect data for.
+ *
+ * This used to hold a hardcoded array; the definitions now live in each service's
+ * rules/tasks/<service>/tasks.json and are read through ServiceRegistry. The public
+ * surface is unchanged so callers (ScansController, ProcessAuditScanJob, Scan,
+ * RulesEngine) did not have to move with it.
+ */
 class ScanTypesService
 {
-    /**
-     * The available scan types with their display names.
-     *
-     * @var array
-     */
-    private static array $scanTypes = [
-        ['value' => 'ec2', 'label' => 'EC2', 'region' => true],
-        ['value' => 'iam', 'label' => 'IAM', 'region' => false],
-        ['value' => 's3', 'label' => 'S3', 'region' => false],  // S3 bucket list is global; can run from any region
-        ['value' => 'rds', 'label' => 'RDS', 'region' => true],
-        ['value' => 'cloudtrail', 'label' => 'CloudTrail', 'region' => true],  // trails are per-region resources
-        ['value' => 'lambda', 'label' => 'Lambda', 'region' => true],
-        ['value' => 'kms', 'label' => 'KMS', 'region' => true],
-    ];
-
     /**
      * Get all available scan types
      *
@@ -26,7 +19,7 @@ class ScanTypesService
      */
     public static function getAll(): array
     {
-        return array_map(fn($type) => $type['value'], self::$scanTypes);
+        return ServiceRegistry::names();
     }
 
     /**
@@ -36,7 +29,14 @@ class ScanTypesService
      */
     public static function getAllWithLabels(): array
     {
-        return self::$scanTypes;
+        return array_values(array_map(
+            fn (array $definition) => [
+                'value' => $definition['service'],
+                'label' => $definition['label'],
+                'region' => $definition['regional'],
+            ],
+            ServiceRegistry::all()
+        ));
     }
 
     /**
@@ -47,7 +47,7 @@ class ScanTypesService
      */
     public static function isValid(string $type): bool
     {
-        return in_array($type, self::getAll());
+        return ServiceRegistry::has($type);
     }
 
     /**
@@ -67,10 +67,10 @@ class ScanTypesService
      */
     public static function getRegionBased(): array
     {
-        return array_map(
-            fn($type) => $type['value'],
-            array_filter(self::$scanTypes, fn($type) => $type['region'])
-        );
+        return array_keys(array_filter(
+            ServiceRegistry::all(),
+            fn (array $definition) => $definition['regional']
+        ));
     }
 
     /**
@@ -80,10 +80,10 @@ class ScanTypesService
      */
     public static function getNonRegionBased(): array
     {
-        return array_map(
-            fn($type) => $type['value'],
-            array_filter(self::$scanTypes, fn($type) => !$type['region'])
-        );
+        return array_keys(array_filter(
+            ServiceRegistry::all(),
+            fn (array $definition) => !$definition['regional']
+        ));
     }
 
     /**
@@ -94,6 +94,6 @@ class ScanTypesService
      */
     public static function isRegionBased(string $type): bool
     {
-        return in_array($type, self::getRegionBased());
+        return (bool) (ServiceRegistry::get($type)['regional'] ?? false);
     }
 }

@@ -6,6 +6,7 @@ use App\Jobs\ProcessRegionScanJob;
 use App\Models\AwsAccount;
 use App\Models\Organization;
 use App\Models\Scan;
+use App\Models\ScanDetail;
 use App\Models\ScanResult;
 use App\Services\AwsSecurityScanner;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -21,6 +22,85 @@ class ProcessRegionScanJobTest extends TestCase
     {
         Mockery::close();
         parent::tearDown();
+    }
+
+    /**
+     * A redelivered region job must not re-collect data it already has.
+     *
+     * SQS is at-least-once and this job retries three times, but scan_details has no
+     * unique constraint — so before the guard, a redelivery silently doubled every row
+     * for that region. The job still has to run to completion (it is what calls the
+     * completion check), it just must not write again.
+     */
+    public function test_a_redelivered_job_does_not_recollect_data_for_its_region(): void
+    {
+        $organization = Organization::factory()->create();
+        $awsAccount = AwsAccount::factory()->completed()->create([
+            'organization_id' => $organization->id,
+        ]);
+
+        $scan = Scan::factory()->running()->create([
+            'organization_id' => $organization->id,
+            'aws_account_id' => $awsAccount->id,
+            'scan_types' => ['ec2'],
+            'rulesets' => ['basic'],
+            'expected_regions_count' => 1,
+        ]);
+
+        // Stand in for what a first, successful delivery would have written.
+        ScanDetail::create([
+            'scan_id' => $scan->id,
+            'service' => 'ec2',
+            'api_method' => 'describeInstances',
+            'raw_data' => ['Reservations' => []],
+            'region' => 'us-east-1',
+        ]);
+
+        $before = ScanDetail::where('scan_id', $scan->id)->count();
+
+        // No AWS credentials are available here; the job completing at all proves it
+        // never tried to assume a role or call an API.
+        (new ProcessRegionScanJob($scan, 'us-east-1', 'ec2'))->handle();
+
+        $this->assertSame($before, ScanDetail::where('scan_id', $scan->id)->count());
+    }
+
+    /**
+     * The guard is scoped to one service in one region — a different pair is still
+     * collected, or a multi-service scan would stop after its first region job.
+     */
+    public function test_the_guard_is_scoped_to_a_single_service_and_region(): void
+    {
+        $organization = Organization::factory()->create();
+        $awsAccount = AwsAccount::factory()->completed()->create([
+            'organization_id' => $organization->id,
+        ]);
+
+        $scan = Scan::factory()->running()->create([
+            'organization_id' => $organization->id,
+            'aws_account_id' => $awsAccount->id,
+            'scan_types' => ['ec2', 'kms'],
+        ]);
+
+        ScanDetail::create([
+            'scan_id' => $scan->id,
+            'service' => 'ec2',
+            'api_method' => 'describeInstances',
+            'raw_data' => [],
+            'region' => 'us-east-1',
+        ]);
+
+        $collected = function (string $service, string $region) use ($scan) {
+            $job = new ProcessRegionScanJob($scan, $region, $service);
+            $method = new \ReflectionMethod($job, 'hasAlreadyCollected');
+            $method->setAccessible(true);
+
+            return $method->invoke($job);
+        };
+
+        $this->assertTrue($collected('ec2', 'us-east-1'));
+        $this->assertFalse($collected('ec2', 'eu-west-1'), 'A different region still needs collecting');
+        $this->assertFalse($collected('kms', 'us-east-1'), 'A different service still needs collecting');
     }
 
     /**

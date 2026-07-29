@@ -3,13 +3,7 @@
 namespace App\Services;
 
 use Aws\Credentials\Credentials;
-use Aws\S3\S3Client;
-use Aws\Iam\IamClient;
-use Aws\Ec2\Ec2Client;
-use Aws\Rds\RdsClient;
-use Aws\CloudTrail\CloudTrailClient;
-use Aws\Lambda\LambdaClient;
-use Aws\Kms\KmsClient;
+use Aws\Sdk;
 use Aws\Sts\StsClient;
 use Illuminate\Support\Facades\Log;
 
@@ -58,11 +52,19 @@ class AwsSecurityScanner
     }
 
     /**
-     * Create AWS client with assumed role credentials
+     * Create an AWS client with the assumed-role credentials.
+     *
+     * $service is the SDK's own manifest key (its endpoint prefix — 's3', 'kms',
+     * 'elasticloadbalancingv2'), so every service the installed SDK supports is
+     * reachable without this class knowing about it. An unrecognised key throws
+     * \InvalidArgumentException from Aws\manifest().
+     *
+     * Returns mixed rather than AwsClientInterface so tests can substitute a minimal
+     * fake client instead of standing up a full SDK mock.
      */
     protected function createClient(string $service, array $credentials, ?string $region = null): mixed
     {
-        $config = [
+        return (new Sdk())->createClient($service, [
             'version' => 'latest',
             'region' => $region ?? $this->region,
             'credentials' => new Credentials(
@@ -70,18 +72,7 @@ class AwsSecurityScanner
                 $credentials['SecretAccessKey'],
                 $credentials['SessionToken']
             ),
-        ];
-
-        return match ($service) {
-            's3' => new S3Client($config),
-            'iam' => new IamClient($config),
-            'ec2' => new Ec2Client($config),
-            'rds' => new RdsClient($config),
-            'cloudtrail' => new CloudTrailClient($config),
-            'lambda' => new LambdaClient($config),
-            'kms' => new KmsClient($config),
-            default => throw new \InvalidArgumentException("Unknown service: {$service}"),
-        };
+        ]);
     }
 
     /**
