@@ -52,9 +52,14 @@ What follows from that:
 ### Constraint
 
 **One person building, with Claude.** This is the single biggest input to the plan. The
-**Now** bucket held four items at creation and is sequenced, not parallel — two are done,
-two remain. Resist growing it — adding an item makes the others later, it does not make
-more happen.
+**Now** bucket is sequenced, not parallel. Resist growing it — adding an item makes the
+others later, it does not make more happen.
+
+**Now was grown once, deliberately.** N-5 (release pipeline) was added on 2026-07-30 after
+N-3's design showed that "installs from the documentation alone" is unreachable while
+installation means compiling assets on the user's machine. It is not a fifth wish-list
+item; it is a prerequisite that was missing from the original plan. The rule still holds —
+N-3 and N-4 are now later than they were, and that is the price. See D-8.
 
 ---
 
@@ -71,6 +76,7 @@ Decisions already made, so we don't relitigate them. Each has a trigger for revi
 | **D-5** | **MFA ships as new-device email OTP, not TOTP.** No authenticator app, no external OTP service. | 2026-07-29 | Delivers most of the protection (stolen password alone is insufficient) for a fraction of the work, and works on the native auth path where TOTP currently doesn't. | Design partners ask for authenticator-app support, or a compliance requirement forces it. |
 | **D-6** | **No billing, plans, or licence gating.** | 2026-07-29 | No revenue model yet (D-1). | A commercial model is chosen. |
 | **D-7** | **Apache-2.0, with trademark held separately and a DCO for contributions.** | 2026-07-29 | See below — this one has enough reasoning behind it to warrant its own section. | Effectively never; the DCO is what makes it durable. |
+| **D-8** | **Ship prebuilt images from Docker Hub, cut by a real release pipeline.** `install.sh` pulls tagged images; it never builds. | 2026-07-30 | See below — this is the biggest single change to how TOPS is delivered. | A registry other than Docker Hub is chosen, or images stop being the distribution unit. |
 
 ### D-7 in full: licensing
 
@@ -126,6 +132,51 @@ that unlock with payment. If a managed offering ever exists, it runs this code.
 
 ---
 
+### D-8 in full: distribution and releases
+
+**`install.sh` runs prebuilt images. It does not build anything.**
+
+The honest reason this decision is here at all: **TOPS has never had a release process.**
+There is no version number, no tag, no changelog, no published artifact. Every install to
+date has been a `git clone` plus a local build. That was survivable while the only operator
+was the author, and it stops being survivable the moment a design partner is involved —
+"which version are you running?" currently has no answer.
+
+**What a first-time user does**
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/teemops/tops/master/install.sh)
+```
+
+That script pulls tagged images from Docker Hub and starts the stack. No PHP, no Composer,
+no Node, no npm, no compile step. The only host dependency is Docker.
+
+**What it costs.** This is a **more intense effort** than writing setup documentation, and
+it is worth being blunt about that: it needs a release workflow, a versioning scheme, a
+Docker Hub organisation, image publishing for three images, a second Compose file, and a
+split of the current install path in two. Two or three times the work of the documentation
+task it replaces.
+
+**Why it wins anyway.** It is not extra work bolted onto N-3 — it is the release process
+that should have existed from the first commit, arriving late. It buys, in one change:
+
+- **A supportable answer to "what are you running?"** — a version, a tag, and an image
+  digest instead of a branch name and a hope.
+- **Time-to-first-scan measured in minutes**, because the slowest part of setup today is
+  compiling assets on the user's machine.
+- **A rollback story.** Pin `TOPS_IMAGE_TAG` to the previous version and restart.
+- **A downloadable artifact** — the tagged source zip GitHub cuts automatically.
+- **The removal of four host prerequisites** that had nothing to do with running a scanner.
+
+Anything less than this leaves the milestone's "installs from the documentation alone"
+resting on the user having a correct PHP and Node toolchain, which is the single most
+likely thing to go wrong on a machine we cannot see.
+
+**What stays for contributors.** `docker/scripts/prepare-build.sh` is retained unchanged,
+and the build-from-source path keeps working — it moves to `install-build.sh` plus
+`docker-compose.build.yml`. Contributors are explicitly not asked to pull images to work
+on the code.
+
 ## At a Glance
 
 Sizes are rough and relative, for one person: **XS** under a day · **S** a day or two ·
@@ -137,7 +188,8 @@ Sizes are rough and relative, for one person: **XS** under a day · **S** a day 
 | --- | --- | --- | :---: |
 | ~~**N-1**~~ | ~~Fix the clean-checkout build~~ | ✅ **Done** 2026-07-29 — `@vitejs/plugin-vue` on `^6`, `npm ci` clean, frontend CI job added. | — |
 | ~~**N-2**~~ | ~~Choose and add a licence~~ | ✅ **Done** 2026-07-29 — Apache-2.0, trademark held separately, DCO for contributions. See D-7. | — |
-| **N-3** | Setup docs a stranger can follow | The milestone is "installs without a call". This is that, plus removing vendor-baked defaults from `.env.example`. | L |
+| **N-5** | Release pipeline + Docker Hub images | **New, and it goes first.** TOPS has no version, tag, changelog or published artifact. `install.sh` cannot pull images that nobody publishes. See D-8. | L |
+| **N-3** | Setup docs a stranger can follow | The milestone is "installs without a call". Now sits on top of N-5: one `install.sh`, plus removing vendor-baked defaults from `.env.example`. | M |
 | **N-4** | Remediation for every finding | 39 of 74 rules have no fix text — including all 22 CIS rules. A finding without a fix is homework. | M |
 
 ### Next — before the repo goes public
@@ -203,6 +255,76 @@ reasoning in **D-7** above.
       (`composer.json` had been declaring the project MIT under the Laravel skeleton's
       name — a direct conflict, now fixed)
 - [x] Recorded in the Decisions Log as D-7
+
+---
+
+### N-5 · Release pipeline and published images
+
+*Infrastructure with a user-facing outcome. Sequenced before N-3, which depends on it.*
+
+**Problem:** there is no release process. No version, no tag, no changelog, no published
+artifact. A design partner cannot say which build they are running, and `install.sh` cannot
+pull an image that nobody publishes. Full reasoning in **D-8**.
+
+**Shape of the work**
+
+| Piece | Detail |
+| --- | --- |
+| Version source of truth | A root `VERSION` file. The repo is polyglot — neither `composer.json` nor `app/package.json` is the natural home. |
+| Release workflow | On push to `develop`, gated on the test suite passing: bump, tag `vX.Y.Z`, cut the GitHub release (which gives the downloadable zip for free), then build and push images. |
+| Images | **Three**, not one: `tops-app` (shared by the app and worker services), `tops-backup`, `tops-installer`. Missing any one leaves users building locally. |
+| Tags per image | `vX.Y.Z`, `X.Y`, `sha-<short>`, and `latest`. |
+| Architectures | `linux/amd64` **and** `linux/arm64` via buildx. Apple Silicon is common among the target users; without arm64 they get QEMU emulation or a failure. |
+| Compose | `docker-compose.yml` pulls `${TOPS_IMAGE_TAG:-latest}` and carries no `build:` stanza. A new `docker-compose.build.yml` keeps the build-from-source path. |
+| Script split | `install.sh` (pull and run, new) · `install-build.sh` (contributor build path, new) · `install-messaging.sh` (today's root `install.sh`, renamed). |
+
+**Acceptance criteria**
+- [ ] Given a machine with only Docker, when I run `install.sh`, then the stack starts from pulled images with no PHP, Composer, Node or npm present
+- [ ] Given a push to `develop` with passing tests, when the workflow runs, then a new tag, GitHub release and set of pushed images exist
+- [ ] Given a push to `develop` with failing tests, when the workflow runs, then nothing is tagged or published
+- [ ] Given the tag already exists, when the workflow re-runs, then it is a no-op rather than an error
+- [ ] Given I set `TOPS_IMAGE_TAG` to a previous version, when I restart, then I am running that version
+- [ ] Given I am a contributor, when I run `install-build.sh`, then the stack builds from my working tree exactly as it does today
+- [ ] Given an upgrade, when containers restart, then migrations apply automatically (the entrypoint already does this)
+
+**Technical notes**
+- CI builds images by running `docker/scripts/prepare-build.sh` on the runner and then
+  `docker build`, reusing today's Dockerfile. **No multi-stage rewrite is needed** — the
+  runner has PHP and Node, and this keeps the contributor path byte-identical.
+- Gate on tests via `workflow_run` against the existing Tests workflow, checking
+  `conclusion == success`.
+- Docker Hub credentials are a scoped access token in repository secrets, never a password.
+- Testing does not require the full Actions cycle — images can be pushed manually to
+  Docker Hub to validate `install.sh` end to end first.
+
+**Built 2026-07-30** — `VERSION`, `.github/workflows/release.yml`, `install.sh`,
+`install-build.sh`, `docker-compose.build.yml`, and `docker-compose.yml` switched to
+`teem/tops` + `teem/tops-backup`. Today's root `install.sh` is now `install-messaging.sh`.
+
+**Verified locally:** the contributor path builds and tags both images; `install.sh`
+creates `.env`, generates `APP_KEY`, pins `TOPS_IMAGE_TAG`, and is idempotent on re-run.
+
+**Not yet verified:** the pull-and-run path, which needs images on Docker Hub, and the
+workflow itself, which only runs on `develop`.
+
+**Found while testing:** the Compose services use fixed `container_name` values, so a
+leftover container from an earlier install blocks a new one with an opaque Docker error.
+`install.sh` now detects this and explains it. Removing the hardcoded names would be the
+real fix — deferred, since it changes the names in every existing runbook.
+
+**`latest` tracks `develop`** (decided 2026-07-30). There is no separate stable channel;
+`develop` is the integration branch and every release moves `latest`. The risk that a user
+silently floats onto an untested build is handled at the other end: `install.sh` pins
+`TOPS_IMAGE_TAG` to the version it installed, so moving forward is always an explicit
+`docker compose pull`. Revisit if a design partner ever needs to stay on a known-good
+release for longer than a single merge.
+
+**Open — still needed**
+- Whether the repo is renamed to `teemops/tops` at public release. The installer and docs
+  currently say `teemops/tops` per the agreed one-liner; this repo is `teemops/saas` on
+  `develop`, so **the URL is wrong until that rename happens**. `TOPS_REPO` overrides it.
+- `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` repository secrets.
+- Images pushed to Docker Hub, so the pull-and-run path can be tested end to end.
 
 ---
 
@@ -455,6 +577,11 @@ Blocking nothing today, but each one shapes the plan:
 
 ## Changelog
 
+- **2026-07-30** — N-5 added to **Now**, ahead of N-3, and recorded as D-8. Designing N-3
+  showed that installation currently means compiling assets on the user's machine, which
+  the milestone cannot survive. `install.sh` becomes a thin runner over published Docker
+  Hub images, and TOPS gets the release process it never had. N-3 drops from L to M as a
+  result; `setup-env.sh` was deleted the same day.
 - **2026-07-29** — npm advisories cut 17 → 5, criticals to 0, and CI fails on a new
   critical. `axios` — the only bundled dependency among them — is on 1.18.1. X-7 now
   covers only `firebase`'s `@grpc/grpc-js` and a build-time `brace-expansion`.

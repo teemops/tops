@@ -1,13 +1,58 @@
 # Teemops Docker Compose (Phase 1–3)
 
-Run the full stack (Laravel app, MySQL, Maildev, queue worker):
+There are two ways to run the stack (Laravel app, MySQL, Maildev, queue worker).
+Pick by whether you intend to change the code.
+
+## Running it — published images
+
+Needs **Docker only**. No PHP, Composer, Node or npm.
 
 ```bash
-cp .env.docker.example .env
-chmod +x docker/scripts/prepare-build.sh install.sh
+./install.sh
+```
+
+Or without a clone at all:
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/teemops/tops/master/install.sh)
+```
+
+It pulls `teem/tops` and `teem/tops-backup` from Docker Hub, writes a `.env` with
+a generated `APP_KEY`, pins `TOPS_IMAGE_TAG` to the version it installed, and
+starts the stack. Re-running it is safe — an existing `.env` and `APP_KEY` are
+left alone.
+
+Upgrading, and rolling back:
+
+```bash
+docker compose pull && docker compose up -d
+```
+
+To roll back, set `TOPS_IMAGE_TAG=v0.1.0` in `.env` and run `docker compose up -d`.
+Migrations run automatically from the container entrypoint on every start.
+
+`latest` tracks the `develop` branch, so it moves on every release. You are not
+exposed to that by default — `install.sh` pins `TOPS_IMAGE_TAG` to the version it
+installed, and you only move when you choose to pull.
+
+## Building it — contributors
+
+Needs Docker **plus** PHP 8.3, Composer, Node >=22.12 and npm on the host.
+
+```bash
+./install-build.sh
+```
+
+That runs `docker/scripts/prepare-build.sh` to produce `app/vendor` and
+`app/public/build`, then builds the images from your working tree via
+`docker-compose.build.yml` instead of pulling them.
+
+The equivalent by hand:
+
+```bash
 ./docker/scripts/prepare-build.sh
-docker compose build
-docker compose up -d
+docker compose -f docker-compose.yml -f docker-compose.build.yml build
+docker compose -f docker-compose.yml -f docker-compose.build.yml up -d
 ```
 
 Open http://localhost:8080 — health checks:
@@ -28,7 +73,7 @@ Deploy real AWS queues in a single region and wire them into the app:
 3. Run the installer:
 
 ```bash
-./install.sh
+./install-messaging.sh
 docker compose up -d --build
 ```
 
@@ -45,7 +90,7 @@ Output is written to `generated/teemops.env` (gitignored). The app and worker lo
 
 Logs: `generated/install.log`
 
-On EC2 without mounted credentials, set `TOPS_INSTALLER_NETWORK=host` in `.env` before `./install.sh`.
+On EC2 without mounted credentials, set `TOPS_INSTALLER_NETWORK=host` in `.env` before `./install-messaging.sh`.
 
 ## Phase 3: Add an AWS account (end to end)
 
@@ -63,7 +108,7 @@ Once messaging is installed, connecting a customer AWS account works without any
 5. The modal is polling `GET /api/aws-accounts/{id}` and flips to **Account connected** on its own, then closes and refreshes the list — no manual refresh needed.
 
 **Fallbacks**
-- If messaging hasn't been installed, "Add AWS Account" returns a clear message to run `./install.sh` first.
+- If messaging hasn't been installed, "Add AWS Account" returns a clear message to run `./install-messaging.sh` first.
 - If CloudFormation is slow or fails, the modal offers **Enter details manually** (paste the AWS account ID + IAM role ARN).
 
 ## Services
