@@ -1,0 +1,45 @@
+{
+    "$schema": "tops/scan/tasks/schema.v1",
+    "name": "tasks.json",
+    "description": "Tasks for auditing AWS DynamoDB resources",
+    "config": {
+        "service": "dynamodb",
+        "label": "DynamoDB",
+        "client": "dynamodb",
+        "regional": true,
+        "profiles": [
+            "basic",
+            "cis",
+            "pci"
+        ],
+        "start": "listTables"
+    },
+    "tasks": [
+        {
+            "listTables": {
+                "task": "listTables",
+                "id": "table",
+                "description": "List all DynamoDB tables. listTables returns bare table names rather than objects, so each item is a string and '$item' refers to the name itself.",
+                "actions": [
+                    {
+                        "describeTable": {
+                            "params": {
+                                "TableName": "$item"
+                            }
+                        }
+                    },
+                    {
+                        "describeContinuousBackups": {
+                            "params": {
+                                "TableName": "$item"
+                            }
+                        }
+                    }
+                ],
+                "items": {
+                    "TableNames": []
+                }
+            }
+        }
+    ]
+}

@@ -4,6 +4,15 @@
     "description": "Tasks for auditing AWS S3 resources",
     "config": {
         "service": "s3",
+        "label": "S3",
+        "client": "s3",
+        "regional": false,
+        "profiles": [
+            "basic",
+            "cis",
+            "pci"
+        ],
+        "scanner": "App\\Services\\Scanners\\S3Scanner",
         "start": "listBuckets",
         "defaults": {
             "actions": {

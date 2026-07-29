@@ -4,6 +4,14 @@
     "description": "Tasks for auditing AWS KMS resources",
     "config": {
         "service": "kms",
+        "label": "KMS",
+        "client": "kms",
+        "regional": true,
+        "profiles": [
+            "basic",
+            "cis",
+            "pci"
+        ],
         "start": "listKeys",
         "defaults": {
             "actions": {

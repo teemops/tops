@@ -95,13 +95,16 @@ export function useScans() {
             scanProfiles.value = response.data.scanProfiles;
         } catch (err: any) {
             console.error('Error fetching scan profiles:', err);
-            // Fallback to the Basic profile if the API fails
+            // Fallback to the Basic profile if the API fails. The service list is
+            // deliberately empty rather than hardcoded: the server derives it from the
+            // tasks.json definitions, and a stale copy here would quietly mislead about
+            // what a scan covers. The backend expands the profile either way.
             scanProfiles.value = [
                 {
                     value: 'basic',
                     label: 'Basic',
                     description: 'Core security checks across all supported services',
-                    services: ['s3', 'iam', 'ec2', 'rds', 'cloudtrail', 'lambda', 'kms'],
+                    services: [],
                 },
             ];
         }

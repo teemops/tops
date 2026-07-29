@@ -4,6 +4,14 @@
     "description": "Tasks for auditing AWS Lambda resources",
     "config": {
         "service": "lambda",
+        "label": "Lambda",
+        "client": "lambda",
+        "regional": true,
+        "profiles": [
+            "basic",
+            "cis",
+            "pci"
+        ],
         "start": "listFunctions",
         "defaults": {
             "actions": {

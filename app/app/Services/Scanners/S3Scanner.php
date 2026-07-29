@@ -2,25 +2,30 @@
 
 namespace App\Services\Scanners;
 
-use App\Services\AwsSecurityScanner;
 use Illuminate\Support\Facades\Log;
 
-class S3Scanner extends AwsSecurityScanner
+/**
+ * S3 needs one thing the generic scanner cannot express: bucket-specific calls must be
+ * signed against the bucket's own region, which is not known until we ask. Everything
+ * else — which operations exist, pagination — comes from GenericAwsScanner.
+ */
+class S3Scanner extends GenericAwsScanner
 {
+    protected string $clientKey = 's3';
+
+    protected string $label = 'S3';
+
     /**
-     * Execute S3 API calls based on method name
-     * Returns raw AWS SDK response (array)
-     * 
-     * For bucket-specific calls, automatically determines and uses the bucket's region
+     * Bucket-scoped calls fail with AuthorizationHeaderMalformed unless the client is
+     * configured for the bucket's region, so resolve it before delegating.
      */
     public function executeApiCall(string $method, array $credentials, array $params = [], ?string $region = null): array
     {
-        // For bucket-specific calls, get the bucket's region first
-        // Note: getBucketLocation itself doesn't need region lookup (it works from any region)
+        // getBucketLocation is deliberately absent: it works from any region and is one
+        // of the ways the region gets resolved in the first place.
         $bucketSpecificMethods = ['getPublicAccessBlock', 'getBucketEncryption', 'getBucketVersioning', 'getBucketAcl', 'getBucketLogging'];
-        
+
         if (in_array($method, $bucketSpecificMethods) && isset($params['Bucket'])) {
-            // Get the bucket's region
             $bucketRegion = $this->getBucketRegion($params['Bucket'], $credentials);
             if ($bucketRegion) {
                 $region = $bucketRegion;
@@ -31,20 +36,8 @@ class S3Scanner extends AwsSecurityScanner
                 ]);
             }
         }
-        
-        // Use provided region or default
-        $s3Client = $this->createClient('s3', $credentials, $region);
 
-        return $this->callApi('S3', $method, $params, fn () => match ($method) {
-            'listBuckets' => $s3Client->listBuckets($params)->toArray(),
-            'getBucketLocation' => $s3Client->getBucketLocation($params)->toArray(),
-            'getPublicAccessBlock' => $s3Client->getPublicAccessBlock($params)->toArray(),
-            'getBucketEncryption' => $s3Client->getBucketEncryption($params)->toArray(),
-            'getBucketVersioning' => $s3Client->getBucketVersioning($params)->toArray(),
-            'getBucketAcl' => $s3Client->getBucketAcl($params)->toArray(),
-            'getBucketLogging' => $s3Client->getBucketLogging($params)->toArray(),
-            default => throw new \InvalidArgumentException("Unknown S3 method: {$method}"),
-        }, ['region' => $region]);
+        return parent::executeApiCall($method, $credentials, $params, $region);
     }
 
     /**

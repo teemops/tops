@@ -4,7 +4,9 @@ namespace App\Jobs;
 
 use App\Models\Scan;
 use App\Services\AwsSecurityScanner;
+use App\Services\RegionResourceIndex;
 use App\Services\ScanTypesService;
+use App\Services\ServiceRegistry;
 use App\Services\RulesEngine\RulesEngine;
 use App\Services\RulesEngine\FindingsEngine;
 use App\Services\RulesEngine\ConditionEvaluator;
@@ -20,6 +22,15 @@ class ProcessAuditScanJob implements ShouldQueue
     use Queueable, InteractsWithQueue, SerializesModels;
 
     private const RULESET_BASIC = 'basic';
+
+    /**
+     * Tagging API index per region, memoised for this job run so a scan covering many
+     * services costs one call per region rather than one per (service, region).
+     * A null entry means the region could not be indexed and must not be pruned.
+     *
+     * @var array<string, string[]|null>
+     */
+    private array $regionServicePrefixes = [];
 
     /**
      * The number of times the job may be attempted.
@@ -185,8 +196,17 @@ class ProcessAuditScanJob implements ShouldQueue
 
         $dispatched = 0;
         $failedRegions = [];
+        $prunedRegions = [];
 
         foreach ($regions as $region) {
+            // Skipping is only ever done on positive evidence that the region holds
+            // resources for other services but none for this one — never on an empty or
+            // failed index, which would silently report the region as clean.
+            if ($this->canSkipRegion($scanType, $region, $credentials)) {
+                $prunedRegions[] = $region;
+                continue;
+            }
+
             try {
                 $job = new ProcessRegionScanJob($this->scan, $region, $scanType);
                 $job->onConnection($regionConnection);
@@ -219,7 +239,48 @@ class ProcessAuditScanJob implements ShouldQueue
             'regions_count' => count($regions),
             'dispatched' => $dispatched,
             'failed_regions' => $failedRegions,
+            'pruned_regions' => $prunedRegions,
         ]);
+    }
+
+    /**
+     * Whether this service demonstrably has nothing in this region.
+     *
+     * Returns false unless the Tagging API positively indexed the region and this
+     * service was absent from it. Every uncertain case — feature disabled, index
+     * unavailable, region reported nothing at all — dispatches the job, because the cost
+     * of a wasted job is a few seconds and the cost of a wrong skip is a region reported
+     * compliant that nobody looked at.
+     *
+     * Regions are indexed once per job run, not once per service, so a scan covering
+     * twenty services still makes one Tagging API call per region.
+     */
+    private function canSkipRegion(string $scanType, string $region, array $credentials): bool
+    {
+        if (!config('scan.prune_regions_with_tagging', false)) {
+            return false;
+        }
+
+        if (!array_key_exists($region, $this->regionServicePrefixes)) {
+            $awsAccount = $this->scan->awsAccount;
+
+            $this->regionServicePrefixes[$region] = (new RegionResourceIndex())->servicePrefixesIn(
+                $awsAccount->iam_role_arn,
+                $awsAccount->external_id,
+                $credentials,
+                $region
+            );
+        }
+
+        $prefixes = $this->regionServicePrefixes[$region];
+
+        if ($prefixes === null) {
+            return false;
+        }
+
+        $arnService = ServiceRegistry::get($scanType)['arnService'] ?? $scanType;
+
+        return !in_array($arnService, $prefixes, true);
     }
 
     private function runGlobalScanForService(RulesEngine $rulesEngine, string $scanType, array $credentials): void

@@ -1,0 +1,44 @@
+{
+    "$schema": "tops/scan/tasks/schema.v1",
+    "name": "tasks.json",
+    "description": "Tasks for auditing AWS SNS resources",
+    "config": {
+        "service": "sns",
+        "label": "SNS",
+        "client": "sns",
+        "regional": true,
+        "profiles": [
+            "basic",
+            "cis",
+            "pci"
+        ],
+        "start": "listTopics"
+    },
+    "tasks": [
+        {
+            "listTopics": {
+                "task": "listTopics",
+                "id": "topic",
+                "key": "TopicArn",
+                "description": "List all SNS topics. Items are objects carrying only TopicArn; encryption and access policy come from getTopicAttributes.",
+                "actions": [
+                    {
+                        "getTopicAttributes": {
+                            "params": {
+                                "TopicArn": "$item['TopicArn']"
+                            }
+                        }
+                    }
+                ],
+                "items": {
+                    "Topics": [
+                        {
+                            "Name": "TopicArn",
+                            "Type": "String"
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+}

@@ -4,6 +4,14 @@
     "description": "Tasks for auditing AWS RDS resources",
     "config": {
         "service": "rds",
+        "label": "RDS",
+        "client": "rds",
+        "regional": true,
+        "profiles": [
+            "basic",
+            "cis",
+            "pci"
+        ],
         "start": "describeDBInstances",
         "defaults": {
             "actions": {
