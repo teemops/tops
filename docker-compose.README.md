@@ -14,7 +14,7 @@ Needs **Docker only**. No PHP, Composer, Node or npm.
 Or without a clone at all:
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/teemops/tops/master/install.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/teemops/tops/develop/install.sh)
 ```
 
 It pulls `teem/tops` and `teem/tops-backup` from Docker Hub, writes a `.env` with
