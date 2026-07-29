@@ -23,6 +23,8 @@ class Scan extends Model
         'completed_at',
         'error_message',
         'expected_regions_count',
+        'processed_regions_count',
+        'is_partial',
     ];
 
     protected $casts = [
@@ -30,6 +32,7 @@ class Scan extends Model
         'rulesets' => 'array',
         'started_at' => 'datetime',
         'completed_at' => 'datetime',
+        'is_partial' => 'boolean',
     ];
 
     /**
@@ -155,6 +158,11 @@ class Scan extends Model
             $this->update([
                 'status' => 'completed',
                 'completed_at' => now(),
+                // is_partial is what consumers act on; the message stays for humans
+                // reading the scan. Compliance scoring must never treat a scan that
+                // missed regions as a clean bill of health.
+                'is_partial' => $timedOut,
+                'processed_regions_count' => $processedRegionJobs,
                 'error_message' => $timedOut
                     ? "Scan timed out (partial results). {$processedRegionJobs}/{$expectedRegionJobs} region jobs completed."
                     : null,

@@ -214,44 +214,17 @@ class FindingsEngine
     }
 
     /**
-     * Build remediation steps
+     * Build remediation steps.
+     *
+     * Remediation text belongs to the rule, in the ruleset JSON alongside its condition.
+     * It used to live in a PHP array keyed by rule id here, which meant a contributor
+     * could add a perfectly good rule and silently get the generic fallback below until
+     * somebody remembered to edit this class. Rules without their own text still get the
+     * fallback, as they always did.
      */
     private function buildRemediation(array $rule, ScanDetail $detail): ?string
     {
-        // For MVP, use a generic remediation or rule-specific
-        $remediations = [
-            'tops-iam-001' => 'Enable MFA for the IAM user to enhance security.',
-            'tops-iam-002' => 'Remove access keys and use IAM Identity Center for Single Sign-on.',
-            'tops-iam-003' => 'Remove inline policies and use IAM Groups instead.',
-            'tops-iam-004' => 'Remove attached policies and use IAM Groups instead.',
-            'tops-s3-001' => 'Enable Public Access Block on the bucket to prevent accidental public access.',
-            'tops-s3-002' => 'Enable server-side encryption (SSE) on the bucket.',
-            'tops-s3-003' => 'Enable versioning on the bucket to protect against accidental deletion.',
-            'tops-s3-005' => 'Enable S3 server access logging and direct logs to a dedicated log bucket.',
-            'tops-ec2-002' => 'Consider using a NAT Gateway or removing the public IP if not needed.',
-            'tops-ec2-006' => 'Set the instance metadata options to require IMDSv2 (HttpTokens=required).',
-            'tops-ec2-007' => 'Enable VPC Flow Logs for the VPC and deliver them to CloudWatch Logs or S3.',
-            'tops-rds-007' => 'Enable deletion protection on the RDS instance.',
-            'tops-rds-008' => 'Enable Enhanced Monitoring on the RDS instance for OS-level metrics.',
-            'tops-rds-009' => 'Enable automatic minor version upgrades on the RDS instance.',
-            'tops-iam-011' => 'Enable MFA on the AWS root account immediately and store the device securely.',
-            'tops-iam-012' => 'Delete the root account access keys and use IAM roles or IAM Identity Center instead.',
-            'tops-iam-013' => 'Configure an IAM password policy with a minimum length of at least 14 characters and complexity requirements.',
-            'tops-cloudtrail-001' => 'Start logging on the CloudTrail trail so account activity is captured.',
-            'tops-cloudtrail-002' => 'Enable log file validation on the trail to detect tampering.',
-            'tops-cloudtrail-003' => 'Recreate or update the trail as a multi-region trail.',
-            'tops-cloudtrail-004' => 'Configure the trail to deliver events to a CloudWatch Logs log group.',
-            'tops-cloudtrail-005' => 'Configure the trail to encrypt log files with a KMS customer managed key.',
-            'tops-lambda-001' => 'Change the function URL AuthType to AWS_IAM, or remove the function URL if not required.',
-            'tops-lambda-002' => 'Migrate the function to a currently supported runtime version.',
-            'tops-lambda-003' => 'Attach a VPC configuration to the function if it accesses private resources.',
-            'tops-lambda-004' => 'Move secrets out of environment variables into AWS Secrets Manager or SSM Parameter Store.',
-            'tops-kms-001' => 'Cancel the scheduled key deletion if the key is still needed for decryption.',
-            'tops-kms-002' => 'Enable automatic key rotation on the customer managed KMS key.',
-            'tops-kms-003' => 'Re-enable the KMS key if it is still required, or schedule it for deletion if not.',
-        ];
-        
-        $ruleId = $rule['rule'] ?? null;
-        return $remediations[$ruleId] ?? 'Review and remediate the security issue according to AWS best practices.';
+        return ($rule['remediation'] ?? '')
+            ?: 'Review and remediate the security issue according to AWS best practices.';
     }
 }

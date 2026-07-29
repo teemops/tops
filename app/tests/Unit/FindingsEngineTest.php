@@ -479,6 +479,7 @@ class FindingsEngineTest extends TestCase
                     'method' => 'listAccessKeys',
                     'description' => 'Access Keys should not be used',
                     'severity' => 'medium',
+                    'remediation' => 'Remove access keys and use IAM Identity Center for Single Sign-on.',
                     'condition' => "count(\$data['AccessKeyMetadata'] ?? []) > 0",
                 ],
             ],
@@ -508,6 +509,8 @@ class FindingsEngineTest extends TestCase
         $this->assertNotNull($finding);
         $this->assertEquals('IAM User Access Keys - test-user-keys', $finding->title);
         $this->assertEquals('medium', $finding->severity);
+        // The rule's own remediation reaches the finding — no PHP lookup involved, which
+        // is what lets a contributor ship a complete rule as JSON alone.
         $this->assertEquals(
             'Remove access keys and use IAM Identity Center for Single Sign-on.',
             $finding->remediation
@@ -754,5 +757,44 @@ class FindingsEngineTest extends TestCase
         $findings = ScanResult::where('scan_id', $scan->id)->get();
         $this->assertCount(1, $findings);
         $this->assertEquals('test-user-match', $findings->first()->resource_id);
+    }
+
+    /**
+     * A rule that declares no remediation still gets the generic advice rather than an
+     * empty column — the behaviour rules without an entry in the old PHP map always had.
+     */
+    public function test_a_rule_without_remediation_falls_back_to_generic_advice(): void
+    {
+        $method = new \ReflectionMethod(FindingsEngine::class, 'buildRemediation');
+        $method->setAccessible(true);
+
+        $engine = new FindingsEngine(Mockery::mock(ConditionEvaluator::class));
+        $detail = new ScanDetail();
+
+        $this->assertSame(
+            'Review and remediate the security issue according to AWS best practices.',
+            $method->invoke($engine, ['rule' => 'tops-whatever-001'], $detail)
+        );
+        $this->assertSame(
+            'Do the thing.',
+            $method->invoke($engine, ['rule' => 'tops-whatever-001', 'remediation' => 'Do the thing.'], $detail)
+        );
+    }
+
+    /**
+     * Every rule that had remediation text before it moved out of PHP must still have it.
+     * A backfill that dropped entries would silently downgrade findings to generic advice.
+     */
+    public function test_shipped_rulesets_carry_their_remediation_text(): void
+    {
+        $engine = new FindingsEngine(Mockery::mock(ConditionEvaluator::class));
+
+        $withRemediation = collect($engine->loadRules('basic'))
+            ->filter(fn (array $rule) => !empty($rule['remediation']));
+
+        $this->assertGreaterThanOrEqual(29, $withRemediation->count());
+        $this->assertNotEmpty(
+            $withRemediation->firstWhere('rule', 'tops-kms-002')['remediation'] ?? null
+        );
     }
 }

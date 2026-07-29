@@ -2,70 +2,39 @@
 
 namespace App\Services\Scanners;
 
-use App\Services\AwsSecurityScanner;
+use Aws\AwsClientInterface;
 use Aws\Iam\Exception\IamException;
-use Illuminate\Support\Facades\Log;
 
-class IamScanner extends AwsSecurityScanner
+/**
+ * IAM needs one thing the generic scanner cannot express: a missing account password
+ * policy is reported as an error, but that absence is itself the insecure condition
+ * CIS 1.8/1.9 test for. Everything else comes from GenericAwsScanner.
+ */
+class IamScanner extends GenericAwsScanner
 {
-    /**
-     * Execute IAM API calls based on method name
-     * Returns raw AWS SDK response (array)
-     */
-    public function executeApiCall(string $method, array $credentials, array $params = []): array
-    {
-        $iamClient = $this->createClient('iam', $credentials);
+    protected string $clientKey = 'iam';
 
-        // Log params for debugging (especially for methods that require parameters)
-        if (in_array($method, ['getUser', 'listMFADevices', 'listAccessKeys', 'listUserPolicies', 'listGroupsForUser', 'listAttachedUserPolicies', 'getRole', 'listRolePolicies', 'listAttachedRolePolicies'])) {
-            Log::info("IAM API call with params", [
-                'method' => $method,
-                'params' => $params,
-                'params_count' => count($params),
-                'params_empty' => empty($params),
-                'has_username' => isset($params['UserName']),
-                'username_value' => $params['UserName'] ?? 'NOT SET',
-                'has_rolename' => isset($params['RoleName']),
-                'rolename_value' => $params['RoleName'] ?? 'NOT SET',
-            ]);
-        }
-
-        return $this->callApi('IAM', $method, $params, fn () => match ($method) {
-            'listUsers' => $iamClient->listUsers($params)->toArray(),
-            'listRoles' => $iamClient->listRoles($params)->toArray(),
-            'getUser' => $iamClient->getUser($params)->toArray(),
-            'listMFADevices' => $iamClient->listMFADevices($params)->toArray(),
-            'listAccessKeys' => $iamClient->listAccessKeys($params)->toArray(),
-            'listUserPolicies' => $iamClient->listUserPolicies($params)->toArray(),
-            'listGroupsForUser' => $iamClient->listGroupsForUser($params)->toArray(),
-            'listAttachedUserPolicies' => $iamClient->listAttachedUserPolicies($params)->toArray(),
-            'getRole' => $iamClient->getRole($params)->toArray(),
-            'getRolePolicy' => $iamClient->getRolePolicy($params)->toArray(),
-            'listRolePolicies' => $iamClient->listRolePolicies($params)->toArray(),
-            'listAttachedRolePolicies' => $iamClient->listAttachedRolePolicies($params)->toArray(),
-            'getAccountSummary' => $iamClient->getAccountSummary($params)->toArray(),
-            'getAccountPasswordPolicy' => $this->getAccountPasswordPolicy($iamClient, $params),
-            default => throw new \InvalidArgumentException("Unknown IAM method: {$method}"),
-        });
-    }
+    protected string $label = 'IAM';
 
     /**
-     * Fetch the account password policy.
+     * Translate "no password policy configured" into the engine's error marker so the
+     * rules' "$data === false" branch fires, mirroring how RulesEngine records failed
+     * per-item actions.
      *
-     * IAM throws NoSuchEntity when no password policy is configured — which is
-     * itself the insecure condition we want to flag. Translate that specific case
-     * into the engine's error marker so the rule's "$data === false" branch fires
-     * (mirrors how RulesEngine stores failed per-item actions). Any other error is
-     * rethrown so callApi() can log and retry it as a genuine failure.
+     * This deliberately sits inside invoke() rather than wrapping executeApiCall(): the
+     * expected absence must not travel through callApi()'s catch, which would log a
+     * scan error on every scan of a correctly-detected misconfiguration. Any other IAM
+     * error is rethrown so it is logged and retried as the genuine failure it is.
      */
-    private function getAccountPasswordPolicy(\Aws\Iam\IamClient $iamClient, array $params): array
+    protected function invoke(AwsClientInterface $client, string $method, string $operation, array $params): array
     {
         try {
-            return $iamClient->getAccountPasswordPolicy($params)->toArray();
+            return parent::invoke($client, $method, $operation, $params);
         } catch (IamException $e) {
-            if ($e->getAwsErrorCode() === 'NoSuchEntity') {
+            if ($method === 'getAccountPasswordPolicy' && $e->getAwsErrorCode() === 'NoSuchEntity') {
                 return ['__error__' => true, 'error_message' => 'No account password policy configured'];
             }
+
             throw $e;
         }
     }
