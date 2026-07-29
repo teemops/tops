@@ -93,30 +93,6 @@ jobs:
           echo "version=$NEXT" >> "$GITHUB_OUTPUT"
           echo "tag=v$NEXT" >> "$GITHUB_OUTPUT"
 
-      - name: Write VERSION and push
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          if [ "$(tr -d '[:space:]' < VERSION)" != "$VERSION" ]; then
-            echo "$VERSION" > VERSION
-            git add VERSION
-            git commit -m "chore(release): v$VERSION [skip ci]"
-            git push origin develop
-          fi
-
-      - name: Create the tag
-        env:
-          TAG: ${{ steps.version.outputs.tag }}
-          VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          set -euo pipefail
-          git tag -a "$TAG" -m "Release $VERSION"
-          git push origin "$TAG"
-
       - name: Set up PHP
         uses: shivammathur/setup-php@v2
         with:
@@ -189,6 +165,36 @@ jobs:
             ${{ env.INSTALLER_IMAGE }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # Everything below only runs once all three images are pushed. Tagging
+      # first would mean a failed image build leaves a dangling tag: the next
+      # run would see v<version> already exists, bump past it, and that version
+      # would be burned forever with nothing published under it.
+      - name: Write VERSION and push
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # [skip ci] stops this push re-triggering Tests, which would in turn
+          # re-trigger this workflow.
+          if [ "$(tr -d '[:space:]' < VERSION)" != "$VERSION" ]; then
+            echo "$VERSION" > VERSION
+            git add VERSION
+            git commit -m "chore(release): v$VERSION [skip ci]"
+            git push origin develop
+          fi
+
+      - name: Create the tag
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          git tag -a "$TAG" -m "Release $VERSION"
+          git push origin "$TAG"
 
       - name: Cut the GitHub release
         env:

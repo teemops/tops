@@ -1,6 +1,6 @@
 # Teemops - Cloud Security Scanning Application
 
-[![Tests](https://github.com/teemops/saas/actions/workflows/tests.yml/badge.svg?branch=develop)](https://github.com/teemops/saas/actions/workflows/tests.yml)
+[![Tests](https://github.com/teemops/tops/actions/workflows/tests.yml/badge.svg?branch=develop)](https://github.com/teemops/tops/actions/workflows/tests.yml)
 [![PHP](https://img.shields.io/badge/PHP-8.2%2B-777BB4?logo=php&logoColor=white)](https://www.php.net/)
 [![Laravel](https://img.shields.io/badge/Laravel-12-FF2D20?logo=laravel&logoColor=white)](https://laravel.com/)
 [![Vue](https://img.shields.io/badge/Vue-3-4FC08D?logo=vue.js&logoColor=white)](https://vuejs.org/)

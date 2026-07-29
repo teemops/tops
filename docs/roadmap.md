@@ -33,8 +33,9 @@ their own AWS accounts, and telling us what's wrong with it.
 **Done when:** a design partner can install TOPS from the documentation alone, connect an
 AWS account, run a scan, and act on the findings — without a call.
 
-Note this milestone is **not** "the repo goes public". Public release is a later
-milestone with a higher bar (see Decisions Log, D-4).
+Note this milestone was **not** "the repo goes public" — public release was meant to be a
+later, higher-barred milestone (D-4). **The repo went public on 2026-07-30 anyway**, ahead
+of that sequencing, which promoted several items. See D-4 and N-6.
 
 ### Who we're building for
 
@@ -72,7 +73,7 @@ Decisions already made, so we don't relitigate them. Each has a trigger for revi
 | **D-1** | **Open source, self-hosted first.** Hosted multi-tenant SaaS is not the focus. | 2026-07-29 | Removes the entire commercial layer from the roadmap; every hard dependency on a hosted service becomes an adoption barrier instead of an assumption. | A commercial model is chosen. |
 | **D-2** | **Firebase auth stays, opt-in and off by default.** Not removed. | 2026-07-29 | It's built and works; some self-hosters will want OAuth. The default path must never require a Firebase project. | Never — it stays optional. |
 | **D-3** | **AWS onboarding stays as-is** (`install.sh` + CFN + SNS/SQS); we document it better rather than simplifying it. | 2026-07-29 | With a handful of hand-held design partners the friction is tolerable, and we'll learn whether the SNS automation is actually valued before investing in replacing it. | **Public release**, or the first design partner who gives up during setup. |
-| **D-4** | **Public repo release is a separate, later milestone.** | 2026-07-29 | Design partners are a smaller, safer audience. Going public raises the bar on security, docs, and contributor experience. | Design partners are running successfully. |
+| ~~**D-4**~~ | ~~**Public repo release is a separate, later milestone.**~~ **Superseded 2026-07-30 — the repo is public.** | 2026-07-29 | Design partners were meant to come first, with public release held to a higher bar on security, docs and contributor experience. That sequencing did not happen. | **Done.** Its dependants are listed below. |
 | **D-5** | **MFA ships as new-device email OTP, not TOTP.** No authenticator app, no external OTP service. | 2026-07-29 | Delivers most of the protection (stolen password alone is insufficient) for a fraction of the work, and works on the native auth path where TOTP currently doesn't. | Design partners ask for authenticator-app support, or a compliance requirement forces it. |
 | **D-6** | **No billing, plans, or licence gating.** | 2026-07-29 | No revenue model yet (D-1). | A commercial model is chosen. |
 | **D-7** | **Apache-2.0, with trademark held separately and a DCO for contributions.** | 2026-07-29 | See below — this one has enough reasoning behind it to warrant its own section. | Effectively never; the DCO is what makes it durable. |
@@ -145,7 +146,7 @@ was the author, and it stops being survivable the moment a design partner is inv
 **What a first-time user does**
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/teemops/tops/master/install.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/teemops/tops/develop/install.sh)
 ```
 
 That script pulls tagged images from Docker Hub and starts the stack. No PHP, no Composer,
@@ -188,7 +189,8 @@ Sizes are rough and relative, for one person: **XS** under a day · **S** a day 
 | --- | --- | --- | :---: |
 | ~~**N-1**~~ | ~~Fix the clean-checkout build~~ | ✅ **Done** 2026-07-29 — `@vitejs/plugin-vue` on `^6`, `npm ci` clean, frontend CI job added. | — |
 | ~~**N-2**~~ | ~~Choose and add a licence~~ | ✅ **Done** 2026-07-29 — Apache-2.0, trademark held separately, DCO for contributions. See D-7. | — |
-| **N-5** | Release pipeline + Docker Hub images | **New, and it goes first.** TOPS has no version, tag, changelog or published artifact. `install.sh` cannot pull images that nobody publishes. See D-8. | L |
+| **N-6** | SNS signature verification | **Promoted from Next on 2026-07-30**, the day the repo went public — this is X-2, whose own deferral reasoning said it expired at exactly that point. The verifier is a stub that returns `true`, on an unauthenticated route that registers IAM role ARNs, and the code is now readable by anyone. | M |
+| **N-5** | Release pipeline + Docker Hub images | Built 2026-07-30; blocked on Docker Hub secrets. TOPS had no version, tag, changelog or published artifact. See D-8. | L |
 | **N-3** | Setup docs a stranger can follow | The milestone is "installs without a call". Now sits on top of N-5: one `install.sh`, plus removing vendor-baked defaults from `.env.example`. | M |
 | **N-4** | Remediation for every finding | 39 of 74 rules have no fix text — including all 22 CIS rules. A finding without a fix is homework. | M |
 
@@ -197,10 +199,9 @@ Sizes are rough and relative, for one person: **XS** under a day · **S** a day 
 | # | Feature | Why it's here | Size |
 | --- | --- | --- | :---: |
 | **X-1** | New-device email OTP | Wanted soon. Code prompt only on an unrecognised browser. Generator already exists — mostly extraction. | M |
-| **X-2** | SNS signature verification | Currently a stub with a `TODO`. Exposure is per-deployment today; **that reasoning expires at public release.** | M |
 | **X-3** | Prove the self-hosted path in CI | Nothing asserts the app boots with `FIREBASE_USER_AUTH=false` — the default config. | S |
 | **X-4** | Delete or route the dead OAuth controller | 99 lines, zero routes, unused dependency. Could give native-auth users OAuth without Firebase. | S |
-| **X-6** | Enforce DCO sign-off in CI | Sign-off is required in writing but unchecked. D-7's no-rug-pull guarantee depends on provenance being recorded. | XS |
+| **X-6** | Enforce DCO sign-off in CI | Sign-off is required in writing but unchecked. D-7's guarantee depends on provenance. **The repo is public, so an external PR can now arrive at any time.** | XS |
 | **X-5** | Reconcile member permissions | Code, comments and the plan doc disagree on who can manage members. | XS |
 | **X-7** | Clear the remaining npm audit backlog | 17 → **5**, criticals at 0 and gated in CI. What's left needs a `firebase` major bump; nothing reaches a running instance. | XS |
 
@@ -213,8 +214,8 @@ Sizes are rough and relative, for one person: **XS** under a day · **S** a day 
 | Expand scanner coverage | Nothing — it's available now. Cheapest: rules for the four pilot services (DynamoDB, ELBv2, SNS, SQS) where plumbing exists. | Ongoing |
 | PCI ruleset | A decision: author it or delete it. Empty for six months. | M |
 | Sandbox rule conditions (`eval()`) | **Any feature accepting a ruleset we didn't write.** Community rules turn a condition into RCE. | M |
-| Simplify AWS onboarding | Public release, or the first partner who gives up during setup (D-3). | M |
-| Contributor experience | The public-release milestone (D-4). | M |
+| Simplify AWS onboarding | **Trigger fired** — D-3 named public release, which has happened. | M |
+| Contributor experience | **Trigger fired** — repo is public. | M |
 | Multi-cloud (Azure, GCP) | AWS being genuinely good first. | L |
 
 ---
@@ -255,6 +256,36 @@ reasoning in **D-7** above.
       (`composer.json` had been declaring the project MIT under the Laravel skeleton's
       name — a direct conflict, now fixed)
 - [x] Recorded in the Decisions Log as D-7
+
+---
+
+### N-6 · SNS signature verification
+
+*Security. Promoted from X-2 on 2026-07-30 because the repo went public.*
+
+`SnsSignatureVerifier::verify()` checks that three JSON fields are present and then
+`return true`. The `TODO` listing the four real steps — fetch `SigningCertURL`, download the
+certificate, verify the chain, verify the signature — is untouched, and `verifyWithAwsSdk()`
+is a comment-only shell. `SubscriptionConfirmation` messages are auto-accepted.
+
+**What changed.** Nothing in the code. What changed is who can read it. The consuming route
+is unauthenticated by design and is the one that registers IAM role ARNs during account
+linking. While the repo was private, an attacker had to guess the shape of an acceptable
+payload; now the accepted fields and the absence of any cryptographic check are public.
+X-2's own text said this reasoning "expires at public release" — it has.
+
+**Acceptance criteria**
+- [ ] Given a message with a valid AWS signature, when it arrives, then it is accepted
+- [ ] Given a message with a missing, malformed or incorrect signature, when it arrives, then it is rejected and logged
+- [ ] Given a `SigningCertURL` not on an `amazonaws.com` host over HTTPS, when it arrives, then it is rejected **without** fetching the URL — that is the classic bypass
+- [ ] Given a `SubscriptionConfirmation`, when it arrives, then it is verified before the subscription is confirmed
+- [ ] Given verification fails, when the request completes, then no account state changed
+
+**Technical notes**
+- `aws/aws-sdk-php` is already a dependency and ships `Aws\Sns\MessageValidator`. Use it
+  rather than hand-rolling certificate handling.
+- The dead `verifyWithAwsSdk()` shell should go in the same change, not linger beside a
+  working implementation.
 
 ---
 
@@ -319,10 +350,17 @@ silently floats onto an untested build is handled at the other end: `install.sh`
 `docker compose pull`. Revisit if a design partner ever needs to stay on a known-good
 release for longer than a single merge.
 
+**Repo renamed 2026-07-30** — `teemops/saas` is now `teemops/tops`, so the install URL is
+correct. It points at `develop` rather than `master`: `develop` is the default branch, and
+it is consistent with `latest` tracking `develop`. The consequence, accepted knowingly, is
+that the script users pipe into `bash` moves when `develop` moves.
+
+**Untested until public release:** `raw.githubusercontent.com` returns 404 for private
+repos, so the one-liner cannot be verified while D-4 is open — and GitHub only documents
+rename redirects for web and git operations, not for the raw host. Re-check the URL by hand
+the day the repo goes public.
+
 **Open — still needed**
-- Whether the repo is renamed to `teemops/tops` at public release. The installer and docs
-  currently say `teemops/tops` per the agreed one-liner; this repo is `teemops/saas` on
-  `develop`, so **the URL is wrong until that rename happens**. `TOPS_REPO` overrides it.
 - `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` repository secrets.
 - Images pushed to Docker Hub, so the pull-and-run path can be tested end to end.
 
@@ -440,23 +478,6 @@ Queued behind the design-partner milestone. Not started, not forgotten.
 
 ---
 
-### X-2 · Implement SNS signature verification
-
-*Security. Currently a stub.*
-
-`SnsSignatureVerifier.php:62-66` is a literal `TODO`. It checks a header and three JSON
-field names — nothing cryptographic. `verifyWithAwsSdk()` is a comment-only shell.
-`SubscriptionConfirmation` messages are auto-accepted. The consuming route is
-unauthenticated by design and registers IAM role ARNs.
-
-**Placed in Next, not Now, deliberately:** each design partner runs their own instance
-and their own SNS topic, so the exposure is to their own deployment rather than a shared
-tenant. That reasoning **expires at public release** — this must be closed before D-4.
-
-`aws/aws-sdk-php` is already a dependency and ships `Aws\Sns\MessageValidator`. Reject
-`SigningCertURL` values not on an `amazonaws.com` host over HTTPS — that's the classic
-bypass.
-
 ### X-3 · Prove the self-hosted path in CI
 
 No test asserts the app boots and authenticates with `FIREBASE_USER_AUTH=false` — which
@@ -516,7 +537,7 @@ unchanged; `composer run dev` is the only caller.
 - **`brace-expansion`** via `vue-tsc` → `minimatch`. Build-time only. The 2.x line has no
   fix, so it clears when `vue-tsc` updates its `minimatch`.
 
-**Finish this before public release**, alongside X-2.
+**The public-release deadline for this passed on 2026-07-30.** Finish it alongside N-6.
 
 ### X-5 · Reconcile member-management permissions
 
@@ -536,7 +557,7 @@ Real, but not now. Most need a user to ask before they're worth building.
 | **Scheduled / recurring scans** | Not started. Likely the first thing a real operator asks for; promote on first request. |
 | **PCI ruleset** | `pci.json` has been empty for six months and the profile is hidden. **Author it or delete it** — an empty file is a promise we're not keeping. |
 | **Simplify AWS onboarding** | Promote the existing manual role-ARN path to primary, drop the SNS/SQS requirement for basic use. Triggered by D-3's revisit condition. |
-| **Contributor experience** | `CONTRIBUTING.md`, code of conduct, issue templates, good-first-issues, published container images. Belongs with the public-release milestone (D-4). |
+| **Contributor experience** | `CONTRIBUTING.md`, code of conduct, issue templates, good-first-issues, published container images. **Trigger fired 2026-07-30** — the repo is public, so this is live rather than waiting. |
 | **Expand scanner coverage** | 11 services today. [`planning.md`](./planning.md) holds the staged plan — Secrets Manager, CloudWatch, GuardDuty, EBS, ACM and more. Now a JSON-only change, so it's contributor-friendly work — good candidates for first issues once public. Cheapest wins: rules for the four pilot services (DynamoDB, ELBv2, SNS, SQS) where the plumbing already exists. |
 | **Sandbox rule conditions** | `ConditionEvaluator.php:40` evaluates rule conditions with PHP `eval()`. Safe while we author every ruleset — **not safe once rulesets are shared**, which open source invites. **Trigger: any feature that accepts a ruleset we didn't write** (community rules, rule upload, downloadable rulesets). Options and rationale in [`planning.md`](./planning.md#known-constraint-rule-conditions-use-eval). |
 | **Multi-cloud (Azure, GCP)** | Untouched. Not before AWS is genuinely good. |
@@ -567,9 +588,9 @@ Blocking nothing today, but each one shapes the plan:
    but worth getting right before the repo is public.
 3. **How many design partners, and by when?** Sizes the Now bucket and sets a real
    deadline.
-4. **Does the SNS gap (X-2) need closing before you hand the code to an external party?**
-   The current placement assumes partners are trusted and self-hosting. If any partner is
-   at arm's length, this moves to Now.
+4. ~~**Does the SNS gap need closing before you hand the code to an external party?**~~
+   ✅ **Answered by events 2026-07-30** — the repo is public, so the code is already in
+   arm's-length hands. Promoted to **N-6**.
 5. **What does a design partner have to tell us for this milestone to count as a
    success?** Worth deciding before we start, not after.
 
@@ -577,6 +598,13 @@ Blocking nothing today, but each one shapes the plan:
 
 ## Changelog
 
+- **2026-07-30** — **The repo went public**, ahead of D-4's intended sequencing. Verified
+  the install one-liner resolves (`raw.githubusercontent.com` does follow the rename
+  redirect, so both old and new URLs serve). Four deferrals were keyed to this moment and
+  all fired at once: SNS signature verification promoted to **N-6** in Now, the npm
+  backlog's deadline passed, DCO enforcement is now urgent because an external PR can
+  arrive any day, and contributor experience plus AWS-onboarding simplification are live.
+  D-4 is marked superseded rather than done — the bar it described was not met first.
 - **2026-07-30** — N-5 added to **Now**, ahead of N-3, and recorded as D-8. Designing N-3
   showed that installation currently means compiling assets on the user's machine, which
   the milestone cannot survive. `install.sh` becomes a thin runner over published Docker
