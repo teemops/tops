@@ -150,6 +150,7 @@ Sizes are rough and relative, for one person: **XS** under a day · **S** a day 
 | **X-4** | Delete or route the dead OAuth controller | 99 lines, zero routes, unused dependency. Could give native-auth users OAuth without Firebase. | S |
 | **X-6** | Enforce DCO sign-off in CI | Sign-off is required in writing but unchecked. D-7's no-rug-pull guarantee depends on provenance being recorded. | XS |
 | **X-5** | Reconcile member permissions | Code, comments and the plan doc disagree on who can manage members. | XS |
+| **X-7** | Clear the remaining npm audit backlog | 17 → **5**, criticals at 0 and gated in CI. What's left needs a `firebase` major bump; nothing reaches a running instance. | XS |
 
 ### Later — real, but waiting on a trigger
 
@@ -354,6 +355,47 @@ provenance being recorded, so an unsigned commit that slips through weakens it. 
 sign-off check is a standard GitHub Action and belongs in place before the first external
 PR, not after.
 
+### X-7 · Clear the remaining npm audit backlog
+
+Surfaced by N-1: once `npm ci` completed, `npm audit` ran for the first time and reported
+**17 advisories — 4 critical, 10 high, 3 moderate**.
+
+**On 2026-07-29 this went 17 → 5, with criticals at 0** and CI now failing on a new one
+(`npm audit --audit-level=critical`).
+
+Only two packages needed a manifest change; everything else was a lockfile refresh into
+ranges the manifest already allowed.
+
+| Package | Was | Now | Route in | Needed |
+| --- | --- | --- | --- | --- |
+| `axios` | 1.13.2 | 1.18.1 | direct, **bundled** | manifest floor `^1.11.0` → `^1.18.1` |
+| `concurrently` | 9.2.1 | 10.0.4 | direct | major bump — it pins `shell-quote` exactly |
+| `shell-quote` | 1.8.3 | 1.9.0 | `concurrently` | came with the above |
+| `protobufjs` | 7.5.4 | 7.6.5 | `firebase` → `@grpc/proto-loader` | in-range |
+| `websocket-driver` | 0.7.4 | 0.7.5 | `firebase` → `faye-websocket` | in-range |
+| `vite` | 7.3.1 | 7.3.6 | direct | in-range |
+| `form-data`, `qs`, `lodash-es`, `minimatch`, `picomatch`, `postcss`, `rollup` | — | — | transitive | in-range |
+
+`axios` was the important one: it is bundled into the app at `resources/js/bootstrap.ts:1`,
+so it is the only entry here that reached a running instance. It was on a range covering
+nine advisories including a `validateStatus` prototype-pollution auth bypass. The manifest
+range `^1.11.0` already permitted the fix — the lockfile had simply never been refreshed —
+but the floor was raised so it cannot drift back below it.
+
+`concurrently` raises the Node floor to 22, now recorded in `package.json` `engines`
+alongside the 22.12 that `@vitejs/plugin-vue@6` already required. Its CLI flags are
+unchanged; `composer run dev` is the only caller.
+
+**What remains — 5 high, in two packages, neither reaching a running instance:**
+
+- **`@grpc/grpc-js`** via `firebase` → `@firebase/firestore`. Pinned by Firebase, so it
+  needs a `firebase` major bump. Per D-2 Firebase is opt-in and off by default, so this
+  affects only operators who enable it.
+- **`brace-expansion`** via `vue-tsc` → `minimatch`. Build-time only. The 2.x line has no
+  fix, so it clears when `vue-tsc` updates its `minimatch`.
+
+**Finish this before public release**, alongside X-2.
+
 ### X-5 · Reconcile member-management permissions
 
 Code permits administrators to manage members; the comments directly above it and
@@ -413,6 +455,9 @@ Blocking nothing today, but each one shapes the plan:
 
 ## Changelog
 
+- **2026-07-29** — npm advisories cut 17 → 5, criticals to 0, and CI fails on a new
+  critical. `axios` — the only bundled dependency among them — is on 1.18.1. X-7 now
+  covers only `firebase`'s `@grpc/grpc-js` and a build-time `brace-expansion`.
 - **2026-07-29** — N-1 landed. `npm ci` is clean on a fresh clone and CI now builds the
   frontend. **Now** is down to N-3 (setup docs) and N-4 (remediation coverage); N-3 is
   next.
