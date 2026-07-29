@@ -161,8 +161,10 @@ Visit: http://localhost:8000
 - [Environment Setup](./docs/laravel-app/ENV_SETUP.md) - Environment variables
 
 ### Architecture & Planning
+- [**Roadmap**](./docs/roadmap.md) - The plan of record: Now / Next / Later and the decisions log
+- [Progress](./docs/PROGRESS.md) - What's actually built, verified against the code
 - [Architecture](./docs/architecture.md) - System architecture and design decisions
-- [Planning](./docs/planning.md) - Project planning and roadmap
+- [AWS Scanner Coverage](./docs/planning.md) - Services and misconfigurations to scan, and the plan for expanding coverage
 
 ### Features
 - [Feature Specifications](./docs/features/features-spec.md) - All features and user stories
