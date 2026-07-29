@@ -27,9 +27,11 @@ EOF
     [ -n "$prompt" ] || exit 0
 
     # Only fire on prompts that read as new feature work. Deliberately narrow —
-    # a reminder on every prompt is noise, and noise gets the hook deleted.
+    # a reminder on every prompt is noise, and noise gets the hook deleted, so
+    # this errs toward silence. "report" is left out on purpose: paired with
+    # "new" it matched ordinary sentences like "push any new commits and report".
     echo "$prompt" | grep -qiE \
-      '\b(add|build|implement|create|new)\b.{0,40}\b(feature|page|screen|endpoint|api|report|dashboard|workflow|integration)\b' \
+      '\b(add|build|implement|create|new)\b.{0,40}\b(feature|page|screen|endpoint|api|dashboard|workflow|integration)\b' \
       || exit 0
 
     jq -n '{
