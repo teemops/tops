@@ -23,7 +23,7 @@ sudo -u www-data composer update
 
 #npm install
 cd /srv/apps/tops/app
-sudo -u www-data npm install --legacy-peer-deps
+sudo -u www-data npm ci
 #build front-end assets for production
 # These variables should be loaded from /srv/apps/tops/app/.env into /etc/environment above.
 # No need to redefine APP_URL, ZIGGY_URL, ASSET_URL here.

@@ -1,4 +1,4 @@
-# Phase 2: AWS messaging installer (run via ./install.sh)
+# Phase 2: AWS messaging installer (run via ./install-messaging.sh)
 services:
   installer:
     build:
