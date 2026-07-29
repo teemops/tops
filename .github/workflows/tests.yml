@@ -91,7 +91,45 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
-  # A frontend build job is deliberately not included yet: `npm ci` currently
-  # fails on a clean checkout because @vitejs/plugin-vue@5 peer-depends on
-  # vite ^5 || ^6 while the project is on vite 7. Add the job once that is
-  # resolved, otherwise the badge is red for reasons unrelated to any change.
+  frontend:
+    name: Frontend build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      # Ziggy publishes its route helper from the Composer package, and the
+      # type-check step of `npm run build` imports it, so the frontend build
+      # needs vendor/ present.
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: bcmath, mbstring, sockets, zip
+          coverage: none
+
+      - name: Cache Composer packages
+        uses: actions/cache@v4
+        with:
+          path: app/vendor
+          key: composer-${{ runner.os }}-php8.3-${{ hashFiles('app/composer.lock') }}
+          restore-keys: composer-${{ runner.os }}-php8.3-
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      # No --force and no --legacy-peer-deps: a clean checkout must install as
+      # published, and this job is what keeps it that way.
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build assets
+        run: npm run build

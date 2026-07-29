@@ -52,8 +52,9 @@ What follows from that:
 ### Constraint
 
 **One person building, with Claude.** This is the single biggest input to the plan. The
-**Now** bucket holds four items and is sequenced, not parallel. Resist growing it —
-adding a fifth item makes the first four later, it does not make more happen.
+**Now** bucket held four items at creation and is sequenced, not parallel — two are done,
+two remain. Resist growing it — adding an item makes the others later, it does not make
+more happen.
 
 ---
 
@@ -134,7 +135,7 @@ Sizes are rough and relative, for one person: **XS** under a day · **S** a day 
 
 | # | Feature | Why it's here | Size |
 | --- | --- | --- | :---: |
-| **N-1** | Fix the clean-checkout build | `npm ci` fails on a fresh clone. First command a new person runs, and it fails. | S |
+| ~~**N-1**~~ | ~~Fix the clean-checkout build~~ | ✅ **Done** 2026-07-29 — `@vitejs/plugin-vue` on `^6`, `npm ci` clean, frontend CI job added. | — |
 | ~~**N-2**~~ | ~~Choose and add a licence~~ | ✅ **Done** 2026-07-29 — Apache-2.0, trademark held separately, DCO for contributions. See D-7. | — |
 | **N-3** | Setup docs a stranger can follow | The milestone is "installs without a call". This is that, plus removing vendor-baked defaults from `.env.example`. | L |
 | **N-4** | Remediation for every finding | 39 of 74 rules have no fix text — including all 22 CIS rules. A finding without a fix is homework. | M |
@@ -169,23 +170,22 @@ Sizes are rough and relative, for one person: **XS** under a day · **S** a day 
 
 The path to putting TOPS in a design partner's hands. Sequenced — do them in order.
 
-### N-1 · Fix the clean-checkout build
+### ~~N-1 · Fix the clean-checkout build~~ ✅ Done 2026-07-29
 
-*Infrastructure — no user story required, but ships with a green CI job.*
+`@vitejs/plugin-vue` moved from `^5` to `^6`, whose peer range is
+vite `^5 || ^6 || ^7`. No other change was needed — the plugin's own API is unchanged for
+this project's usage, and the build output is identical.
 
-**Problem:** `npm ci` fails on a fresh clone. `@vitejs/plugin-vue@5` peer-depends on
-vite `^5 || ^6`; the project is on vite 7. This is documented as a CI workaround at
-`.github/workflows/tests.yml:94-97` and has never been tracked as a defect. It is the
-**first command a new person runs**, and it fails.
+- [x] `npm ci` succeeds on a clean checkout with no `--force` or `--legacy-peer-deps`
+- [x] `npm run build` produces a working bundle
+- [x] CI gains a frontend build job that would catch a regression
+- [x] The workaround comment in `tests.yml` is removed, not amended
+- [x] `app/install-deps.sh` no longer passes `--legacy-peer-deps`, and no longer
+      swallows a failed build behind a warning
 
-**Acceptance criteria**
-- [ ] `npm ci` succeeds on a clean checkout with no `--force` or `--legacy-peer-deps`
-- [ ] `npm run build` produces a working bundle
-- [ ] CI gains a frontend build job that would catch a regression
-- [ ] The workaround comment in `tests.yml` is removed, not amended
-
-**Why first:** everything else in Now is invisible if the project won't build. Cheapest
-item with the widest blast radius.
+**Note for N-3:** the frontend build needs `composer install` to have run first — Ziggy's
+route helper is published by the Composer package and imported by the type-check step.
+The CI job installs both. The setup docs must state that order.
 
 ---
 
@@ -413,6 +413,11 @@ Blocking nothing today, but each one shapes the plan:
 
 ## Changelog
 
+- **2026-07-29** — N-1 landed. `npm ci` is clean on a fresh clone and CI now builds the
+  frontend. **Now** is down to N-3 (setup docs) and N-4 (remediation coverage); N-3 is
+  next.
+- **2026-07-29** — N-2 landed. Apache-2.0, trademark held separately, DCO. Recorded as
+  D-7.
 - **2026-07-29** — Created. Follows a full code audit that found `PROGRESS.md` six months
   and ~8 merged PRs stale. Direction set to open-source self-hosted; milestone set to
   design partners; decisions D-1 to D-6 recorded.

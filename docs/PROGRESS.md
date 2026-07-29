@@ -164,9 +164,8 @@ box without an AWS account or a Firebase project?**
 
 #### CI Pipeline
 - **Status**: ✅ Complete *(unrecorded)*
-- **Implementation**: `.github/workflows/tests.yml` — PHPUnit + `scan:validate-rules`
-- **Gap**: no frontend build job, because `npm ci` fails on a clean checkout (see
-  Open-Source Readiness)
+- **Implementation**: `.github/workflows/tests.yml` — two jobs: PHPUnit +
+  `scan:validate-rules`, and a frontend job running `npm ci` (no flags) + `npm run build`
 
 ---
 
@@ -234,10 +233,10 @@ most of it blocks the first external contributor or self-hoster.
    separately (`TRADEMARK.md`) and a DCO for contributions (`CONTRIBUTING.md`). Rationale
    in roadmap decision D-7. `composer.json` had been declaring the project MIT under the
    Laravel skeleton's name; corrected in the same change.
-2. **`npm ci` fails on a clean checkout.** `@vitejs/plugin-vue@5` peer-depends on
-   vite ^5||^6, the project is on vite 7. Documented as a CI workaround in
-   `.github/workflows/tests.yml:94-97` but never tracked as a defect. **Every new
-   contributor hits this on their first command.**
+2. ~~**`npm ci` fails on a clean checkout.**~~ ✅ **Resolved 2026-07-29** —
+   `@vitejs/plugin-vue` moved to `^6`, which peer-depends on vite `^5 || ^6 || ^7`. A
+   frontend CI job now runs `npm ci` with no flags plus `npm run build`, so a regression
+   fails the build rather than being absorbed by `--legacy-peer-deps`.
 3. **AWS account onboarding requires vendor infrastructure.** `init()` hard-fails 503
    without `AWS_PARENT_ACCOUNT_ID`, `TOPS_CFN_TEMPLATE_URL` and
    `TOPS_DEPLOYMENT_REGION`, and `install.sh` deploys real SNS/SQS into an account you
@@ -317,7 +316,7 @@ most of it blocks the first external contributor or self-hoster.
 | Auth (both paths) | ✅ Good (32 feature tests) |
 | Self-hosted / native-auth boot path | ❌ None |
 | Docker stack | ⚠️ Shell tests for backup/PITR only |
-| Frontend build | ❌ No CI job (`npm ci` broken) |
+| Frontend build | ✅ CI job — `npm ci` + `npm run build` |
 
 E2E: `scans.spec.ts` (31), `organizations.spec.ts` (13), `mfa.spec.ts` (6),
 `auth.spec.ts` (2).
@@ -333,7 +332,7 @@ E2E: `scans.spec.ts` (31), `organizations.spec.ts` (13), `mfa.spec.ts` (6),
 | **Database** — normalised schema, reversible migrations, Eloquent only | ✅ Following |
 | **Code quality** | ✅ Following |
 | **Security** — multi-tenancy, authz, encryption | ⚠️ Org scoping and encryption are solid; **the SNS webhook is the outstanding gap** |
-| **Testing** — tests ship with the change | ✅ Following for application code; ❌ the self-hosted path and frontend build are untested |
+| **Testing** — tests ship with the change | ✅ Following for application code; the frontend build is now covered by CI; ❌ the self-hosted boot path is still untested |
 | **Documentation** | ⚠️ This document had drifted six months. Update it with each merged feature, not in batches |
 
 ---
@@ -342,18 +341,21 @@ E2E: `scans.spec.ts` (31), `organizations.spec.ts` (13), `mfa.spec.ts` (6),
 
 Ordered against the open-source self-hosted direction, not against feature count.
 
-1. **Add a `LICENSE` file.** Nothing else about "open source" is real until this exists.
-2. **Fix `npm ci` on a clean checkout**, then add a frontend build job to CI.
-3. **Implement SNS signature verification** — the one genuine security gap.
-4. **Rewrite `README.md` for the self-hosted path**, removing Firebase and AWS from the
+1. ~~**Add a `LICENSE` file.**~~ ✅ Done 2026-07-29 — Apache-2.0.
+2. ~~**Fix `npm ci` on a clean checkout**, then add a frontend build job to CI.~~
+   ✅ Done 2026-07-29.
+3. **Rewrite `README.md` for the self-hosted path**, removing Firebase and AWS from the
    hard prerequisites.
-5. **Remove vendor-owned defaults** from `.env.example`.
+4. **Remove vendor-owned defaults** from `.env.example`.
+5. **Implement SNS signature verification** — the one genuine security gap.
 6. **Decide the MFA approach** (native TOTP vs shipping the OTP service) before any MFA
    work restarts — per the product direction, this is gated on the roadmap.
 7. **Close the remediation coverage gap** — findings without remediation text are
    findings users can't act on. The CIS ruleset has none at all.
 
-Items 1–5 are the ones a stranger hits before they can use or contribute to the project.
+Items 1–4 are the ones a stranger hits before they can use or contribute to the project.
+Ordering matches the roadmap: SNS verification sits behind the setup docs because each
+design partner runs their own instance and their own topic (roadmap X-2).
 
 > **See [`roadmap.md`](./roadmap.md)** for how these are sequenced into Now / Next /
 > Later, and for the user stories behind each one. This document records *state*; the
