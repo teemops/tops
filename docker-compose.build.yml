@@ -1,0 +1,43 @@
+# Build-from-source overlay for contributors.
+#
+# docker-compose.yml pulls published images from Docker Hub, which is what a
+# first-time user wants. This overlay adds the `build:` stanzas back, so the
+# same services are built from your working tree instead.
+#
+# Use install-build.sh rather than invoking this by hand — it runs
+# docker/scripts/prepare-build.sh first, which produces the app/vendor and
+# app/public/build artifacts that docker/app/Dockerfile requires.
+#
+#   ./install-build.sh
+#
+# The equivalent by hand:
+#
+#   ./docker/scripts/prepare-build.sh
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml build
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d
+#
+# `image:` is left to docker-compose.yml, so a local build tags the same name a
+# pull would have produced. That keeps `docker compose up` working afterwards
+# without this overlay — and means a local build shadows the published image of
+# the same tag, which is the intended behaviour while you are working on it.
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/app/Dockerfile
+
+  worker:
+    build:
+      context: .
+      dockerfile: docker/app/Dockerfile
+
+  backup:
+    build:
+      context: .
+      dockerfile: docker/backup/Dockerfile
+
+  db-restore:
+    build:
+      context: .
+      dockerfile: docker/backup/Dockerfile
