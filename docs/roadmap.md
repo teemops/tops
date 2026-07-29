@@ -145,7 +145,7 @@ was the author, and it stops being survivable the moment a design partner is inv
 **What a first-time user does**
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/teemops/tops/master/install.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/teemops/tops/develop/install.sh)
 ```
 
 That script pulls tagged images from Docker Hub and starts the stack. No PHP, no Composer,
@@ -319,10 +319,17 @@ silently floats onto an untested build is handled at the other end: `install.sh`
 `docker compose pull`. Revisit if a design partner ever needs to stay on a known-good
 release for longer than a single merge.
 
+**Repo renamed 2026-07-30** — `teemops/saas` is now `teemops/tops`, so the install URL is
+correct. It points at `develop` rather than `master`: `develop` is the default branch, and
+it is consistent with `latest` tracking `develop`. The consequence, accepted knowingly, is
+that the script users pipe into `bash` moves when `develop` moves.
+
+**Untested until public release:** `raw.githubusercontent.com` returns 404 for private
+repos, so the one-liner cannot be verified while D-4 is open — and GitHub only documents
+rename redirects for web and git operations, not for the raw host. Re-check the URL by hand
+the day the repo goes public.
+
 **Open — still needed**
-- Whether the repo is renamed to `teemops/tops` at public release. The installer and docs
-  currently say `teemops/tops` per the agreed one-liner; this repo is `teemops/saas` on
-  `develop`, so **the URL is wrong until that rename happens**. `TOPS_REPO` overrides it.
 - `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` repository secrets.
 - Images pushed to Docker Hub, so the pull-and-run path can be tested end to end.
 
