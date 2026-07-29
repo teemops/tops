@@ -10,6 +10,7 @@
             "method": "listMFADevices",
             "description": "IAM Users should have MFA enabled",
             "severity": "high",
+            "remediation": "Enable MFA for the IAM user to enhance security.",
             "condition": "count($data['MFADevices'] ?? []) == 0"
         },
         {
@@ -19,6 +20,7 @@
             "method": "listAccessKeys",
             "description": "Access Keys should not be used for IAM Users. Instead use IAM Identity Center to setup Single Sign-on.",
             "severity": "medium",
+            "remediation": "Remove access keys and use IAM Identity Center for Single Sign-on.",
             "condition": "count($data['AccessKeyMetadata'] ?? []) > 0"
         },
         {
@@ -28,6 +30,7 @@
             "method": "listUserPolicies",
             "description": "IAM Users should not have inline IAM policies. Instead use IAM Groups to define IAM Policies and assign the user to the group.",
             "severity": "medium",
+            "remediation": "Remove inline policies and use IAM Groups instead.",
             "condition": "count($data['PolicyNames'] ?? []) > 0"
         },
         {
@@ -37,6 +40,7 @@
             "method": "listAttachedUserPolicies",
             "description": "IAM Policies should not be attached to IAM Users. Instead use IAM Groups to define IAM Policies and assign the user to the group.",
             "severity": "medium",
+            "remediation": "Remove attached policies and use IAM Groups instead.",
             "condition": "count($data['AttachedPolicies'] ?? []) > 0"
         },
         {
@@ -100,6 +104,7 @@
             "method": "getPublicAccessBlock",
             "description": "S3 Buckets should not be publicly available",
             "severity": "high",
+            "remediation": "Enable Public Access Block on the bucket to prevent accidental public access.",
             "condition": "$data === false || !isset($data['PublicAccessBlockConfiguration']) || ($data['PublicAccessBlockConfiguration']['BlockPublicAcls'] ?? false) == false || ($data['PublicAccessBlockConfiguration']['BlockPublicPolicy'] ?? false) == false || ($data['PublicAccessBlockConfiguration']['IgnorePublicAcls'] ?? false) == false || ($data['PublicAccessBlockConfiguration']['RestrictPublicBuckets'] ?? false) == false"
         },
         {
@@ -109,6 +114,7 @@
             "method": "getBucketEncryption",
             "description": "S3 Buckets should have encryption enabled",
             "severity": "medium",
+            "remediation": "Enable server-side encryption (SSE) on the bucket.",
             "condition": "($data['ServerSideEncryptionConfiguration']['Rules'][0]['BucketKeyEnabled'] ?? false) == false"
         },
         {
@@ -118,6 +124,7 @@
             "method": "getBucketVersioning",
             "description": "S3 Buckets should have versioning enabled",
             "severity": "medium",
+            "remediation": "Enable versioning on the bucket to protect against accidental deletion.",
             "condition": "($data['Status'] ?? '') != 'Enabled'"
         },
         {
@@ -145,6 +152,7 @@
             "method": "describeInstances",
             "description": "EC2 Instances should not have a Public IP Address",
             "severity": "medium",
+            "remediation": "Consider using a NAT Gateway or removing the public IP if not needed.",
             "condition": "isset($data['PublicIpAddress'])"
         },
         {
@@ -235,6 +243,7 @@
             "method": "describeDBInstances",
             "description": "RDS Instances should have deletion protection enabled for production workloads",
             "severity": "medium",
+            "remediation": "Enable deletion protection on the RDS instance.",
             "condition": "isset($data['DBInstanceIdentifier']) && ($data['DeletionProtection'] ?? false) == false"
         },
         {
@@ -244,6 +253,7 @@
             "method": "describeDBInstances",
             "description": "RDS Instances should have enhanced monitoring enabled for OS-level metrics",
             "severity": "low",
+            "remediation": "Enable Enhanced Monitoring on the RDS instance for OS-level metrics.",
             "condition": "isset($data['DBInstanceIdentifier']) && ($data['MonitoringInterval'] ?? 0) == 0"
         },
         {
@@ -253,6 +263,7 @@
             "method": "describeDBInstances",
             "description": "RDS Instances should enable automatic minor version upgrades to receive security patches",
             "severity": "low",
+            "remediation": "Enable automatic minor version upgrades on the RDS instance.",
             "condition": "isset($data['DBInstanceIdentifier']) && ($data['AutoMinorVersionUpgrade'] ?? false) == false"
         },
         {
@@ -262,6 +273,7 @@
             "method": "describeInstances",
             "description": "EC2 Instances should enforce IMDSv2 (HttpTokens=required) to mitigate SSRF-based credential theft",
             "severity": "high",
+            "remediation": "Set the instance metadata options to require IMDSv2 (HttpTokens=required).",
             "condition": "isset($data['InstanceId']) && ($data['MetadataOptions']['HttpTokens'] ?? 'required') != 'required'"
         },
         {
@@ -271,6 +283,7 @@
             "method": "describeFlowLogs",
             "description": "Every VPC should have flow logs enabled to record network traffic for security analysis",
             "severity": "medium",
+            "remediation": "Enable VPC Flow Logs for the VPC and deliver them to CloudWatch Logs or S3.",
             "condition": "count($data['FlowLogs'] ?? []) == 0"
         },
         {
@@ -280,6 +293,7 @@
             "method": "getBucketLogging",
             "description": "S3 Buckets should have server access logging enabled for audit and investigation",
             "severity": "low",
+            "remediation": "Enable S3 server access logging and direct logs to a dedicated log bucket.",
             "condition": "empty($data['LoggingEnabled'] ?? null)"
         },
         {
@@ -289,6 +303,7 @@
             "method": "getAccountSummary",
             "description": "The AWS root account must have multi-factor authentication (MFA) enabled",
             "severity": "critical",
+            "remediation": "Enable MFA on the AWS root account immediately and store the device securely.",
             "condition": "($data['SummaryMap']['AccountMFAEnabled'] ?? 0) == 0"
         },
         {
@@ -298,6 +313,7 @@
             "method": "getAccountSummary",
             "description": "The AWS root account should not have access keys; remove them and use IAM roles or users instead",
             "severity": "critical",
+            "remediation": "Delete the root account access keys and use IAM roles or IAM Identity Center instead.",
             "condition": "($data['SummaryMap']['AccountAccessKeysPresent'] ?? 0) > 0"
         },
         {
@@ -307,6 +323,7 @@
             "method": "getAccountPasswordPolicy",
             "description": "The account should enforce a strong IAM password policy with a minimum length of at least 14 characters",
             "severity": "medium",
+            "remediation": "Configure an IAM password policy with a minimum length of at least 14 characters and complexity requirements.",
             "condition": "$data === false || ($data['PasswordPolicy']['MinimumPasswordLength'] ?? 0) < 14"
         },
         {
@@ -316,6 +333,7 @@
             "method": "getTrailStatus",
             "description": "CloudTrail trails should be actively logging to capture account activity",
             "severity": "high",
+            "remediation": "Start logging on the CloudTrail trail so account activity is captured.",
             "condition": "($data['IsLogging'] ?? false) == false"
         },
         {
@@ -325,6 +343,7 @@
             "method": "describeTrails",
             "description": "CloudTrail log file validation should be enabled to detect tampering with log files",
             "severity": "high",
+            "remediation": "Enable log file validation on the trail to detect tampering.",
             "condition": "isset($data['TrailARN']) && ($data['LogFileValidationEnabled'] ?? false) == false"
         },
         {
@@ -334,6 +353,7 @@
             "method": "describeTrails",
             "description": "CloudTrail trails should be multi-region to capture activity across all regions",
             "severity": "medium",
+            "remediation": "Recreate or update the trail as a multi-region trail.",
             "condition": "isset($data['TrailARN']) && ($data['IsMultiRegionTrail'] ?? false) == false"
         },
         {
@@ -343,6 +363,7 @@
             "method": "describeTrails",
             "description": "CloudTrail should deliver logs to CloudWatch Logs for real-time monitoring and alerting",
             "severity": "medium",
+            "remediation": "Configure the trail to deliver events to a CloudWatch Logs log group.",
             "condition": "isset($data['TrailARN']) && empty($data['CloudWatchLogsLogGroupArn'] ?? '')"
         },
         {
@@ -352,6 +373,7 @@
             "method": "describeTrails",
             "description": "CloudTrail log files should be encrypted at rest using a KMS customer managed key",
             "severity": "medium",
+            "remediation": "Configure the trail to encrypt log files with a KMS customer managed key.",
             "condition": "isset($data['TrailARN']) && empty($data['KmsKeyId'] ?? '')"
         },
         {
@@ -361,6 +383,7 @@
             "method": "getFunctionUrlConfig",
             "description": "Lambda function URLs should require IAM authentication; AuthType NONE exposes the function publicly",
             "severity": "high",
+            "remediation": "Change the function URL AuthType to AWS_IAM, or remove the function URL if not required.",
             "condition": "($data['AuthType'] ?? '') == 'NONE'"
         },
         {
@@ -370,6 +393,7 @@
             "method": "listFunctions",
             "description": "Lambda functions should not use deprecated runtimes, which no longer receive security updates",
             "severity": "medium",
+            "remediation": "Migrate the function to a currently supported runtime version.",
             "condition": "isset($data['FunctionName']) && in_array($data['Runtime'] ?? '', ['nodejs4.3','nodejs6.10','nodejs8.10','nodejs10.x','nodejs12.x','nodejs14.x','python2.7','python3.6','python3.7','ruby2.5','ruby2.7','dotnetcore1.0','dotnetcore2.0','dotnetcore2.1','dotnetcore3.1','go1.x','java8'])"
         },
         {
@@ -379,6 +403,7 @@
             "method": "listFunctions",
             "description": "Sensitive Lambda functions should run inside a VPC to restrict network access",
             "severity": "low",
+            "remediation": "Attach a VPC configuration to the function if it accesses private resources.",
             "condition": "isset($data['FunctionName']) && empty($data['VpcConfig']['VpcId'] ?? '')"
         },
         {
@@ -388,6 +413,7 @@
             "method": "listFunctions",
             "description": "Lambda environment variables named like secrets may store credentials in plaintext; use AWS Secrets Manager instead",
             "severity": "low",
+            "remediation": "Move secrets out of environment variables into AWS Secrets Manager or SSM Parameter Store.",
             "condition": "isset($data['FunctionName']) && isset($data['Environment']['Variables']) && count(array_filter(array_keys($data['Environment']['Variables']), function($k){ return preg_match('/SECRET|PASSWORD|TOKEN|APIKEY|ACCESS_KEY/i', $k); })) > 0"
         },
         {
@@ -397,6 +423,7 @@
             "method": "describeKey",
             "description": "KMS keys pending deletion will permanently destroy the ability to decrypt data encrypted under them",
             "severity": "high",
+            "remediation": "Cancel the scheduled key deletion if the key is still needed for decryption.",
             "condition": "($data['KeyMetadata']['KeyState'] ?? '') == 'PendingDeletion'"
         },
         {
@@ -406,6 +433,7 @@
             "method": "getKeyRotationStatus",
             "description": "Customer managed KMS keys should have automatic annual key rotation enabled",
             "severity": "medium",
+            "remediation": "Enable automatic key rotation on the customer managed KMS key.",
             "condition": "isset($data['KeyRotationEnabled']) && $data['KeyRotationEnabled'] === false"
         },
         {
@@ -415,7 +443,68 @@
             "method": "describeKey",
             "description": "Disabled customer managed KMS keys cannot be used and may indicate misconfiguration",
             "severity": "low",
+            "remediation": "Re-enable the KMS key if it is still required, or schedule it for deletion if not.",
             "condition": "($data['KeyMetadata']['KeyManager'] ?? '') == 'CUSTOMER' && ($data['KeyMetadata']['KeyState'] ?? '') == 'Disabled'"
+        },
+        {
+            "rule": "tops-sqs-001",
+            "name": "SQS Queue Not Encrypted At Rest",
+            "service": "sqs",
+            "method": "getQueueAttributes",
+            "description": "SQS queues should encrypt messages at rest using either an SQS-managed key or a KMS key.",
+            "severity": "medium",
+            "remediation": "Enable server-side encryption on the queue, using SQS-managed encryption (SSE-SQS) or a KMS customer managed key.",
+            "condition": "isset($data['Attributes']) && !isset($data['Attributes']['KmsMasterKeyId']) && ($data['Attributes']['SqsManagedSseEnabled'] ?? 'false') !== 'true'"
+        },
+        {
+            "rule": "tops-sns-001",
+            "name": "SNS Topic Not Encrypted At Rest",
+            "service": "sns",
+            "method": "getTopicAttributes",
+            "description": "SNS topics should encrypt messages at rest using a KMS key.",
+            "severity": "medium",
+            "remediation": "Set a KMS master key on the topic to enable server-side encryption.",
+            "condition": "isset($data['Attributes']) && empty($data['Attributes']['KmsMasterKeyId'])"
+        },
+        {
+            "rule": "tops-dynamodb-001",
+            "name": "DynamoDB Point-In-Time Recovery Disabled",
+            "service": "dynamodb",
+            "method": "describeContinuousBackups",
+            "description": "DynamoDB tables should have point-in-time recovery enabled so data can be restored after accidental writes or deletes.",
+            "severity": "medium",
+            "remediation": "Enable point-in-time recovery on the table.",
+            "condition": "isset($data['ContinuousBackupsDescription']) && ($data['ContinuousBackupsDescription']['PointInTimeRecoveryDescription']['PointInTimeRecoveryStatus'] ?? '') !== 'ENABLED'"
+        },
+        {
+            "rule": "tops-dynamodb-002",
+            "name": "DynamoDB Deletion Protection Disabled",
+            "service": "dynamodb",
+            "method": "describeTable",
+            "description": "Production DynamoDB tables should have deletion protection enabled to prevent accidental removal.",
+            "severity": "low",
+            "remediation": "Enable deletion protection on the table.",
+            "condition": "isset($data['Table']) && ($data['Table']['DeletionProtectionEnabled'] ?? false) == false"
+        },
+        {
+            "rule": "tops-elbv2-001",
+            "name": "Load Balancer Listener Without TLS",
+            "service": "elbv2",
+            "method": "describeListeners",
+            "description": "Load balancer listeners should terminate TLS rather than serving plaintext HTTP.",
+            "severity": "medium",
+            "remediation": "Replace the HTTP listener with an HTTPS listener, or redirect HTTP to HTTPS.",
+            "condition": "isset($data['Listeners']) && count(array_filter($data['Listeners'], function($listener) { return ($listener['Protocol'] ?? '') === 'HTTP'; })) > 0"
+        },
+        {
+            "rule": "tops-elbv2-002",
+            "name": "Load Balancer Access Logging Disabled",
+            "service": "elbv2",
+            "method": "describeLoadBalancerAttributes",
+            "description": "Load balancers should write access logs to S3 for incident investigation.",
+            "severity": "low",
+            "remediation": "Enable access logging on the load balancer and point it at a dedicated log bucket.",
+            "condition": "isset($data['Attributes']) && count(array_filter($data['Attributes'], function($attribute) { return ($attribute['Key'] ?? '') === 'access_logs.s3.enabled' && ($attribute['Value'] ?? '') === 'false'; })) > 0"
         }
     ]
 }

@@ -1,0 +1,41 @@
+{
+    "$schema": "tops/scan/tasks/schema.v1",
+    "name": "tasks.json",
+    "description": "Tasks for auditing AWS SQS resources",
+    "config": {
+        "service": "sqs",
+        "label": "SQS",
+        "client": "sqs",
+        "regional": true,
+        "profiles": [
+            "basic",
+            "cis",
+            "pci"
+        ],
+        "start": "listQueues"
+    },
+    "tasks": [
+        {
+            "listQueues": {
+                "task": "listQueues",
+                "id": "queue",
+                "description": "List all SQS queues. listQueues returns queue URLs as bare strings, so '$item' is the URL. Every queue setting worth auditing (encryption, policy, redrive) arrives through getQueueAttributes, which must be asked for 'All' explicitly.",
+                "actions": [
+                    {
+                        "getQueueAttributes": {
+                            "params": {
+                                "QueueUrl": "$item",
+                                "AttributeNames": [
+                                    "All"
+                                ]
+                            }
+                        }
+                    }
+                ],
+                "items": {
+                    "QueueUrls": []
+                }
+            }
+        }
+    ]
+}

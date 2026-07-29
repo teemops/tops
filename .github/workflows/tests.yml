@@ -50,6 +50,12 @@ jobs:
           cp .env.example .env
           php artisan key:generate
 
+      # Services and rules are contributed as JSON, and both fail quietly when wrong:
+      # a rule aimed at data no tasks.json collects never matches anything, which looks
+      # exactly like a compliant account. This checks them offline, with no AWS calls.
+      - name: Validate scan definitions
+        run: php artisan scan:validate-rules
+
       - name: Run tests
         run: php artisan test --coverage-clover=coverage.xml
 

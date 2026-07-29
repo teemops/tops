@@ -85,16 +85,38 @@ class AwsSecurityScannerTest extends TestCase
     }
 
     /**
-     * An unknown service name is rejected rather than silently returning null.
+     * A service name the SDK does not provide is rejected rather than silently
+     * returning null.
      */
-    public function test_create_client_rejects_unknown_service(): void
+    public function test_create_client_rejects_a_service_the_sdk_does_not_provide(): void
     {
         $scanner = new ExposedAwsSecurityScanner(self::ROLE_ARN, 'external-id');
 
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Unknown service: dynamodb');
+        $this->expectExceptionMessage('is not provided by the AWS SDK for PHP');
 
-        $scanner->exposedCreateClient('dynamodb', self::CREDENTIALS);
+        $scanner->exposedCreateClient('notarealawsservice', self::CREDENTIALS);
+    }
+
+    /**
+     * Any service the installed SDK models can be built, without this class carrying a
+     * list of them. Before the registry, createClient matched on a hardcoded seven, so
+     * adding a service meant editing PHP and importing another client class.
+     */
+    public function test_create_client_builds_services_beyond_the_original_seven(): void
+    {
+        $scanner = new ExposedAwsSecurityScanner(self::ROLE_ARN, 'external-id');
+
+        $this->assertInstanceOf(
+            \Aws\DynamoDb\DynamoDbClient::class,
+            $scanner->exposedCreateClient('dynamodb', self::CREDENTIALS)
+        );
+        // Endpoint prefixes are not always guessable from the service name, which is why
+        // tasks.json declares the client key explicitly.
+        $this->assertInstanceOf(
+            \Aws\ElasticLoadBalancingV2\ElasticLoadBalancingV2Client::class,
+            $scanner->exposedCreateClient('elasticloadbalancingv2', self::CREDENTIALS)
+        );
     }
 
     /**

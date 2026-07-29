@@ -1,0 +1,68 @@
+{
+    "$schema": "tops/scan/tasks/schema.v1",
+    "name": "tasks.json",
+    "description": "Tasks for auditing AWS Application and Network Load Balancers (ELBv2)",
+    "config": {
+        "service": "elbv2",
+        "label": "Load Balancers",
+        "client": "elasticloadbalancingv2",
+        "arnService": "elasticloadbalancing",
+        "regional": true,
+        "profiles": [
+            "basic",
+            "cis",
+            "pci"
+        ],
+        "start": "describeLoadBalancers"
+    },
+    "tasks": [
+        {
+            "describeLoadBalancers": {
+                "task": "describeLoadBalancers",
+                "id": "load_balancer",
+                "key": "LoadBalancerArn",
+                "description": "List Application/Network Load Balancers. Neither the SDK client key ('elasticloadbalancingv2') nor the ARN service ('elasticloadbalancing') matches the service name, so both are declared above.",
+                "actions": [
+                    {
+                        "describeListeners": {
+                            "params": {
+                                "LoadBalancerArn": "$item['LoadBalancerArn']"
+                            }
+                        }
+                    },
+                    {
+                        "describeLoadBalancerAttributes": {
+                            "params": {
+                                "LoadBalancerArn": "$item['LoadBalancerArn']"
+                            }
+                        }
+                    }
+                ],
+                "items": {
+                    "LoadBalancers": [
+                        {
+                            "Name": "LoadBalancerArn",
+                            "Type": "String"
+                        },
+                        {
+                            "Name": "LoadBalancerName",
+                            "Type": "String"
+                        },
+                        {
+                            "Name": "Scheme",
+                            "Type": "String"
+                        },
+                        {
+                            "Name": "Type",
+                            "Type": "String"
+                        },
+                        {
+                            "Name": "VpcId",
+                            "Type": "String"
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+}

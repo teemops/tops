@@ -4,6 +4,14 @@
     "description": "Tasks for auditing AWS CloudTrail resources",
     "config": {
         "service": "cloudtrail",
+        "label": "CloudTrail",
+        "client": "cloudtrail",
+        "regional": true,
+        "profiles": [
+            "basic",
+            "cis",
+            "pci"
+        ],
         "start": "describeTrails",
         "defaults": {
             "actions": {

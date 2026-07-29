@@ -78,31 +78,52 @@ class RulesEngineTest extends TestCase
         ];
     }
 
-    public function test_get_items_key_reads_the_first_items_key(): void
+    public function test_get_items_path_reads_the_first_items_key(): void
     {
-        $this->assertEquals('Users', $this->invoke('getItemsKey', [['items' => ['Users' => []]]]));
-        $this->assertNull($this->invoke('getItemsKey', [[]]));
-        $this->assertNull($this->invoke('getItemsKey', [['items' => []]]));
+        $this->assertEquals('Users', $this->invoke('getItemsPath', [['items' => ['Users' => []]]]));
+        $this->assertNull($this->invoke('getItemsPath', [[]]));
+        $this->assertNull($this->invoke('getItemsPath', [['items' => []]]));
     }
 
-    public function test_get_resource_id_prefers_the_configured_key_field(): void
+    public function test_get_items_path_prefers_an_explicit_declaration(): void
+    {
+        $this->assertEquals(
+            'Reservations.Instances',
+            $this->invoke('getItemsPath', [[
+                'itemsPath' => 'Reservations.Instances',
+                'items' => ['Reservations' => []],
+            ]])
+        );
+    }
+
+    public function test_get_resource_id_uses_the_configured_key_field(): void
     {
         $item = ['Name' => 'my-bucket', 'UserName' => 'ignored'];
 
-        $this->assertEquals('my-bucket', $this->invoke('getResourceId', [$item, 'Name', 'bucket']));
+        $this->assertEquals('my-bucket', $this->invoke('getResourceId', [$item, 'Name']));
     }
 
-    public function test_get_resource_id_falls_back_to_common_id_fields(): void
+    /**
+     * A scalar item is its own identifier — SQS listQueues returns queue URLs and
+     * DynamoDB listTables returns table names, with no object to read a field from.
+     */
+    public function test_get_resource_id_handles_scalar_items(): void
     {
-        $this->assertEquals('alice', $this->invoke('getResourceId', [['UserName' => 'alice'], null, null]));
-        $this->assertEquals('Admin', $this->invoke('getResourceId', [['RoleName' => 'Admin'], null, null]));
-        $this->assertEquals('i-123', $this->invoke('getResourceId', [['InstanceId' => 'i-123'], null, null]));
-        $this->assertEquals('db-1', $this->invoke('getResourceId', [['DBInstanceIdentifier' => 'db-1'], null, null]));
+        $this->assertEquals(
+            'https://sqs.us-east-1.amazonaws.com/123456789012/my-queue',
+            $this->invoke('getResourceId', ['https://sqs.us-east-1.amazonaws.com/123456789012/my-queue', null])
+        );
+        $this->assertEquals('my-table', $this->invoke('getResourceId', ['my-table', 'TableName']));
     }
 
-    public function test_get_resource_id_returns_null_when_nothing_matches(): void
+    /**
+     * There is no guessing from well-known field names any more: a task whose declared
+     * key does not match its items is a tasks.json bug and must surface as one.
+     */
+    public function test_get_resource_id_returns_null_when_the_declared_key_is_absent(): void
     {
-        $this->assertNull($this->invoke('getResourceId', [['Unrecognised' => 'x'], null, null]));
+        $this->assertNull($this->invoke('getResourceId', [['Unrecognised' => 'x'], null]));
+        $this->assertNull($this->invoke('getResourceId', [['UserName' => 'alice'], 'Name']));
     }
 
     public function test_evaluate_params_resolves_php_expressions(): void
@@ -168,56 +189,90 @@ class RulesEngineTest extends TestCase
     }
 
     /**
-     * With no config at all, params are inferred from well-known item fields.
+     * With nothing declared, the call is made with no params rather than guessing at
+     * them from the item's field names.
      */
-    #[DataProvider('inferredParamsProvider')]
-    public function test_build_action_params_infers_params_from_the_item(array $item, string $action, array $expected): void
+    public function test_build_action_params_declares_nothing_when_nothing_is_configured(): void
     {
-        $this->assertSame($expected, $this->invoke('buildActionParams', [$item, [], $action, null]));
+        $this->assertSame([], $this->invoke('buildActionParams', [['UserName' => 'alice'], [], 'listMFADevices', null]));
+        $this->assertSame([], $this->invoke('buildActionParams', [['Name' => 'b1'], [], 'getBucketAcl', null]));
     }
 
-    public static function inferredParamsProvider(): array
+    /**
+     * A scalar item is addressable as "$item" in a params expression, which is how the
+     * two-step list-then-describe services (SQS, DynamoDB) pass their identifier along.
+     */
+    public function test_build_action_params_resolves_a_scalar_item(): void
     {
-        return [
-            'user name' => [['UserName' => 'alice'], 'listMFADevices', ['UserName' => 'alice']],
-            'role name' => [['RoleName' => 'Admin'], 'listRolePolicies', ['RoleName' => 'Admin']],
-            'bucket name' => [['BucketName' => 'b1'], 'getBucketAcl', ['Bucket' => 'b1']],
-            'name for a user action' => [['Name' => 'alice'], 'getUser', ['UserName' => 'alice']],
-            'name for a role action' => [['Name' => 'Admin'], 'getRole', ['RoleName' => 'Admin']],
-            'name for a bucket action' => [['Name' => 'b1'], 'getBucketAcl', ['Bucket' => 'b1']],
-            'nothing inferable' => [['Arn' => 'arn:aws:s3:::b1'], 'getPublicAccessBlock', []],
-        ];
+        $params = $this->invoke('buildActionParams', [
+            'https://sqs.us-east-1.amazonaws.com/123456789012/q',
+            [],
+            'getQueueAttributes',
+            ['QueueUrl' => '$item', 'AttributeNames' => ['All']],
+        ]);
+
+        $this->assertSame([
+            'QueueUrl' => 'https://sqs.us-east-1.amazonaws.com/123456789012/q',
+            'AttributeNames' => ['All'],
+        ], $params);
     }
 
-    public function test_extract_items_flattens_ec2_reservations_into_instances(): void
+    public function test_extract_items_walks_a_nested_path(): void
     {
-        $reservations = [
-            ['Instances' => [['InstanceId' => 'i-1'], ['InstanceId' => 'i-2']]],
-            ['Instances' => [['InstanceId' => 'i-3']]],
+        $result = [
+            'Reservations' => [
+                ['Instances' => [['InstanceId' => 'i-1'], ['InstanceId' => 'i-2']]],
+                ['Instances' => [['InstanceId' => 'i-3']]],
+            ],
         ];
 
-        $items = $this->invoke('extractItems', [$reservations, ['items' => ['Reservations' => []]], 'ec2']);
+        $items = $this->invoke('extractItems', [$result, ['itemsPath' => 'Reservations.Instances']]);
 
         $this->assertCount(3, $items);
         $this->assertEquals(['i-1', 'i-2', 'i-3'], array_column($items, 'InstanceId'));
     }
 
-    public function test_extract_items_skips_reservations_without_instances(): void
+    public function test_extract_items_skips_containers_missing_the_nested_key(): void
     {
         $items = $this->invoke('extractItems', [
-            [['ReservationId' => 'r-1']],
-            ['items' => ['Reservations' => []]],
-            'ec2',
+            ['Reservations' => [['ReservationId' => 'r-1']]],
+            ['itemsPath' => 'Reservations.Instances'],
         ]);
 
         $this->assertSame([], $items);
     }
 
-    public function test_extract_items_leaves_other_services_untouched(): void
+    public function test_extract_items_reads_a_single_level_list(): void
     {
         $buckets = [['Name' => 'b1'], ['Name' => 'b2']];
 
-        $this->assertSame($buckets, $this->invoke('extractItems', [$buckets, ['items' => ['Buckets' => []]], 's3']));
+        $this->assertSame($buckets, $this->invoke('extractItems', [['Buckets' => $buckets], ['items' => ['Buckets' => []]]]));
+    }
+
+    /**
+     * Responses that list bare strings rather than objects must survive extraction —
+     * these were a TypeError before, which is what kept services like DynamoDB and SQS
+     * out of reach of a JSON-only definition.
+     */
+    public function test_extract_items_handles_lists_of_scalars(): void
+    {
+        $items = $this->invoke('extractItems', [
+            ['TableNames' => ['orders', 'customers']],
+            ['items' => ['TableNames' => []]],
+        ]);
+
+        $this->assertSame(['orders', 'customers'], $items);
+    }
+
+    public function test_extract_items_returns_nothing_when_no_path_is_declared(): void
+    {
+        $this->assertSame([], $this->invoke('extractItems', [['SummaryMap' => ['x' => 1]], []]));
+    }
+
+    public function test_item_raw_data_wraps_scalars_for_json_storage(): void
+    {
+        $this->assertSame(['Value' => 'my-table'], $this->invoke('itemRawData', ['my-table']));
+        $this->assertSame(['Name' => 'b1'], $this->invoke('itemRawData', [['Name' => 'b1']]));
     }
 
     public function test_store_scan_detail_persists_the_raw_response(): void
@@ -246,17 +301,20 @@ class RulesEngineTest extends TestCase
         $this->assertEquals(['Owner' => ['ID' => 'abc']], $detail->raw_data);
     }
 
-    public function test_get_scanner_rejects_an_unknown_service(): void
+    public function test_get_scanner_rejects_a_service_with_no_registry_definition(): void
     {
         $scan = Scan::factory()->create();
 
         $this->expectException(\Exception::class);
-        $this->expectExceptionMessage('Unknown service: dynamodb');
+        $this->expectExceptionMessage('Unknown service: notarealservice');
 
-        $this->invoke('getScanner', ['dynamodb', $scan]);
+        $this->invoke('getScanner', ['notarealservice', $scan]);
     }
 
     /**
+     * Services get the generic scanner unless their tasks.json names a bespoke one.
+     * s3 and iam are the only two that do, and they must keep getting theirs — the
+     * generic scanner cannot resolve bucket regions or read an absent password policy.
      */
     #[DataProvider('scannerForServiceProvider')]
     public function test_get_scanner_returns_the_scanner_for_each_service(string $service, string $expectedClass): void
@@ -271,8 +329,10 @@ class RulesEngineTest extends TestCase
         return [
             'iam' => ['iam', \App\Services\Scanners\IamScanner::class],
             's3' => ['s3', \App\Services\Scanners\S3Scanner::class],
-            'ec2' => ['ec2', \App\Services\Scanners\Ec2Scanner::class],
-            'rds' => ['rds', \App\Services\Scanners\RdsScanner::class],
+            'ec2' => ['ec2', \App\Services\Scanners\GenericAwsScanner::class],
+            'rds' => ['rds', \App\Services\Scanners\GenericAwsScanner::class],
+            'kms' => ['kms', \App\Services\Scanners\GenericAwsScanner::class],
+            'cloudtrail' => ['cloudtrail', \App\Services\Scanners\GenericAwsScanner::class],
         ];
     }
 }

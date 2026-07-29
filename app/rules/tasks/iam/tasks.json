@@ -4,6 +4,15 @@
     "description": "Tasks for auditing AWS IAM resources",
     "config": {
         "service": "iam",
+        "label": "IAM",
+        "client": "iam",
+        "regional": false,
+        "profiles": [
+            "basic",
+            "cis",
+            "pci"
+        ],
+        "scanner": "App\\Services\\Scanners\\IamScanner",
         "start": "listUsers",
         "defaults": {
             "actions": {
@@ -18,7 +27,7 @@
             "listUsers": {
                 "task": "listUsers",
                 "id": "user",
-                "key": "Name",
+                "key": "UserName",
                 "description": "List all users",
                 "actions": [
                     {

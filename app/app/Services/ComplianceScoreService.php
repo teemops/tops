@@ -20,7 +20,8 @@ use Illuminate\Support\Facades\File;
  *
  * A framework only gets a score when at least one completed scan in the period
  * actually evaluated it (scans.rulesets), otherwise it reports as not evaluated —
- * scoring a framework nobody ran would read as 100% compliant.
+ * scoring a framework nobody ran would read as 100% compliant. Scans that completed
+ * only partially are excluded for the same reason.
  */
 class ComplianceScoreService
 {
@@ -31,9 +32,14 @@ class ComplianceScoreService
      */
     public function scoresFor(string $organizationId, Carbon $since): array
     {
+        // Partial scans are excluded, not merely flagged. A scan that timed out before
+        // reaching every region collected no findings from the regions it missed, so
+        // scoring it would report those regions as compliant rather than unexamined —
+        // the one direction a compliance score must never fail in.
         $scans = Scan::query()
             ->where('organization_id', $organizationId)
             ->where('status', 'completed')
+            ->where('is_partial', false)
             ->where('created_at', '>=', $since)
             ->get(['id', 'rulesets']);
 
