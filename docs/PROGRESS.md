@@ -165,7 +165,8 @@ box without an AWS account or a Firebase project?**
 #### CI Pipeline
 - **Status**: ✅ Complete *(unrecorded)*
 - **Implementation**: `.github/workflows/tests.yml` — two jobs: PHPUnit +
-  `scan:validate-rules`, and a frontend job running `npm ci` (no flags) + `npm run build`
+  `scan:validate-rules`, and a frontend job running `npm ci` (no flags), `npm run build`
+  and `npm audit --audit-level=critical`
 
 ---
 
@@ -245,6 +246,10 @@ most of it blocks the first external contributor or self-hoster.
    points at `storage.teemops.com` (`:88`), and a Teemops AWS account ID plus SQS ARNs
    are hard-coded (`:89-93`).
 5. **MFA's TOTP backend is a closed external service** (see above).
+6. **5 npm advisories on a clean install** — all high, none critical, down from 17 on
+   2026-07-29. CI now fails on a new critical. What remains is `@grpc/grpc-js` (pinned by
+   `firebase`, which is opt-in and off by default) and `brace-expansion` (build-time only,
+   via `vue-tsc`). Neither reaches a running instance. Tracked as roadmap X-7.
 
 ### Missing project hygiene
 

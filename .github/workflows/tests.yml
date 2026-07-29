@@ -133,3 +133,10 @@ jobs:
 
       - name: Build assets
         run: npm run build
+
+      # Critical only, deliberately. The high and moderate advisories are a known
+      # backlog (roadmap X-7) and gating on them would leave the job permanently
+      # red, which teaches everyone to ignore it. Criticals are at zero, and this
+      # is what keeps them there.
+      - name: Audit dependencies
+        run: npm audit --audit-level=critical
