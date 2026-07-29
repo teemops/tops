@@ -1,0 +1,55 @@
+---
+description: Testing conventions for the TOPS SaaS suite — PHPUnit unit and feature tests, Playwright E2E.
+globs: app/tests/**,app/phpunit.xml,app/playwright.config.ts
+---
+
+# Testing Conventions
+
+Full detail in `docs/practices/testing.md`.
+
+## What to test
+
+Test behaviour, not implementation. Cover the happy path first, then the error cases
+that actually matter — authorization failures, invalid input, missing resources.
+
+Do not test framework code, trivial accessors, or the mock you just configured.
+Coverage is a tool for finding untested code, not a target to hit.
+
+## Layers
+
+- `tests/Unit/` — business logic in services and models, no database where avoidable.
+  Fast, isolated, one behaviour per test.
+- `tests/Feature/` — endpoints end to end: routing, validation, authorization,
+  Inertia page rendering, and database interaction.
+- `tests/e2e/` — Playwright, reserved for critical user flows only. E2E tests are slow
+  and brittle; add one when a flow breaking would be a genuine incident.
+
+## Required coverage for new endpoints
+
+Every new endpoint gets a feature test that proves a user from one organization cannot
+read or mutate another organization's data. This is the single test most likely to be
+skipped and most costly to miss.
+
+## Test quality
+
+Descriptive names that state what is verified. Arrange-Act-Assert. No
+interdependencies between tests — each sets up its own state and passes in isolation.
+
+Prefer factories over fixtures. Keep the setup visible in the test rather than hidden
+in a base class, unless it is genuinely shared by most of the file.
+
+## Running
+
+From `app/`:
+
+```bash
+php artisan test
+```
+
+If the host PHP lacks `pdo_sqlite` the in-memory database fails to connect. Use the
+dev image — `docker exec` will not work, since the container bakes its own copy of
+the source rather than mounting yours:
+
+```bash
+docker run --rm -v "$PWD:/w" -w /w --entrypoint php saas-app artisan test
+```

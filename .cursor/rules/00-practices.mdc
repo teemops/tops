@@ -1,0 +1,61 @@
+---
+description: Core engineering principles for TOPS SaaS — simplicity first, startup agility, and the feature development process. Applies to all work.
+alwaysApply: true
+---
+
+# TOPS SaaS — Engineering Principles
+
+The authoritative rules live in `docs/practices/` and `docs/processes/`. This rule is
+the always-on summary; open the source docs when a decision turns on the detail.
+
+## Two standing principles
+
+**Simplicity first** — simple for the end user, simple to maintain, simple to change.
+
+**Startup agility** — ship the smallest working version, learn from real usage, and
+optimize only after measuring. Never build for hypothetical scale.
+
+## The decision framework
+
+Before adding a feature, dependency, abstraction, or config option, answer:
+
+1. Does this make it simpler for the end user?
+2. Does this make it simpler to maintain?
+3. Can we achieve the same outcome with less complexity?
+4. What are we willing to remove to add this?
+
+Any "no" means reconsider the approach before writing code.
+
+## Non-negotiables
+
+- Every query touching tenant data is scoped by `organization_id`, and every new
+  endpoint has a test proving cross-organization access fails.
+- Eloquent or the query builder only. Never concatenate user input into SQL.
+- No secrets in the repo — not in code, config, fixtures, or test data.
+- Authenticate *and* authorize every route. Client-side checks are not authorization.
+- Tests ship with the change. A feature without a test is not done.
+- Migrations reversible where possible; data migrations separate from schema ones.
+
+## New features follow the process
+
+Any new feature follows the six phases in `docs/processes/feature-development.md`:
+Discovery → Definition → Design → Development → Review → Deployment.
+
+Before writing feature code there must be a user story with acceptance criteria in
+Given-When-Then form, using `docs/templates/user-story-template.md`. If the user asks
+for a feature and no story exists, write the story first and confirm it — do not jump
+straight to implementation because the change looks small.
+
+Bugfixes, refactors and infrastructure work skip the story but keep the practices
+and the tests.
+
+## Before a PR
+
+Walk `docs/processes/practices-checklist.md` against the diff and fill in the Quality
+Gate in the PR template honestly.
+
+## Anti-patterns — flag these, including in your own suggestions
+
+Building "just in case" · optimizing before measuring · over-engineering the first
+version · complex solutions where simple ones work · enterprise patterns without
+enterprise problems · skipping tests to move faster · waiting for perfection to ship.

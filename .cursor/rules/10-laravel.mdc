@@ -1,0 +1,60 @@
+---
+description: Laravel, Inertia and database conventions for the TOPS SaaS monolith.
+globs: app/app/**,app/routes/**,app/database/**,app/config/**,app/resources/**
+---
+
+# Laravel Conventions
+
+Full detail in `docs/practices/database.md`, `docs/practices/architecture.md` and
+`docs/practices/security.md`.
+
+## Multi-tenancy
+
+Tenant data hangs off `organization_id`. Every read and write is scoped to the acting
+user's organization — controller, service, and job alike. Background jobs do not
+inherit a session, so they must carry and re-apply the organization explicitly.
+
+A missing scope looks exactly like working code until it leaks another tenant's data.
+Treat an unscoped query on a tenant table as a bug, not a style issue.
+
+## Structure
+
+Controllers stay thin: validate, delegate, return. Business logic belongs in
+`app/app/Services/`, data access in Eloquent models. This is a modular monolith —
+do not split services out, and do not introduce a new architectural layer without a
+measured reason.
+
+Follow the patterns already in the directory you are editing rather than importing
+conventions from elsewhere.
+
+## Validation
+
+Validate every input on the server, in a Form Request where there is more than a
+couple of rules. Client-side validation is a UX affordance, never a control.
+
+Prefer allowlists over denylists. Validate types and ranges, not just presence.
+
+## Queries
+
+Use Eloquent, which parameterizes automatically. Eager-load relations to avoid N+1 —
+the common failure here is a Blade or Vue loop that triggers a query per row.
+
+Do not add indexes, caches, or denormalized columns until profiling shows a real
+bottleneck. Ship the clear query first.
+
+## Migrations
+
+Schema changes go in migrations, reversible where the operation allows. Keep data
+migrations in their own files, separate from schema changes, so a rollback of one
+does not silently undo the other.
+
+## Errors and logging
+
+Fail fast with clear, actionable messages. Log with enough context to debug, never
+swallow an exception silently, and never expose an internal error to the client.
+
+## Scan services and rules
+
+Services and rules are contributed as JSON and fail quietly when wrong: a rule aimed
+at data no `tasks.json` collects never matches, which is indistinguishable from a
+compliant account. Run `php artisan scan:validate-rules` after any change to them.
