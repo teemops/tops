@@ -31,6 +31,23 @@ This directory contains all project documentation organized by topic.
 - [Practices Checklist](./processes/practices-checklist.md) - Development practices checklist
 - [User Story Template](./templates/user-story-template.md) - Template for writing user stories
 
+### AI Coding Assistants
+
+The practices below are the single source of truth. These files load them into an
+assistant's context automatically so no session starts without them:
+
+- [`CLAUDE.md`](../CLAUDE.md) - loaded into every Claude Code session
+- [`.cursor/rules/`](../.cursor/rules/) - loaded into every Cursor request; `00-practices.mdc`
+  always applies, the others attach by file path
+- [`.claude/skills/`](../.claude/skills/) - on-demand skills: `feature-development` drives the
+  six-phase process, `practices-review` checks a diff against the checklist, `run-tests`
+  covers the suite and its Docker fallback
+- [`.claude/settings.json`](../.claude/settings.json) - informational hooks that surface the
+  practices at session start and on feature-shaped prompts
+
+Keep these in sync when the practices change - they summarise and link, they do not
+duplicate.
+
 ### Practices
 - [Product Practices](./practices/product.md) - Product development practices
 - [Architecture Practices](./practices/architecture.md) - Architecture guidelines
