@@ -156,7 +156,8 @@ See `tests/e2e/README.md` for detailed documentation on:
 ## 🐛 Troubleshooting
 
 ### "Cannot find package '@playwright/test'"
-- Run: `npm install -D @playwright/test --legacy-peer-deps`
+- Run: `npm ci` — `@playwright/test` is already a devDependency, so a clean install is
+  usually all that is missing.
 
 ### "Browser not found" or "libnspr4.so: cannot open shared object file"
 - **Install system dependencies:**
