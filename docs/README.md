@@ -9,8 +9,9 @@ This directory contains all project documentation organized by topic.
 - [Laravel App Setup](./laravel-app/setup.md) - Detailed setup instructions
 
 ### Architecture & Planning
+- [**Roadmap**](./roadmap.md) - **The plan of record.** Now / Next / Later, user stories, and the decisions log
 - [Architecture](./architecture.md) - System architecture and design decisions
-- [Planning](./planning.md) - Project planning and roadmap
+- [AWS Scanner Coverage & Research](./planning.md) - Which AWS services and misconfigurations to scan, current rule coverage, CIS alignment, and the staged plan for expanding it
 - [Docker self-hosted deployment session (2026-06-21)](./sessions/2026-06-21-docker-self-hosted-deployment.md) - ECS/Lambda assessment, Docker Compose Phases 1–2, installer, region wiring
 
 ### Features
@@ -57,7 +58,7 @@ duplicate.
 - [Database Practices](./practices/database.md) - Database design practices
 
 ### Progress & Status
-- [Progress Tracking](./PROGRESS.md) - Feature completion status and progress
+- [Progress Tracking](./PROGRESS.md) - Feature completion status, known gaps, and open-source readiness. Records *state*; the [roadmap](./roadmap.md) records *plan*
 
 ## Documentation Structure
 
