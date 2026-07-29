@@ -50,7 +50,7 @@ echo "Installing PHP dependencies..."
 composer install --no-dev --no-interaction --no-scripts --prefer-dist --optimize-autoloader
 
 echo "Installing Node dependencies and building frontend..."
-npm ci --legacy-peer-deps
+npm ci
 npm run build
 
 echo "Build artifacts ready in app/vendor and app/public/build"

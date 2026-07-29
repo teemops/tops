@@ -36,9 +36,10 @@ services:
         max-size: 1m
 
   app:
-    build:
-      context: .
-      dockerfile: docker/app/Dockerfile
+    # Published image. Pin a release by setting TOPS_IMAGE_TAG in .env; roll back
+    # by setting it to a previous version and restarting. To build from your
+    # working tree instead, use install-build.sh (adds docker-compose.build.yml).
+    image: ${TOPS_IMAGE:-teem/tops}:${TOPS_IMAGE_TAG:-latest}
     container_name: teemops-app
     restart: unless-stopped
     ports:
@@ -63,9 +64,10 @@ services:
       # NOTE: QUEUE_CONNECTION / SCAN_QUEUE_CONNECTION / SCAN_REGION_QUEUE_CONNECTION
       # are deliberately NOT set here. `environment:` overrides `env_file:`, so
       # setting them would clobber the sqs-* values that generated/teemops.env
-      # provides after ./install.sh, silently sending scan jobs to the database
+      # provides after ./install-messaging.sh, silently sending scan jobs to the database
       # queue while the workers poll SQS. They come from env_file layering instead:
-      # .env (database, Phase 1) -> generated/teemops.env (sqs-*, Phase 2).
+      # .env (database, Phase 1) -> generated/teemops.env (sqs-*, from
+      # ./install-messaging.sh).
       MAIL_MAILER: smtp
       MAIL_HOST: maildev
       MAIL_PORT: "1025"
@@ -87,9 +89,8 @@ services:
         condition: service_started
 
   worker:
-    build:
-      context: .
-      dockerfile: docker/app/Dockerfile
+    # Same image as `app`; only the entrypoint differs.
+    image: ${TOPS_IMAGE:-teem/tops}:${TOPS_IMAGE_TAG:-latest}
     container_name: teemops-worker
     restart: unless-stopped
     env_file:
@@ -129,10 +130,7 @@ services:
   # Database backup scheduler: daily full, hourly differential, 15-minute
   # binary log archive. See docs/backups.md and ./backup.sh.
   backup:
-    build:
-      context: .
-      dockerfile: docker/backup/Dockerfile
-    image: teemops-backup
+    image: ${TOPS_BACKUP_IMAGE:-teem/tops-backup}:${TOPS_IMAGE_TAG:-latest}
     container_name: teemops-backup
     restart: unless-stopped
     environment:
@@ -151,7 +149,7 @@ services:
       TOPS_BACKUP_FULL_RETENTION_DAYS: ${TOPS_BACKUP_FULL_RETENTION_DAYS:-7}
       TOPS_BACKUP_BINLOG_RETENTION_DAYS: ${TOPS_BACKUP_BINLOG_RETENTION_DAYS:-14}
       # Finished backups are chowned to this uid:gid so the host user owns
-      # ~/.tops/backups. setup-env.sh fills these in from `id -u` / `id -g`.
+      # ~/.tops/backups. install.sh fills these in from `id -u` / `id -g`.
       TOPS_BACKUP_UID: ${TOPS_BACKUP_UID:-1000}
       TOPS_BACKUP_GID: ${TOPS_BACKUP_GID:-1000}
     volumes:
@@ -173,10 +171,7 @@ services:
   # stopped. Keeping it behind a profile means a stray `docker compose up`
   # cannot bring up something that is able to overwrite the database.
   db-restore:
-    build:
-      context: .
-      dockerfile: docker/backup/Dockerfile
-    image: teemops-backup
+    image: ${TOPS_BACKUP_IMAGE:-teem/tops-backup}:${TOPS_IMAGE_TAG:-latest}
     profiles: ["restore"]
     environment:
       DB_HOST: mysql

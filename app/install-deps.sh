@@ -50,16 +50,10 @@ echo "📦 Installing PHP dependencies..."
 composer install
 
 echo "📦 Installing Node.js dependencies..."
-# Use --legacy-peer-deps to handle dependency conflicts
-npm install --legacy-peer-deps
+npm ci
 
-# Build assets (skip if node_modules doesn't exist or build fails)
 echo "🏗️  Building assets..."
-if [ -d "node_modules" ]; then
-    npm run build || echo "⚠️  Build failed, but continuing. You can run 'npm run build' manually later."
-else
-    echo "⚠️  node_modules not found, skipping build. Run 'npm install --legacy-peer-deps' first."
-fi
+npm run build
 
 # Generate application key if needed
 if [ ! -f ".env" ]; then
