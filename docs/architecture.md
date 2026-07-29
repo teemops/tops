@@ -229,4 +229,6 @@ Future: Integration with AWS Config and Security Hub for additional insights.
 
 ## Next Steps
 
-See [Planning](./planning.md) for detailed implementation steps and [Quick Start](./quick-start.md) for setup instructions.
+See the [Roadmap](./roadmap.md) for what's planned and why, [Progress](./PROGRESS.md) for
+what's built, [AWS Scanner Coverage](./planning.md) for the scanner expansion plan, and
+[Quick Start](./quick-start.md) for setup instructions.

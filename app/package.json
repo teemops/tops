@@ -1,6 +1,8 @@
 {
     "$schema": "https://www.schemastore.org/package.json",
+    "name": "tops",
     "private": true,
+    "license": "Apache-2.0",
     "type": "module",
     "scripts": {
         "build": "vue-tsc && vite build",
