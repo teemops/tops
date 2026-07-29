@@ -230,8 +230,10 @@ most of it blocks the first external contributor or self-hoster.
 
 ### Blockers
 
-1. **No `LICENSE` file.** The repository cannot be open-sourced without one. Highest
-   priority — everything else in this section is downstream of it.
+1. ~~**No `LICENSE` file.**~~ ✅ **Resolved 2026-07-29** — Apache-2.0, with trademark held
+   separately (`TRADEMARK.md`) and a DCO for contributions (`CONTRIBUTING.md`). Rationale
+   in roadmap decision D-7. `composer.json` had been declaring the project MIT under the
+   Laravel skeleton's name; corrected in the same change.
 2. **`npm ci` fails on a clean checkout.** `@vitejs/plugin-vue@5` peer-depends on
    vite ^5||^6, the project is on vite 7. Documented as a CI workaround in
    `.github/workflows/tests.yml:94-97` but never tracked as a defect. **Every new
@@ -247,8 +249,12 @@ most of it blocks the first external contributor or self-hoster.
 
 ### Missing project hygiene
 
-- No `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, or issue templates. `.github/` contains
-  only `pull_request_template.md` and `workflows/tests.yml`.
+- `CONTRIBUTING.md` now exists but covers licensing and DCO sign-off only. No
+  `CODE_OF_CONDUCT.md` and no issue templates — `.github/` still contains only
+  `pull_request_template.md` and `workflows/tests.yml`. The fuller contributor
+  documentation belongs with the public-release milestone.
+- **No DCO enforcement in CI.** Sign-off is documented but nothing rejects an unsigned
+  commit, so the guarantee behind D-7 depends on reviewer diligence.
 - `README.md:31-36` still reads as hosted SaaS — it lists a Firebase project and an AWS
   account as hard prerequisites and points at `app/README.md` rather than the Docker path.
 - No published container images; Compose builds from source only.

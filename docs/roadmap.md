@@ -69,6 +69,59 @@ Decisions already made, so we don't relitigate them. Each has a trigger for revi
 | **D-4** | **Public repo release is a separate, later milestone.** | 2026-07-29 | Design partners are a smaller, safer audience. Going public raises the bar on security, docs, and contributor experience. | Design partners are running successfully. |
 | **D-5** | **MFA ships as new-device email OTP, not TOTP.** No authenticator app, no external OTP service. | 2026-07-29 | Delivers most of the protection (stolen password alone is insufficient) for a fraction of the work, and works on the native auth path where TOTP currently doesn't. | Design partners ask for authenticator-app support, or a compliance requirement forces it. |
 | **D-6** | **No billing, plans, or licence gating.** | 2026-07-29 | No revenue model yet (D-1). | A commercial model is chosen. |
+| **D-7** | **Apache-2.0, with trademark held separately and a DCO for contributions.** | 2026-07-29 | See below — this one has enough reasoning behind it to warrant its own section. | Effectively never; the DCO is what makes it durable. |
+
+### D-7 in full: licensing
+
+**The model is Red Hat's; the licensing tactics are deliberately not.**
+
+Red Hat sells subscriptions, not software — support, certified builds, backports,
+indemnification, long-term updates, wrapped around code that is 100% open. That is the
+model TOPS is aiming at: enterprise support, hand-holding through setup, uptime and
+incident response, training and remediation help, and integration tooling on top.
+
+What we are **not** copying is how Red Hat implements it. The GPL obliges them to give
+source to whoever receives binaries, not to the public; they satisfy that for subscribers,
+then use the *subscription contract* to terminate customers who exercise their
+redistribution rights. The Software Freedom Conservancy's summary — ["if you exercise your
+rights under the GPL, your money is no good here"](https://sfconservancy.org/blog/2023/jun/23/rhel-gpl-analysis/)
+— and their verdict that it is "not in the spirit of the GPL". Restricting RHEL sources to
+CentOS Stream in 2023 compounded it. That is precisely the "one day this turns on me"
+dynamic TOPS exists to avoid. Canonical's Ubuntu Pro has a milder version of the same
+problem: free for 5 machines, then a bill.
+
+**Why Apache-2.0**
+- **No limits, ever.** Nothing in it permits usage caps, seat counts or tiers, so the "you
+  hit a threshold, now pay" scenario is structurally impossible rather than merely
+  promised.
+- **Explicit patent grant**, which MIT lacks — worth having on a security product.
+- **Enterprise-friendly.** Our target user is a solo engineer installing a scanner inside
+  a company. AGPL is blanket-banned at many companies' procurement layer, so its cost
+  would be immediate and certain while its benefit — deterring a competitor's managed
+  offering — is speculative and years away.
+- **Integration-friendly**, which matters because "integration CLI and tools on top" is
+  one of the intended service lines.
+- **Validated in this exact market:** [Prowler](https://github.com/prowler-cloud/prowler),
+  the closest comparator, is Apache-2.0 and runs a commercial hosted offering on top of it.
+
+**Rejected:** AGPL-3.0 (corporate friction outweighs speculative protection at this
+stage), GPL-3.0 (AGPL's friction without its protection — the SaaS loophole stays open),
+MIT (no patent grant), and anything source-available such as BUSL or SSPL (they are the
+rug-pull we are promising not to perform).
+
+**Trademark does the protecting, not the licence.** Red Hat's real moat is that anyone may
+rebuild RHEL but nobody may call it Red Hat. [`TRADEMARK.md`](../TRADEMARK.md) gets the
+same protection honestly: the code is free to fork, the name is not free to reuse.
+
+**DCO, not CLA — and this is the load-bearing part.** Contributors keep their copyright
+and grant us no relicensing rights. We therefore *cannot* move TOPS to a proprietary or
+source-available licence later without every contributor agreeing. A CLA is exactly the
+mechanism that made the Elastic and HashiCorp relicensings possible. Giving up that
+optionality is the point: it converts "we won't rug-pull you" from a promise into a
+structural fact. The cost, stated plainly, is that dual-licensing is now off the table.
+
+**Same software, managed or not.** No open core, no enterprise build, no feature flags
+that unlock with payment. If a managed offering ever exists, it runs this code.
 
 ---
 
@@ -82,7 +135,7 @@ Sizes are rough and relative, for one person: **XS** under a day · **S** a day 
 | # | Feature | Why it's here | Size |
 | --- | --- | --- | :---: |
 | **N-1** | Fix the clean-checkout build | `npm ci` fails on a fresh clone. First command a new person runs, and it fails. | S |
-| **N-2** | Choose and add a licence | No `LICENSE` file. Handing code to an external party without one leaves their rights undefined. **Needs your decision.** | XS |
+| ~~**N-2**~~ | ~~Choose and add a licence~~ | ✅ **Done** 2026-07-29 — Apache-2.0, trademark held separately, DCO for contributions. See D-7. | — |
 | **N-3** | Setup docs a stranger can follow | The milestone is "installs without a call". This is that, plus removing vendor-baked defaults from `.env.example`. | L |
 | **N-4** | Remediation for every finding | 39 of 74 rules have no fix text — including all 22 CIS rules. A finding without a fix is homework. | M |
 
@@ -94,6 +147,7 @@ Sizes are rough and relative, for one person: **XS** under a day · **S** a day 
 | **X-2** | SNS signature verification | Currently a stub with a `TODO`. Exposure is per-deployment today; **that reasoning expires at public release.** | M |
 | **X-3** | Prove the self-hosted path in CI | Nothing asserts the app boots with `FIREBASE_USER_AUTH=false` — the default config. | S |
 | **X-4** | Delete or route the dead OAuth controller | 99 lines, zero routes, unused dependency. Could give native-auth users OAuth without Firebase. | S |
+| **X-6** | Enforce DCO sign-off in CI | Sign-off is required in writing but unchecked. D-7's no-rug-pull guarantee depends on provenance being recorded. | XS |
 | **X-5** | Reconcile member permissions | Code, comments and the plan doc disagree on who can manage members. | XS |
 
 ### Later — real, but waiting on a trigger
@@ -135,21 +189,19 @@ item with the widest blast radius.
 
 ---
 
-### N-2 · Choose and add a licence
+### ~~N-2 · Choose and add a licence~~ ✅ Done 2026-07-29
 
-*Administrative — but legally blocking.*
+**Apache-2.0**, with trademark held separately and a DCO for contributions. Full
+reasoning in **D-7** above.
 
-**Problem:** there is no `LICENSE` file. Handing the code to an external design partner
-without one leaves their right to use it undefined. Cannot be deferred to public release.
-
-**Acceptance criteria**
-- [ ] A `LICENSE` file exists at the repository root
-- [ ] `README.md` and `composer.json` / `package.json` state the licence consistently
-- [ ] The choice is recorded in the Decisions Log with its rationale
-
-**⚠️ Open decision — this one is yours, see Open Questions.** The choice materially
-affects whether a commercial model is possible later (D-1 revisit), so it's worth ten
-minutes of thought rather than defaulting to MIT.
+- [x] `LICENSE` at the repository root (canonical Apache-2.0 text)
+- [x] `NOTICE` with the copyright line
+- [x] `TRADEMARK.md` — code is free, the name is not
+- [x] `CONTRIBUTING.md` — DCO sign-off, and why it's a DCO rather than a CLA
+- [x] `README.md`, `composer.json` and `package.json` state the licence consistently
+      (`composer.json` had been declaring the project MIT under the Laravel skeleton's
+      name — a direct conflict, now fixed)
+- [x] Recorded in the Decisions Log as D-7
 
 ---
 
@@ -294,6 +346,14 @@ the only flag coverage. The most important path is the least tested.
 `laravel/socialite` dependency. Either wire it up to give native-auth users OAuth without
 Firebase (genuinely useful for D-2), or delete both. Leaving it is the worst option.
 
+### X-6 · Enforce DCO sign-off in CI
+
+`CONTRIBUTING.md` requires `Signed-off-by` on every commit, but nothing checks it. D-7's
+guarantee — that TOPS cannot be relicensed without every contributor agreeing — rests on
+provenance being recorded, so an unsigned commit that slips through weakens it. A
+sign-off check is a standard GitHub Action and belongs in place before the first external
+PR, not after.
+
 ### X-5 · Reconcile member-management permissions
 
 Code permits administrators to manage members; the comments directly above it and
@@ -336,17 +396,17 @@ Explicitly out of scope, so they don't creep back in:
 
 Blocking nothing today, but each one shapes the plan:
 
-1. **Which licence?** (N-2) Permissive (MIT/Apache-2.0) maximises adoption and lets
-   anyone — including competitors — run and sell it. Copyleft (AGPL-3.0) is the
-   conventional choice for open-core infrastructure because it keeps a hosted-SaaS option
-   open later. Since D-1 explicitly leaves the commercial model undecided, this deserves a
-   deliberate answer. **Your call.**
-2. **How many design partners, and by when?** Sizes the Now bucket and sets a real
+1. ~~**Which licence?**~~ ✅ Resolved 2026-07-29 — Apache-2.0. See D-7.
+2. **Is "TeemOps" a legal entity?** The copyright line in `NOTICE` currently reads
+   `Copyright 2026 TeemOps`. If there is no incorporated company, copyright vests
+   personally and the line should name the individual instead. One-line fix either way,
+   but worth getting right before the repo is public.
+3. **How many design partners, and by when?** Sizes the Now bucket and sets a real
    deadline.
-3. **Does the SNS gap (X-2) need closing before you hand the code to an external party?**
+4. **Does the SNS gap (X-2) need closing before you hand the code to an external party?**
    The current placement assumes partners are trusted and self-hosting. If any partner is
    at arm's length, this moves to Now.
-4. **What does a design partner have to tell us for this milestone to count as a
+5. **What does a design partner have to tell us for this milestone to count as a
    success?** Worth deciding before we start, not after.
 
 ---

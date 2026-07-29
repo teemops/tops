@@ -190,7 +190,21 @@ See [docs/README.md](./docs/README.md) for complete documentation index.
 
 ## License
 
-[Add your license here]
+TOPS is open source under the [Apache License 2.0](LICENSE).
+
+**No limits, no tiers, no usage caps.** Run it at any scale, modify it, fork it, deploy it
+commercially, offer it to your clients. There is no edition you eventually outgrow and no
+threshold that turns into a bill. The software you self-host is the same software we would
+run in any managed offering — there is no "enterprise build".
+
+Two things sit alongside the licence:
+
+- **[TRADEMARK.md](TRADEMARK.md)** — the code is free; the *name* "TOPS" isn't. Fork
+  freely, just call your fork something else.
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** — we use a DCO rather than a CLA, so contributors
+  keep their copyright. That means TOPS **cannot** be relicensed to a proprietary or
+  source-available licence later without every contributor agreeing. The guarantee is
+  structural, not a promise.
 
 ## Support
 
