@@ -9,11 +9,11 @@
 #
 # Or straight from the web:
 #
-#   bash <(curl -fsSL https://raw.githubusercontent.com/teemops/tops/master/install.sh)
+#   bash <(curl -fsSL https://raw.githubusercontent.com/teemops/tops/develop/install.sh)
 #
 # Prefer to read it first? That is the better habit, and it is two commands:
 #
-#   curl -fsSL https://raw.githubusercontent.com/teemops/tops/master/install.sh -o install.sh
+#   curl -fsSL https://raw.githubusercontent.com/teemops/tops/develop/install.sh -o install.sh
 #   less install.sh && bash install.sh
 #
 # Contributors building from source want ./install-build.sh instead.
