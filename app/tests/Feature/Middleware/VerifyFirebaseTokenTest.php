@@ -21,6 +21,12 @@ class VerifyFirebaseTokenTest extends TestCase
     {
         parent::setUp();
 
+        // Firebase is an opt-in path (roadmap D-2) and off by default, so the
+        // middleware short-circuits unless the flag is on. Set it explicitly rather
+        // than inheriting the ambient .env — one test below deliberately turns it
+        // back off to assert the disabled behaviour.
+        config(['features.firebase_auth' => true]);
+
         $this->middleware = new VerifyFirebaseToken();
     }
 
