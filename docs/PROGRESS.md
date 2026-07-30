@@ -249,7 +249,9 @@ most of it blocks the first external contributor or self-hoster.
    without `AWS_PARENT_ACCOUNT_ID`, `TOPS_CFN_TEMPLATE_URL` and
    `TOPS_DEPLOYMENT_REGION`, and `install.sh` deploys real SNS/SQS into an account you
    control. A self-hoster cannot connect an AWS account without doing this first.
-4. **Vendor-owned defaults baked into `.env.example`** — the CloudFormation template URL
+4. ~~**Vendor-owned defaults baked into `.env.example`**~~ ✅ **Resolved 2026-07-30** — every
+   AWS and Firebase value is blank, with a comment saying `install-messaging.sh` writes the
+   real ones into `generated/teemops.env`. Was: the CloudFormation template URL
    points at `storage.teemops.com` (`:88`), and a Teemops AWS account ID plus SQS ARNs
    are hard-coded (`:89-93`).
 5. **MFA's TOTP backend is a closed external service** (see above).
@@ -366,9 +368,10 @@ Ordered against the open-source self-hosted direction, not against feature count
 1. ~~**Add a `LICENSE` file.**~~ ✅ Done 2026-07-29 — Apache-2.0.
 2. ~~**Fix `npm ci` on a clean checkout**, then add a frontend build job to CI.~~
    ✅ Done 2026-07-29.
-3. **Rewrite `README.md` for the self-hosted path**, removing Firebase and AWS from the
-   hard prerequisites.
-4. **Remove vendor-owned defaults** from `.env.example`.
+3. ~~**Rewrite `README.md` for the self-hosted path**~~ ✅ Done 2026-07-30 — opens on what
+   TOPS is and one install command; Firebase and AWS are no longer prerequisites.
+4. ~~**Remove vendor-owned defaults** from `.env.example`.~~ ✅ Done 2026-07-30 — also
+   caught a Firebase project id, service-account email and client id the audit had missed.
 5. ~~**Implement SNS signature verification**~~ ✅ Done 2026-07-30.
 6. **Decide the MFA approach** (native TOTP vs shipping the OTP service) before any MFA
    work restarts — per the product direction, this is gated on the roadmap.

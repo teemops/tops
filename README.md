@@ -1,196 +1,165 @@
-# Teemops - Cloud Security Scanning Application
+# TOPS — open-source AWS security scanning
 
 [![Tests](https://github.com/teemops/tops/actions/workflows/tests.yml/badge.svg?branch=develop)](https://github.com/teemops/tops/actions/workflows/tests.yml)
-[![PHP](https://img.shields.io/badge/PHP-8.2%2B-777BB4?logo=php&logoColor=white)](https://www.php.net/)
+[![License](https://img.shields.io/badge/license-Apache_2.0-blue)](LICENSE)
+[![PHP](https://img.shields.io/badge/PHP-8.3-777BB4?logo=php&logoColor=white)](https://www.php.net/)
 [![Laravel](https://img.shields.io/badge/Laravel-12-FF2D20?logo=laravel&logoColor=white)](https://laravel.com/)
 [![Vue](https://img.shields.io/badge/Vue-3-4FC08D?logo=vue.js&logoColor=white)](https://vuejs.org/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
 
-A cloud security scanning application built with Laravel 12 and Vue 3, providing AWS security scanning and compliance monitoring.
+Scan your AWS accounts for security misconfigurations, and get told how to fix them.
+Self-hosted, Apache-2.0, **no limits and no paid tier**.
 
-## Project Structure
+- **74 checks** across 11 AWS services — S3, IAM, EC2, RDS, CloudTrail, KMS, Lambda,
+  DynamoDB, ELBv2, SNS, SQS
+- **CIS AWS Foundations Benchmark** profile alongside a general "basic" profile
+- **Every finding carries a remediation.** Critical and high findings also carry
+  step-by-step guidance with links to AWS documentation
+- **Multi-tenant**: organisations, team roles, per-organisation data isolation
 
+## Install
+
+You need **Docker** with Compose v2. That is the whole list — no PHP, no Composer, no
+Node, no npm, no database to set up.
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/teemops/tops/develop/install.sh)
 ```
-saas/
-├── app/                 # Laravel application (monolith with Vue frontend)
-│   ├── app/            # Laravel application code
-│   ├── resources/js/   # Vue 3 frontend (Inertia.js)
-│   ├── routes/         # Laravel routes
-│   └── database/       # Migrations and seeders
-├── docs/               # All project documentation
-│   ├── laravel-app/    # Laravel-specific docs
-│   ├── features/       # Feature specifications
-│   └── practices/      # Development practices
-├── design/             # UI designs and mockups
-└── references/         # Reference files (CloudFormation templates, etc.)
+
+Prefer to read a script before running it? Good instinct:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/teemops/tops/develop/install.sh -o install.sh
 ```
 
-## Getting Started
+```bash
+less install.sh && bash install.sh
+```
 
-### Prerequisites
+Either way it pulls the published images from Docker Hub, generates a `.env` with its own
+application key, starts the stack, waits until it answers, and prints the URL. Re-running
+it is safe — an existing `.env` and your data are left alone.
 
-- **PHP 8.2+** (8.3 recommended)
-- **Composer** (PHP dependency manager)
-- **Node.js 18+** and npm
-- **MySQL** database (local or AWS RDS)
-- **Firebase project** (for authentication)
-- **AWS account** (for scanning functionality)
+Then open **http://localhost:8080** and register. The first account you create is yours.
+Sign-up and password-reset emails are captured locally at **http://localhost:8090** instead
+of being sent, so nothing needs an SMTP server to get started.
 
-### Quick Start
+**You do not need an AWS account to try TOPS**, and you never need a Firebase project — the
+default login is ordinary email and password.
 
-1. **Navigate to app directory**:
-   ```bash
-   cd app
-   ```
+## Scanning a real AWS account
 
-2. **Follow setup instructions**:
-   See [app/README.md](./app/README.md) for detailed setup instructions.
+Connecting an AWS account is a separate, deliberate second step, because it deploys real
+resources into your account. Run this from the directory the installer created — it prints
+the path when it finishes, and it is `tops/` unless you set `TOPS_DIR`:
 
-### Test commands
+```bash
+./install-messaging.sh
+```
 
-```bash	
-cd app
+This creates SQS queues, an SNS topic and an S3 bucket in a region you choose, then wires
+them into your instance. **Read [docker-compose.README.md](docker-compose.README.md) first**
+— it lists exactly what gets created and how to remove it. You will need AWS credentials
+available locally and permission to create those resources.
+
+Once it finishes, **AWS Accounts → Add AWS Account** in the UI walks you through a
+CloudFormation stack that grants TOPS a read-only audit role in the account you want
+scanned. Then start a scan; findings appear as they are produced.
+
+## Upgrading and rolling back
+
+```bash
+docker compose pull && docker compose up -d
+```
+
+`install.sh` pins `TOPS_IMAGE_TAG` in your `.env` to the version it installed, so you only
+move when you choose to. To roll back, set that variable to an earlier tag and run
+`docker compose up -d` again. Database migrations apply automatically on start.
+
+## If something goes wrong
+
+**"the Docker daemon is not reachable".** Docker is installed but your user cannot talk to
+it. On Linux: `sudo usermod -aG docker $USER`, then log out and back in, or run
+`newgrp docker`.
+
+**"a container named 'teemops-app' already exists".** Another TOPS install — or a second
+checkout — owns those names. Stop it with `docker compose down` in its directory, or run the
+installer from that directory instead.
+
+**Port 8080 is already in use.** Set `APP_PORT=9090` in `.env`, then `docker compose up -d`.
+
+**"Could not determine the latest release".** Usually a network or GitHub outage. Pin a
+version instead: `TOPS_VERSION=0.1.0 ./install.sh`.
+
+**It started but the page does not load.** Follow the application log with
+`docker compose logs -f app`. MySQL takes a few seconds longer than the app on a first run.
+
+**"Add AWS Account" says messaging is not configured.** `./install-messaging.sh` has not run
+yet, or it failed partway. Its log is `generated/install.log`.
+
+**A scan stays "Running".** Region scans are processed by the worker — check it is alive
+with `docker compose logs -f worker`. To clear scans already stuck:
+
+```bash
+docker compose exec app php artisan scans:mark-stale-region-complete --dry-run
+```
+
+Drop `--dry-run` once you are happy with what it lists.
+
+**Emails never arrive.** They are not meant to leave the machine by default — they are
+captured at http://localhost:8090. Set the `MAIL_*` variables in `.env` to send for real.
+
+More symptoms and causes: [DEBUG.md](DEBUG.md).
+
+## Contributing, and running from source
+
+Building from source needs Docker **plus** PHP 8.3, Composer, Node ≥22.12 and npm:
+
+```bash
+./install-build.sh
+```
+
+That builds the images from your working tree instead of pulling them.
+[docker-compose.README.md](docker-compose.README.md) has the equivalent commands by hand,
+and [CONTRIBUTING.md](CONTRIBUTING.md) covers the DCO sign-off every commit needs.
+
+Run the tests from `app/`:
+
+```bash
 php artisan test
 ```
 
-individual tests:
-```bash
-cd app
-php artisan test --filter ProcessSqsMessagesTest
-php artisan test --filter=Scan --coverage
-php artisan test --filter=test_can_create_scan_with_scan_types
-php artisan test --filter="ScanModelTest|StoreScanRequestTest|ScansControllerTest|ProcessAuditScanJobTest|ProcessRegionScanJobTest|AwsSecurityScannerTest"
+If your PHP lacks `pdo_sqlite` — which the in-memory test database needs — run the suite
+through Docker instead with `app/scripts/run-tests-docker.sh`.
 
-```
-
-The suite runs against an in-memory SQLite database (see `app/phpunit.xml`), so it
-needs the `pdo_sqlite` PHP extension and no database server. If your PHP is missing
-it, `app/scripts/run-tests-docker.sh` runs the same suite inside a Docker PHP image.
-
-Coverage (requires the `pcov` or `xdebug` extension):
+Adding a scan service or a rule is a JSON change with no PHP. Validate it, always:
 
 ```bash
-cd app
-php artisan test --coverage
+php artisan scan:validate-rules
 ```
-
-### Continuous integration
-
-[`.github/workflows/tests.yml`](./.github/workflows/tests.yml) runs the PHP suite on
-every pull request and on pushes to `develop`, and writes a coverage table to the
-workflow run summary. It is **informational only** — it reports build status via the
-badge above and should not be added to the branch-protection required-checks list.
-
-### Development
-
-**Terminal 1 (Laravel)**:
-```bash
-cd app
-php artisan serve
-```
-
-**Terminal 2 (Vite)**:
-```bash
-cd app
-npm run dev
-```
-
-**Terminal 3 (Queue Worker)**:
-```bash
-cd app
-php artisan queue:work
-```
-By default, scan jobs use the queue in `SCAN_QUEUE_CONNECTION` (see below). With `SCAN_QUEUE_CONNECTION=database`, the above command processes scan jobs. With SQS, use the workers in Terminal 7 instead.
-
-**Terminal 4 (SQS Command)**:
-```bash
-cd app
-php artisan aws:process-sqs
-```
-
-**Terminal 5 (SQS Polling Service)**:
-```bash
-cd app
-php artisan aws:process-sqs --once
-```
-
-**Terminal 6 (Scheduler)**:
-```bash
-cd app
-php artisan schedule:run
-```
-
-**Terminal 7 (Queue Workers for SQS)** (only if using SQS for scans):
-```bash
-cd app
-php artisan queue:work sqs-audit --queue=teemops_audit
-# In a second terminal, run the region worker:
-php artisan queue:work sqs-audit-region --queue=teemops_audit_region
-```
-
-**Scan queue behaviour**
-- **Local dev without SQS:** Set in `.env`:
-  - `SCAN_QUEUE_CONNECTION=database`
-  - `SCAN_REGION_QUEUE_CONNECTION=database`
-  Then run **one** worker that processes both main and region jobs:
-  ```bash
-  php artisan queue:work database --queue=default,teemops_audit_region
-  ```
-  (Terminal 3 can use that command instead of plain `queue:work`.)
-- **Production / SQS:** Set `SCAN_QUEUE_CONNECTION=sqs-audit` and `SCAN_REGION_QUEUE_CONNECTION=sqs-audit-region` (or leave unset). Create SQS queues `teemops_audit` and `teemops_audit_region`, set AWS credentials, and run both workers (Terminal 7). If the push to SQS fails, creating a scan returns 503.
-- **Why “no status update” on region worker:** If you see “Scan with region-based service - waiting for region scans to complete” but the region worker never processes jobs, either (1) region jobs are going to SQS but the region worker is not running or is pointing at the wrong queue, or (2) use database for both (above) so one worker handles everything.
-- **Scan stuck in “Running”:** If an EC2/S3 (region-based) scan stays “Running”, ensure the region worker is processing jobs (see above). To fix already-stuck scans, run: `php artisan scans:mark-stale-region-complete` (marks scans that have been running 60+ minutes as completed with partial results). Use `--dry-run` to list scans that would be updated.
-
-Visit: http://localhost:8000
-
-## Technology Stack
-
-- **Backend**: Laravel 12 (PHP 8.2+)
-- **Frontend**: Vue 3 + TypeScript + Inertia.js
-- **Styling**: Tailwind CSS v4
-- **Components**: shadcn-vue
-- **Database**: MySQL
-- **Authentication**: Firebase Auth
-- **Queue**: Laravel Queues
 
 ## Documentation
 
-### Getting Started
-- [Quick Start Guide](./docs/quick-start.md) - Get up and running quickly
-- [Laravel App Setup](./docs/laravel-app/setup.md) - Detailed setup instructions
-- [Environment Setup](./docs/laravel-app/ENV_SETUP.md) - Environment variables
+| | |
+| --- | --- |
+| [Docker Compose guide](docker-compose.README.md) | Install, AWS messaging, backups, services |
+| [Roadmap](docs/roadmap.md) | The plan of record — Now / Next / Later, and the decisions log |
+| [Progress](docs/PROGRESS.md) | What is actually built, verified against the code |
+| [Architecture](docs/architecture.md) | System design and boundaries |
+| [Scanner coverage](docs/planning.md) | Services and misconfigurations, and the plan for more |
+| [Backups](docs/backups.md) | Backup tiers and the three restore procedures |
+| [Debugging](DEBUG.md) | Symptoms, causes and fixes |
+| [Local development](docs/local-development.md) | Running from source without Docker, and the process-per-terminal layout |
+| [Practices](docs/practices/) · [Processes](docs/processes/) | How we build and review |
+| [Full index](docs/README.md) | Everything else |
 
-### Architecture & Planning
-- [**Roadmap**](./docs/roadmap.md) - The plan of record: Now / Next / Later and the decisions log
-- [Progress](./docs/PROGRESS.md) - What's actually built, verified against the code
-- [Architecture](./docs/architecture.md) - System architecture and design decisions
-- [AWS Scanner Coverage](./docs/planning.md) - Services and misconfigurations to scan, and the plan for expanding coverage
+## Technology
 
-### Features
-- [Feature Specifications](./docs/features/features-spec.md) - All features and user stories
-- [AWS Account Onboarding](./docs/features/onboarding-flow.md) - Onboarding process
-- [API Documentation](./docs/laravel-app/API_DOCUMENTATION.md) - API endpoints
+Laravel 12 (PHP 8.3) · Vue 3 + TypeScript + Inertia · Tailwind CSS · MySQL · Docker Compose.
+Scanning is JSON-driven: adding a service means writing a `tasks.json`, not a PHP class.
 
-### Development
-- [Feature Development Process](./docs/processes/feature-development.md) - How to develop features
-- [Practices Checklist](./docs/processes/practices-checklist.md) - Development practices
-- [User Story Template](./docs/templates/user-story-template.md) - Template for user stories
+## Licence
 
-### Full Documentation Index
-See [docs/README.md](./docs/README.md) for complete documentation index.
-
-## Key Features
-
-- **Multi-tenant Organizations**: Isolated data per organization
-- **AWS Account Management**: Secure cross-account IAM role setup
-- **Security Scanning**: Custom checks for S3, IAM, EC2, RDS
-- **OAuth Authentication**: Google, GitHub, Microsoft support
-- **Email Verification**: Required for email/password users
-- **Background Jobs**: Asynchronous scan processing
-
-## License
-
-TOPS is open source under the [Apache License 2.0](LICENSE).
+Apache-2.0. See [LICENSE](LICENSE).
 
 **No limits, no tiers, no usage caps.** Run it at any scale, modify it, fork it, deploy it
 commercially, offer it to your clients. There is no edition you eventually outgrow and no
@@ -208,4 +177,4 @@ Two things sit alongside the licence:
 
 ## Support
 
-For issues and questions, see the documentation or create an issue in the repository.
+Open an issue. For commercial support, get in touch.

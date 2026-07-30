@@ -226,13 +226,18 @@ Sizes are rough and relative, for one person: **XS** under a day · **S** a day 
 
 ### Now — the path to a design partner
 
+**Empty as of 2026-07-30.** Every item that stood between the code and a design partner has
+landed. What remains before handing TOPS to someone is not a build task: connect a real AWS
+account through the documented path (X-9) and find a partner. Pull from **Next** only after
+that, or the plan starts optimising for imagined users again.
+
 | # | Feature | Why it's here | Size |
 | --- | --- | --- | :---: |
 | ~~**N-1**~~ | ~~Fix the clean-checkout build~~ | ✅ **Done** 2026-07-29 — `@vitejs/plugin-vue` on `^6`, `npm ci` clean, frontend CI job added. | — |
 | ~~**N-2**~~ | ~~Choose and add a licence~~ | ✅ **Done** 2026-07-29 — Apache-2.0, trademark held separately, DCO for contributions. See D-7. | — |
 | ~~**N-6**~~ | ~~SNS signature verification~~ | ✅ **Done** 2026-07-30 — real signature verification via AWS's validator package, plus a topic allowlist that fails closed. Promoted from X-2 that morning when going public expired its deferral. | — |
 | **N-5** | Release pipeline + Docker Hub images | Built 2026-07-30; blocked on Docker Hub secrets. TOPS had no version, tag, changelog or published artifact. See D-8. | L |
-| **N-3** | Setup docs a stranger can follow | The milestone is "installs without a call". Now sits on top of N-5: one `install.sh`, plus removing vendor-baked defaults from `.env.example`. | M |
+| ~~**N-3**~~ | ~~Setup docs a stranger can follow~~ | ✅ **Done** 2026-07-30 — README rebuilt around the one-liner, vendor defaults purged from `.env.example`, nine-symptom troubleshooting section, installer verified end to end. | — |
 | ~~**N-4**~~ | ~~Remediation for every finding~~ | ✅ **Done** 2026-07-30 — all 74 rules carry a remediation, all 28 critical/high rules carry step-by-step guidance, and `scan:validate-rules` now fails rather than warns. | — |
 
 ### Next — before the repo goes public
@@ -244,6 +249,8 @@ Sizes are rough and relative, for one person: **XS** under a day · **S** a day 
 | **X-4** | Delete or route the dead OAuth controller | 99 lines, zero routes, unused dependency. Could give native-auth users OAuth without Firebase. | S |
 | **X-6** | Enforce DCO sign-off in CI | Sign-off is required in writing but unchecked. D-7's guarantee depends on provenance. **The repo is public, so an external PR can now arrive at any time.** | XS |
 | **X-5** | Reconcile member permissions | Code, comments and the plan doc disagree on who can manage members. | XS |
+| **X-8** | Publish a SHA256 for `install.sh` | N-3 documents the download-and-read form but cannot document a checksum, because the release workflow does not emit one. Small addition to `release.yml`. | XS |
+| **X-9** | Verify AWS onboarding end to end | N-3's one unmet criterion: nobody has connected a real account and run a scan through the documented path. Needs an AWS account and real spend. | S |
 | **X-7** | Clear the remaining npm audit backlog | 17 → **5**, criticals at 0 and gated in CI. What's left needs a `firebase` major bump; nothing reaches a running instance. | XS |
 
 ### Later — real, but waiting on a trigger
@@ -423,7 +430,7 @@ the day the repo goes public.
 
 ---
 
-### N-3 · Setup documentation a stranger can follow
+### ~~N-3 · Setup documentation a stranger can follow~~ ✅ Done 2026-07-30
 
 **User story**
 > As a solo engineer evaluating TOPS, I want to install it and complete my first scan by
@@ -676,6 +683,16 @@ Blocking nothing today, but each one shapes the plan:
   encryption that made rotation dangerous was removed. `iam_role_arn` is now plaintext,
   rotation is `php artisan key:generate`, and the rotation design is kept as a documented
   rejection.
+- **2026-07-30** — N-3 landed, and **Now is empty**. The README opens on what TOPS is and
+  one install command instead of a directory tree and a prerequisites list naming Firebase
+  and AWS. `app/.env.example` no longer ships Teemops' account id, SQS ARNs, CFN template
+  URL or Firebase project — there were more of those than the audit had recorded — and
+  `FIREBASE_USER_AUTH` now defaults to `false` so the documented path never asks for a
+  Firebase project. The published one-liner was run from an empty directory and reached a
+  healthy instance, which also caught a `set -u` bug that made v0.1.0's installer print an
+  error and exit non-zero *after* succeeding. Two criteria did not land and are now X-8 and
+  X-9: no published checksum, and no real AWS account has been connected through the
+  documented path.
 - **2026-07-30** — N-4 landed. Every rule now carries a remediation and every critical or
   high rule carries step-by-step guidance, so no finding is a dead end. `scan:validate-rules`
   fails rather than warns on a missing remediation, and validates `tips.json` for the first
