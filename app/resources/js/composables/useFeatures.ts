@@ -5,5 +5,5 @@ import type { PageProps } from '@/types';
 export function useFirebaseAuthEnabled() {
     const page = usePage<PageProps>();
 
-    return computed(() => page.props.features?.firebase_auth ?? true);
+    return computed(() => page.props.features?.firebase_auth ?? false);
 }
