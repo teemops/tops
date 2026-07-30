@@ -6,7 +6,6 @@ use App\Models\AwsAccount;
 use App\Models\Organization;
 use App\Models\Scan;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
@@ -36,18 +35,22 @@ class AwsAccountModelTest extends TestCase
     }
 
     /**
-     * The role ARN is a credential-equivalent, so it must not be readable from
-     * the raw column.
+     * The role ARN is stored plaintext — roadmap decision D-9.
+     *
+     * This test previously asserted the opposite, on the premise that the ARN is
+     * "credential-equivalent". It is not: assuming the role additionally requires
+     * sts:AssumeRole permission, a trust policy naming the caller, and the
+     * ExternalId — which lives plaintext and indexed in the very next column.
+     * Encryption at rest is delegated to the host.
      */
-    public function test_the_iam_role_arn_is_encrypted_at_rest(): void
+    public function test_the_iam_role_arn_is_stored_as_plaintext(): void
     {
         $arn = 'arn:aws:iam::123456789012:role/TeemOps';
         $account = AwsAccount::factory()->create(['iam_role_arn' => $arn]);
 
         $stored = DB::table('aws_accounts')->where('id', $account->id)->value('iam_role_arn');
 
-        $this->assertNotEquals($arn, $stored);
-        $this->assertEquals($arn, Crypt::decryptString($stored));
+        $this->assertEquals($arn, $stored);
     }
 
     public function test_the_iam_role_arn_round_trips_through_the_accessor(): void
@@ -66,10 +69,15 @@ class AwsAccountModelTest extends TestCase
     }
 
     /**
-     * Rows written before encryption was introduced are returned as-is rather
-     * than blowing up on decrypt.
+     * A plaintext ARN reads back unchanged.
+     *
+     * This covered the old accessor's catch-and-return-ciphertext behaviour, which
+     * is gone with the encryption (D-9). It is kept because the assertion still
+     * describes something worth guaranteeing — no transformation on read — and
+     * because rows written under the old scheme are plaintext after the
+     * decrypt migration.
      */
-    public function test_an_undecryptable_value_is_returned_unchanged(): void
+    public function test_a_plaintext_arn_is_returned_unchanged(): void
     {
         $account = AwsAccount::factory()->create();
         DB::table('aws_accounts')->where('id', $account->id)->update([
