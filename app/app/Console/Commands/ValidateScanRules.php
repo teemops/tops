@@ -32,7 +32,8 @@ class ValidateScanRules extends Command
         ServiceRegistry::flush();
 
         $collected = $this->validateTasks();
-        $this->validateRulesets($collected);
+        $knownRuleIds = $this->validateRulesets($collected);
+        $this->validateRecommendations($knownRuleIds);
 
         foreach ($this->warnings as $warning) {
             $this->warn('WARN  ' . $warning);
@@ -50,11 +51,12 @@ class ValidateScanRules extends Command
         }
 
         $this->info(sprintf(
-            'OK: %d services, %d collected methods, %d rules across %d rulesets.',
+            'OK: %d services, %d collected methods, %d rules across %d rulesets, %d recommendations.',
             count(ServiceRegistry::all()),
             count($collected),
             $this->ruleCount,
-            $this->rulesetCount
+            $this->rulesetCount,
+            $this->recommendationCount
         ));
 
         return self::SUCCESS;
@@ -63,6 +65,8 @@ class ValidateScanRules extends Command
     private int $ruleCount = 0;
 
     private int $rulesetCount = 0;
+
+    private int $recommendationCount = 0;
 
     /**
      * Validate every tasks.json, returning the set of "service:method" pairs a scan
@@ -192,8 +196,9 @@ class ValidateScanRules extends Command
 
     /**
      * @param array<string, true> $collected
+     * @return array<string, string> Rule id => the ruleset file that defines it.
      */
-    private function validateRulesets(array $collected): void
+    private function validateRulesets(array $collected): array
     {
         $seenIds = [];
 
@@ -243,8 +248,80 @@ class ValidateScanRules extends Command
                     $this->validateCondition($where, $rule['condition']);
                 }
 
-                if (empty($rule['remediation'])) {
-                    $this->warnings[] = "{$where} has no 'remediation'; findings will show generic advice.";
+                // An error, not a warning, since 2026-07-30 (roadmap N-4). A finding
+                // with no remediation is homework rather than something the operator
+                // can act on, and 39 rules had drifted into that state — including
+                // every CIS rule — precisely because this only warned.
+                if (empty(trim($rule['remediation'] ?? ''))) {
+                    $this->errors[] = "{$where} has no 'remediation'. Every rule must tell the operator how to fix what it finds.";
+                }
+            }
+        }
+
+        return $seenIds;
+    }
+
+    /**
+     * Validate rules/recommendations/tips.json, the richer guidance layer.
+     *
+     * These fail the same way rules do — silently. A recommendation pointing at a
+     * rule id that does not exist is never shown to anyone, which is
+     * indistinguishable from guidance nobody needed. tips.json referenced
+     * tops-route53-001 for months, and nothing noticed because nothing checked.
+     *
+     * @param array<string, string> $knownRuleIds
+     */
+    private function validateRecommendations(array $knownRuleIds): void
+    {
+        $path = base_path('rules/recommendations/tips.json');
+
+        if (!File::exists($path)) {
+            $this->warnings[] = 'rules/recommendations/tips.json is missing; findings will fall back to the one-line remediation.';
+
+            return;
+        }
+
+        $decoded = json_decode(File::get($path), true);
+
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            $this->errors[] = 'tips.json is not valid JSON: ' . json_last_error_msg();
+
+            return;
+        }
+
+        $seenNames = [];
+
+        foreach ($decoded['recommendations'] ?? [] as $index => $rec) {
+            $name = $rec['name'] ?? null;
+            $where = $name ? "tips.json:{$name}" : "tips.json recommendation #{$index}";
+            $this->recommendationCount++;
+
+            if (!$name) {
+                $this->errors[] = "{$where} has no 'name'.";
+                continue;
+            }
+
+            if (isset($seenNames[$name])) {
+                $this->errors[] = "{$where} reuses a recommendation name.";
+            }
+            $seenNames[$name] = true;
+
+            foreach (['recommendation', 'description'] as $required) {
+                if (empty(trim((string) ($rec[$required] ?? '')))) {
+                    $this->errors[] = "{$where} has no '{$required}'.";
+                }
+            }
+
+            $rules = $rec['rules'] ?? [];
+
+            if ($rules === []) {
+                $this->errors[] = "{$where} references no rules, so it can never be shown.";
+                continue;
+            }
+
+            foreach ($rules as $ruleId) {
+                if (!isset($knownRuleIds[$ruleId])) {
+                    $this->errors[] = "{$where} references rule '{$ruleId}', which no ruleset defines. The guidance can never be shown.";
                 }
             }
         }

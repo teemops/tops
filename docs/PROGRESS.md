@@ -191,18 +191,25 @@ box without an AWS account or a Firebase project?**
   open-source stack.
 
 #### Remediation Recommendations
-- **Status**: 🔄 Partial *(unrecorded)*
+- **Status**: ✅ Complete for the severities that need it *(roadmap N-4, 2026-07-30)*
 - **Built**: `rules/recommendations/tips.json`, `RecommendationsLoader`,
   `GET /api/recommendations`, rendered in `Findings/Show.vue`
-- **Gap**: remediation exists in two layers and both are thin.
 
   | Layer | Coverage | Notes |
   | --- | --- | --- |
-  | One-line `remediation` field on the rule itself (`rulesets/*.json`) | **35 of 74** | All 17 uncovered basic rules **and all 22 CIS rules** have none |
-  | Rich recommendation — steps, links, impact (`recommendations/tips.json`) | **10 of 74** | 8 recommendations, grouped for the remediation workflow |
+  | One-line `remediation` on the rule (`rulesets/*.json`) | **74 of 74** | Was 35; the 39 gaps included every CIS rule |
+  | Step-by-step guidance (`recommendations/tips.json`) | **28 of 28 critical + high** | 17 recommendations grouped by theme, was 8 |
 
-  The CIS ruleset is the single biggest hole: 22 rules, zero remediation text of either
-  kind. One recommendation targets `tops-route53-001`, a rule that does not exist.
+- **Deliberately not covered**: medium and low severity rules (38) have the one-line
+  remediation only. Writing 38 more step-by-step recommendations is completeness nobody
+  asked for; promote individually when a partner asks.
+- **Enforced, not just fixed**: `scan:validate-rules` now *fails* on a rule with no
+  remediation — it only warned before, which is how the gap grew — and validates
+  `tips.json` for the first time. `RemediationCoverageTest` asserts over the shipped
+  rulesets rather than fixtures, since the original gap was content drift and not a
+  broken code path.
+- The dangling `tops-route53-001` recommendation is removed; it returns with Route53
+  scanner coverage.
 
 #### Compliance Rulesets
 - **Status**: 🔄 Partial
@@ -296,8 +303,10 @@ most of it blocks the first external contributor or self-hoster.
 
 ### Medium
 
-2. **Remediation coverage is thin** — 39 of 74 rules carry no remediation text at all
-   (including every CIS rule), and only 10 have rich step-by-step guidance.
+2. ~~**Remediation coverage is thin**~~ ✅ **Resolved 2026-07-30** (roadmap N-4) — all 74
+   rules carry a remediation, all 28 critical/high rules carry step-by-step guidance, and
+   `scan:validate-rules` fails rather than warns. Medium and low keep the one-liner only,
+   by choice.
 3. **`pci.json` is empty** — the profile is dead weight until authored.
 4. **`Auth/OAuthController.php` is dead code** with an unused `laravel/socialite`
    dependency. Delete it or route it.
@@ -363,8 +372,7 @@ Ordered against the open-source self-hosted direction, not against feature count
 5. ~~**Implement SNS signature verification**~~ ✅ Done 2026-07-30.
 6. **Decide the MFA approach** (native TOTP vs shipping the OTP service) before any MFA
    work restarts — per the product direction, this is gated on the roadmap.
-7. **Close the remediation coverage gap** — findings without remediation text are
-   findings users can't act on. The CIS ruleset has none at all.
+7. ~~**Close the remediation coverage gap**~~ ✅ Done 2026-07-30.
 
 Items 1–4 are the ones a stranger hits before they can use or contribute to the project.
 Ordering matches the roadmap: SNS verification sits behind the setup docs because each

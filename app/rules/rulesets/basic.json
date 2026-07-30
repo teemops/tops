@@ -50,6 +50,7 @@
             "method": "listGroupsForUser",
             "description": "IAM Users should be assigned to IAM Groups for better policy management",
             "severity": "medium",
+            "remediation": "Add the user to an IAM group that carries the permissions they need, then remove any policies attached directly to the user. Group membership is far easier to review than per-user grants when someone changes role or leaves.",
             "condition": "count($data['Groups'] ?? []) == 0"
         },
         {
@@ -59,6 +60,7 @@
             "method": "listRolePolicies",
             "description": "IAM Roles should not have inline IAM policies. Instead use managed policies or customer managed policies.",
             "severity": "medium",
+            "remediation": "Replace the inline role policy with a customer managed policy: copy the policy document, create it under IAM > Policies, attach it to the role, then delete the inline version. Managed policies are versioned, reusable, and visible in one place.",
             "condition": "count($data['PolicyNames'] ?? []) > 0"
         },
         {
@@ -68,6 +70,7 @@
             "method": "listAttachedRolePolicies",
             "description": "IAM Roles should use least privilege policies. Review attached policies for excessive permissions.",
             "severity": "low",
+            "remediation": "Review the policies attached to this role and remove permissions it does not use. IAM Access Analyzer can generate a policy from the role's recent CloudTrail activity, which is a far better starting point than trimming by hand.",
             "condition": "count($data['AttachedPolicies'] ?? []) > 5"
         },
         {
@@ -77,6 +80,7 @@
             "method": "listAttachedUserPolicies",
             "description": "IAM Users should not have AdministratorAccess policy attached. Use least privilege principles and assign users to groups with appropriate permissions.",
             "severity": "high",
+            "remediation": "Detach AdministratorAccess from the user. Give them a scoped policy covering their actual work, or a role they assume when admin is genuinely needed — standing admin on a user is what turns one stolen credential into a full account compromise.",
             "condition": "isset($data['AttachedPolicies']) && count(array_filter($data['AttachedPolicies'] ?? [], function($policy) { return ($policy['PolicyName'] ?? '') == 'AdministratorAccess' || strpos($policy['PolicyArn'] ?? '', 'AdministratorAccess') !== false; })) > 0"
         },
         {
@@ -86,6 +90,7 @@
             "method": "listAttachedUserPolicies",
             "description": "IAM Users should not have managed policies ending in 'FullAccess' attached. These policies grant full access to AWS services and violate least privilege principles.",
             "severity": "high",
+            "remediation": "Detach the *FullAccess policy and grant only the actions needed. AWS publishes narrower managed policies for most services (ReadOnly, or specific job functions); start from one of those rather than from FullAccess.",
             "condition": "isset($data['AttachedPolicies']) && count(array_filter($data['AttachedPolicies'] ?? [], function($policy) { $policyName = $policy['PolicyName'] ?? ''; return strlen($policyName) >= 11 && substr($policyName, -11) === 'FullAccess'; })) > 0"
         },
         {
@@ -95,6 +100,7 @@
             "method": "listUserPolicies",
             "description": "IAM Users with inline policies may contain wildcard permissions (*) that grant full access to one or more services. Inline policies should be reviewed for least privilege compliance.",
             "severity": "high",
+            "remediation": "Rewrite the inline policy to name specific actions and resources instead of using '*'. Check the user's CloudTrail history to see what is actually called, then move the result into a customer managed policy.",
             "condition": "count($data['PolicyNames'] ?? []) > 0"
         },
         {
@@ -134,6 +140,7 @@
             "method": "getBucketAcl",
             "description": "S3 Bucket ACL should not allow public access",
             "severity": "high",
+            "remediation": "Remove the public grants from the bucket ACL: S3 > bucket > Permissions > Access control list > Edit, and clear any grant to 'Everyone' or 'Authenticated users'. Then enable Block Public Access so it cannot be re-added. If the content is meant to be public, serve it through CloudFront with the bucket kept private.",
             "condition": "isset($data['Grants']) && count(array_filter($data['Grants'] ?? [], function($grant) { return ($grant['Grantee']['Type'] ?? '') == 'Group' && ($grant['Grantee']['URI'] ?? '') == 'http://acs.amazonaws.com/groups/global/AllUsers'; })) > 0"
         },
         {
@@ -143,6 +150,7 @@
             "method": "describeSecurityGroups",
             "description": "EC2 Security Groups should not allow inbound traffic from 0.0.0.0/0",
             "severity": "high",
+            "remediation": "Remove the 0.0.0.0/0 inbound rule from the security group and replace it with the specific CIDR ranges that need access. For administrative access prefer Systems Manager Session Manager, which requires no inbound rule at all.",
             "condition": "isset($data['SecurityGroups']) && count(array_filter($data['SecurityGroups'] ?? [], function($sg) { return isset($sg['IpPermissions']) && count(array_filter($sg['IpPermissions'] ?? [], function($perm) { return isset($perm['IpRanges']) && count(array_filter($perm['IpRanges'] ?? [], function($range) { return ($range['CidrIp'] ?? '') == '0.0.0.0/0'; })) > 0; })) > 0; })) > 0"
         },
         {
@@ -162,6 +170,7 @@
             "method": "describeVpcs",
             "description": "Default VPCs should not be used in production environments",
             "severity": "low",
+            "remediation": "Move production workloads into a purpose-built VPC with subnets and routing you have chosen deliberately. The default VPC ships with public subnets and an open default security group, so it rarely matches what a production workload should have.",
             "condition": "isset($data['Vpcs']) && count(array_filter($data['Vpcs'] ?? [], function($vpc) { return ($vpc['IsDefault'] ?? false) == true; })) > 0"
         },
         {
@@ -171,6 +180,7 @@
             "method": "describeSubnets",
             "description": "EC2 Subnets should not have Public IP enabled by default",
             "severity": "medium",
+            "remediation": "Disable auto-assign public IPv4 on the subnet: VPC > Subnets > Edit subnet settings. Instances needing outbound access should sit in a private subnet behind a NAT gateway; inbound traffic belongs on a load balancer.",
             "condition": "($data['Subnets'][0]['MapPublicIpOnLaunch'] ?? false) == true"
         },
         {
@@ -180,6 +190,7 @@
             "method": "describeInstances",
             "description": "EC2 Instances should have termination protection enabled for production workloads",
             "severity": "low",
+            "remediation": "Enable termination protection: EC2 > instance > Actions > Instance settings > Change termination protection. It only guards against accidental termination through the API and console, so treat it as one layer rather than a backup strategy.",
             "condition": "isset($data['DisableApiTermination']) && ($data['DisableApiTermination'] ?? false) == false"
         },
         {
@@ -189,6 +200,7 @@
             "method": "describeDBInstances",
             "description": "RDS Instances should not be publicly accessible",
             "severity": "high",
+            "remediation": "Set Public access to No: RDS > database > Modify > Connectivity, and tighten the security group to the application's group rather than a CIDR. Connect from inside the VPC via a bastion, VPN, or Session Manager port forwarding.",
             "condition": "($data['PubliclyAccessible'] ?? false) == true"
         },
         {
@@ -198,6 +210,7 @@
             "method": "describeDBInstances",
             "description": "RDS Instances should have encryption enabled",
             "severity": "high",
+            "remediation": "Encryption cannot be turned on in place. Snapshot the instance, copy the snapshot with encryption enabled, restore from the copy, repoint the application, then delete the unencrypted original once you have verified the new one.",
             "condition": "isset($data['DBInstanceIdentifier']) && ($data['StorageEncrypted'] ?? false) == false"
         },
         {
@@ -207,6 +220,7 @@
             "method": "describeDBInstances",
             "description": "RDS Instances should have Multi-AZ enabled for production workloads",
             "severity": "medium",
+            "remediation": "Enable Multi-AZ: RDS > database > Modify > Availability & durability. Failover is automatic and typically completes in a minute or two; the modification itself can be applied in the next maintenance window to avoid an immediate restart.",
             "condition": "isset($data['DBInstanceIdentifier']) && ($data['MultiAZ'] ?? false) == false"
         },
         {
@@ -216,6 +230,7 @@
             "method": "describeDBInstances",
             "description": "RDS Instances should have automated backups enabled with appropriate retention period",
             "severity": "medium",
+            "remediation": "Set a backup retention period of at least 7 days: RDS > database > Modify > Backup. Retention of 0 disables automated backups entirely and with it point-in-time recovery, so a mistake becomes unrecoverable.",
             "condition": "isset($data['DBInstanceIdentifier']) && ($data['BackupRetentionPeriod'] ?? 0) < 7"
         },
         {
@@ -225,6 +240,7 @@
             "method": "describeDBClusters",
             "description": "RDS Clusters should have encryption enabled",
             "severity": "high",
+            "remediation": "Encryption cannot be enabled on an existing cluster. Take a cluster snapshot, copy it with encryption enabled, restore a new cluster from the copy, repoint your application, then remove the unencrypted cluster.",
             "condition": "isset($data['DBClusterIdentifier']) && ($data['StorageEncrypted'] ?? false) == false"
         },
         {
@@ -234,6 +250,7 @@
             "method": "describeDBClusters",
             "description": "RDS Clusters should have automated backups enabled with appropriate retention period",
             "severity": "medium",
+            "remediation": "Set a backup retention period of at least 7 days on the cluster: RDS > cluster > Modify > Backup. Retention of 0 means no automated backups and no point-in-time recovery.",
             "condition": "isset($data['DBClusterIdentifier']) && ($data['BackupRetentionPeriod'] ?? 0) < 7"
         },
         {

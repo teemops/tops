@@ -233,7 +233,7 @@ Sizes are rough and relative, for one person: **XS** under a day · **S** a day 
 | ~~**N-6**~~ | ~~SNS signature verification~~ | ✅ **Done** 2026-07-30 — real signature verification via AWS's validator package, plus a topic allowlist that fails closed. Promoted from X-2 that morning when going public expired its deferral. | — |
 | **N-5** | Release pipeline + Docker Hub images | Built 2026-07-30; blocked on Docker Hub secrets. TOPS had no version, tag, changelog or published artifact. See D-8. | L |
 | **N-3** | Setup docs a stranger can follow | The milestone is "installs without a call". Now sits on top of N-5: one `install.sh`, plus removing vendor-baked defaults from `.env.example`. | M |
-| **N-4** | Remediation for every finding | 39 of 74 rules have no fix text — including all 22 CIS rules. A finding without a fix is homework. | M |
+| ~~**N-4**~~ | ~~Remediation for every finding~~ | ✅ **Done** 2026-07-30 — all 74 rules carry a remediation, all 28 critical/high rules carry step-by-step guidance, and `scan:validate-rules` now fails rather than warns. | — |
 
 ### Next — before the repo goes public
 
@@ -460,7 +460,7 @@ environment variable, or ask a question to get unstuck.
 
 ---
 
-### N-4 · Give every finding a remediation
+### ~~N-4 · Give every finding a remediation~~ ✅ Done 2026-07-30
 
 **User story**
 > As a solo engineer reviewing my scan results, I want every finding to tell me how to
@@ -471,28 +471,44 @@ Every finding surfaced in the UI carries, at minimum, a one-line remediation. Th
 highest-severity and most common findings additionally carry step-by-step guidance with
 links. No finding is a dead end.
 
-**Current state — the gap is bigger than it looks**
+**Before and after**
 
-| Layer | Coverage | Worst gap |
+| Layer | Was | Now |
 | --- | --- | --- |
-| One-line `remediation` on the rule | 35 of 74 | 17 basic rules |
-| Rich guidance — steps, links, impact (`tips.json`) | 10 of 74 | — |
-| **CIS ruleset specifically** | **0 of 22** | **Every CIS rule is a dead end** |
+| One-line `remediation` on the rule | 35 of 74 | **74 of 74** |
+| Step-by-step guidance for critical + high (`tips.json`) | 3 of 28 | **28 of 28** |
+| **CIS ruleset specifically** | **0 of 22 — every rule a dead end** | **22 of 22** |
+| Recommendations referencing a rule that exists | 10 of 11 | **all of them** |
+| `scan:validate-rules` on a rule with no remediation | warned | **fails** |
 
-**Acceptance criteria**
-- [ ] Given any rule in `basic.json` or `cis.json`, when it produces a finding, then that finding displays a remediation
-- [ ] Given a critical or high severity finding, when I expand it, then I see step-by-step guidance with links to AWS documentation
-- [ ] Given the recommendations file, when it is validated, then every rule it references exists (today `tops-route53-001` does not)
-- [ ] Given a new rule is added without remediation text, when `scan:validate-rules` runs, then it fails
+**Acceptance criteria** — all met 2026-07-30
+- [x] Given any rule in `basic.json` or `cis.json`, when it produces a finding, then that finding displays a remediation
+- [x] Given a critical or high severity finding, when I expand it, then I see step-by-step guidance with links to AWS documentation
+- [x] Given the recommendations file, when it is validated, then every rule it references exists (`tops-route53-001` no longer does)
+- [x] Given a new rule is added without remediation text, when `scan:validate-rules` runs, then it fails
 
-**Technical notes**
-- Two layers, and the cheap one goes first: fill the 39 missing one-line `remediation`
-  fields in the rulesets before extending `tips.json`. The CIS ruleset's 22 rules are the
-  single highest-value batch.
-- Extending `scan:validate-rules` to enforce remediation is what stops this regressing —
-  do that in the same change, or the gap reopens.
-- `tips.json` groups rules by recommendation for the remediation workflow; keep that
-  grouping meaningful rather than one recommendation per rule.
+**How it was done**
+- Both layers, in the planned order: the 39 one-line `remediation` fields first, then
+  `tips.json`. Field order in the rulesets matches rules that already had the key, so the
+  diff is 39 added lines and nothing reformatted.
+- **Medium and low severity deliberately have no step-by-step guidance** — 38 rules. The
+  one-line remediation is enough for them, and writing 38 more recommendations nobody
+  asked for is the kind of completeness that costs weeks and helps no one. Promote
+  individual ones when a partner asks.
+- `tips.json` grew from 8 recommendations to 17, grouped by theme (root account, IAM least
+  privilege, S3 public access, RDS encryption, RDS exposure, admin ports, CloudTrail,
+  IMDSv2, Lambda URLs, KMS deletion) rather than one per rule. A test fails if that
+  grouping degenerates into a recommendation per rule.
+- The dead `tops-rec-008` Route53 recommendation is removed rather than left dangling. It
+  returns with Route53 scanner coverage.
+- `scan:validate-rules` now also validates `tips.json`, which it never did — which is why
+  the dangling reference survived for months.
+
+**What stops it regressing.** `RemediationCoverageTest` asserts over the *shipped*
+rulesets, not fixtures: every rule has a remediation, every remediation is at least 40
+characters, every critical/high rule has guidance, no reference dangles, every
+recommendation has steps and HTTPS links. The original gap was not a broken code path —
+the code worked fine — so only a test that reads what actually ships would have caught it.
 
 **Success metrics**
 - 100% of findings carry a remediation; 0 dead ends
@@ -660,6 +676,11 @@ Blocking nothing today, but each one shapes the plan:
   encryption that made rotation dangerous was removed. `iam_role_arn` is now plaintext,
   rotation is `php artisan key:generate`, and the rotation design is kept as a documented
   rejection.
+- **2026-07-30** — N-4 landed. Every rule now carries a remediation and every critical or
+  high rule carries step-by-step guidance, so no finding is a dead end. `scan:validate-rules`
+  fails rather than warns on a missing remediation, and validates `tips.json` for the first
+  time — which is how a recommendation pointing at a nonexistent rule survived for months.
+  **Now** is down to N-3 alone.
 - **2026-07-30** — **The repo went public**, ahead of D-4's intended sequencing. Verified
   the install one-liner resolves (`raw.githubusercontent.com` does follow the rename
   redirect, so both old and new URLs serve). Four deferrals were keyed to this moment and
