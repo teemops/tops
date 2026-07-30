@@ -103,12 +103,12 @@ box without an AWS account or a Firebase project?**
   all three were already done)*
 - **Implementation**: CloudFormation quick-create URL generation with config guard and
   actionable errors, pending-account de-duplication, SNS callback handler, SQS polling
-  (`aws:process-sqs`) plus DLQ redrive, role ARN encryption at rest
-  (`AwsAccount.php:53-70`), 5-second UI status polling
+  (`aws:process-sqs`) plus DLQ redrive, role ARN stored plaintext with encryption at rest
+  delegated to the host (roadmap D-9), 5-second UI status polling
   (`useAwsAccounts.ts:162-166`), manual entry fallback
 - **Tests**: 51 tests (`AwsAccountsControllerTest` 28, `AwsAccountModelTest` 9,
   `ProcessSqsMessagesTest` 8, `RedriveDlqMessagesTest` 6)
-- **⚠️ Security gap — see Known Issues.** SNS signature verification is a stub.
+- SNS signature verification implemented 2026-07-30 (roadmap N-6): AWS signature check plus a topic allowlist that fails closed.
 
 #### Scanning Engine
 - **Status**: ✅ Complete
@@ -277,14 +277,22 @@ most of it blocks the first external contributor or self-hoster.
 
 ### High — security
 
-1. **SNS signature verification is not implemented.**
-   `app/app/Services/SnsSignatureVerifier.php:62-66` is an explicit `TODO`. `verify()`
-   checks only the `x-amz-sns-message-type` header and the presence of three JSON
-   fields; `verifyWithAwsSdk()` (`:76-93`) is a comment-only shell that delegates
-   straight back to `verify()`. `SubscriptionConfirmation` messages are auto-accepted.
-   The callback route is unauthenticated by design (`api.php:77`), so **anyone who can
-   POST a well-formed body can attempt to register a role ARN.** The previous revision
-   of this document claimed this feature was complete.
+1. ~~**SNS signature verification is not implemented.**~~ ✅ **Resolved 2026-07-30**
+   (roadmap N-6). `SnsSignatureVerifier` now performs real cryptographic verification via
+   `aws/aws-php-sns-message-validator`, AWS's own package — the validator was **not** in
+   `aws/aws-sdk-php` as previously recorded here. Two checks, both required: the signature,
+   and a `TopicArn` allowlist against `services.aws.sns_arn`, because a valid signature
+   only proves *AWS* sent the message and anyone can create a topic. The topic check fails
+   closed when unconfigured. The comment-only `verifyWithAwsSdk()` shell is deleted.
+   Covered by 15 unit tests that sign real payloads against a generated key pair, plus
+   endpoint tests asserting 401 for unverified notifications *and* unverified
+   subscription confirmations.
+
+   Found while implementing: SNS posts JSON as `Content-Type: text/plain`, so Laravel never
+   parsed the body and `$request->input('Message')` was always empty. **The callback
+   returned 400 for every real notification** — it could not have worked as written. SQS
+   polling is what has been carrying account linking. Both the verifier and the controller
+   now read the raw body.
 
 ### Medium
 
@@ -336,7 +344,7 @@ E2E: `scans.spec.ts` (31), `organizations.spec.ts` (13), `mfa.spec.ts` (6),
 | **Architecture** — monolith, clear boundaries, no premature optimisation | ✅ Following. The JSON-driven scanner refactor is a strong example: adding a service went from a PHP class to a config file |
 | **Database** — normalised schema, reversible migrations, Eloquent only | ✅ Following |
 | **Code quality** | ✅ Following |
-| **Security** — multi-tenancy, authz, encryption | ⚠️ Org scoping and encryption are solid; **the SNS webhook is the outstanding gap** |
+| **Security** — multi-tenancy, authz, encryption | ✅ Org scoping is solid; the SNS webhook is verified as of 2026-07-30; application-level encryption at rest was deliberately removed and delegated to the host (roadmap D-9) |
 | **Testing** — tests ship with the change | ✅ Following for application code; the frontend build is now covered by CI; ❌ the self-hosted boot path is still untested |
 | **Documentation** | ⚠️ This document had drifted six months. Update it with each merged feature, not in batches |
 
@@ -352,7 +360,7 @@ Ordered against the open-source self-hosted direction, not against feature count
 3. **Rewrite `README.md` for the self-hosted path**, removing Firebase and AWS from the
    hard prerequisites.
 4. **Remove vendor-owned defaults** from `.env.example`.
-5. **Implement SNS signature verification** — the one genuine security gap.
+5. ~~**Implement SNS signature verification**~~ ✅ Done 2026-07-30.
 6. **Decide the MFA approach** (native TOTP vs shipping the OTP service) before any MFA
    work restarts — per the product direction, this is gated on the roadmap.
 7. **Close the remediation coverage gap** — findings without remediation text are

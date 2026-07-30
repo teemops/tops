@@ -6,6 +6,7 @@ use App\Models\AwsAccount;
 use App\Models\Organization;
 use App\Models\OrganizationMember;
 use App\Models\User;
+use App\Services\SnsSignatureVerifier;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 use Tests\TestCase;
@@ -397,10 +398,32 @@ class AwsAccountsControllerTest extends TestCase
         ], $overrides);
     }
 
+    /**
+     * Treat the signature as already verified.
+     *
+     * Signature verification has its own unit tests, which sign real payloads
+     * against a generated key pair (SnsSignatureVerifierTest). These tests are
+     * about what the controller does once a message is trusted, so producing a
+     * valid AWS signature here would only obscure that. The endpoint-level
+     * assertion that an *unverified* request is refused is
+     * test_the_sns_callback_rejects_an_unverified_request, which deliberately
+     * does not use this.
+     */
+    private function withVerifiedSnsSignature(): void
+    {
+        $this->app->instance(SnsSignatureVerifier::class, new class extends SnsSignatureVerifier {
+            public function verify(\Illuminate\Http\Request $request): bool
+            {
+                return true;
+            }
+        });
+    }
+
     private function postSnsCallback(array $message): \Illuminate\Testing\TestResponse
     {
-        return $this->withHeader('x-amz-sns-message-type', 'Notification')
-            ->postJson('/api/aws-accounts/sns-callback', ['Message' => json_encode($message)]);
+        $this->withVerifiedSnsSignature();
+
+        return $this->postJson('/api/aws-accounts/sns-callback', ['Message' => json_encode($message)]);
     }
 
     public function test_the_sns_callback_activates_a_pending_account(): void
@@ -440,7 +463,12 @@ class AwsAccountsControllerTest extends TestCase
         $this->assertEquals('Production', $account->fresh()->name);
     }
 
-    public function test_the_sns_callback_rejects_a_request_without_the_sns_header(): void
+    /**
+     * The real verifier, on an unsigned request — the route is unauthenticated by
+     * design, so this 401 is the only thing standing between a stranger and an
+     * account activation with an arbitrary IAM role ARN.
+     */
+    public function test_the_sns_callback_rejects_an_unverified_request(): void
     {
         $account = AwsAccount::factory()->pending()->create();
 
@@ -451,12 +479,18 @@ class AwsAccountsControllerTest extends TestCase
         $this->assertEquals('pending', $account->fresh()->status);
     }
 
+    /**
+     * A verified message can still be missing the CloudFormation outputs the
+     * controller needs — that is a 400, distinct from a signature failure.
+     */
     public function test_the_sns_callback_rejects_a_message_missing_required_fields(): void
     {
         $account = AwsAccount::factory()->pending()->create();
 
         $this->postSnsCallback($this->snsPayload($account, ['TopsRoleArn' => null]))
-            ->assertStatus(401);
+            ->assertStatus(400);
+
+        $this->assertEquals('pending', $account->fresh()->status);
     }
 
     public function test_the_sns_callback_404s_for_an_unknown_account(): void
@@ -486,14 +520,28 @@ class AwsAccountsControllerTest extends TestCase
         $this->assertEquals('pending', $account->fresh()->status);
     }
 
-    public function test_the_sns_callback_accepts_a_subscription_confirmation(): void
+    public function test_the_sns_callback_accepts_a_verified_subscription_confirmation(): void
     {
-        $this->withHeader('x-amz-sns-message-type', 'SubscriptionConfirmation')
-            ->postJson('/api/aws-accounts/sns-callback', [
-                'Type' => 'SubscriptionConfirmation',
-                'SubscribeURL' => 'https://sns.us-east-1.amazonaws.com/?Action=ConfirmSubscription',
-            ])
+        $this->withVerifiedSnsSignature();
+
+        $this->postJson('/api/aws-accounts/sns-callback', [
+            'Type' => 'SubscriptionConfirmation',
+            'SubscribeURL' => 'https://sns.us-east-1.amazonaws.com/?Action=ConfirmSubscription',
+        ])
             ->assertOk()
             ->assertJson(['status' => 'subscription_confirmed']);
+    }
+
+    /**
+     * Confirmations are no longer waved through. The stub this replaced returned
+     * true for every SubscriptionConfirmation without checking a signature, which
+     * would let a stranger's topic subscribe itself to this endpoint.
+     */
+    public function test_the_sns_callback_rejects_an_unverified_subscription_confirmation(): void
+    {
+        $this->postJson('/api/aws-accounts/sns-callback', [
+            'Type' => 'SubscriptionConfirmation',
+            'SubscribeURL' => 'https://sns.us-east-1.amazonaws.com/?Action=ConfirmSubscription',
+        ])->assertStatus(401);
     }
 }

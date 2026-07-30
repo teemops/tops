@@ -230,7 +230,7 @@ Sizes are rough and relative, for one person: **XS** under a day · **S** a day 
 | --- | --- | --- | :---: |
 | ~~**N-1**~~ | ~~Fix the clean-checkout build~~ | ✅ **Done** 2026-07-29 — `@vitejs/plugin-vue` on `^6`, `npm ci` clean, frontend CI job added. | — |
 | ~~**N-2**~~ | ~~Choose and add a licence~~ | ✅ **Done** 2026-07-29 — Apache-2.0, trademark held separately, DCO for contributions. See D-7. | — |
-| **N-6** | SNS signature verification | **Promoted from Next on 2026-07-30**, the day the repo went public — this is X-2, whose own deferral reasoning said it expired at exactly that point. The verifier is a stub that returns `true`, on an unauthenticated route that registers IAM role ARNs, and the code is now readable by anyone. | M |
+| ~~**N-6**~~ | ~~SNS signature verification~~ | ✅ **Done** 2026-07-30 — real signature verification via AWS's validator package, plus a topic allowlist that fails closed. Promoted from X-2 that morning when going public expired its deferral. | — |
 | **N-5** | Release pipeline + Docker Hub images | Built 2026-07-30; blocked on Docker Hub secrets. TOPS had no version, tag, changelog or published artifact. See D-8. | L |
 | **N-3** | Setup docs a stranger can follow | The milestone is "installs without a call". Now sits on top of N-5: one `install.sh`, plus removing vendor-baked defaults from `.env.example`. | M |
 | **N-4** | Remediation for every finding | 39 of 74 rules have no fix text — including all 22 CIS rules. A finding without a fix is homework. | M |
@@ -300,9 +300,9 @@ reasoning in **D-7** above.
 
 ---
 
-### N-6 · SNS signature verification
+### ~~N-6 · SNS signature verification~~ ✅ Done 2026-07-30
 
-*Security. Promoted from X-2 on 2026-07-30 because the repo went public.*
+*Security. Promoted from X-2 on 2026-07-30 because the repo went public, then closed the same day.*
 
 `SnsSignatureVerifier::verify()` checks that three JSON fields are present and then
 `return true`. The `TODO` listing the four real steps — fetch `SigningCertURL`, download the
@@ -315,18 +315,34 @@ linking. While the repo was private, an attacker had to guess the shape of an ac
 payload; now the accepted fields and the absence of any cryptographic check are public.
 X-2's own text said this reasoning "expires at public release" — it has.
 
-**Acceptance criteria**
-- [ ] Given a message with a valid AWS signature, when it arrives, then it is accepted
-- [ ] Given a message with a missing, malformed or incorrect signature, when it arrives, then it is rejected and logged
-- [ ] Given a `SigningCertURL` not on an `amazonaws.com` host over HTTPS, when it arrives, then it is rejected **without** fetching the URL — that is the classic bypass
-- [ ] Given a `SubscriptionConfirmation`, when it arrives, then it is verified before the subscription is confirmed
-- [ ] Given verification fails, when the request completes, then no account state changed
+**Acceptance criteria** — all met 2026-07-30
+- [x] Given a message with a valid AWS signature, when it arrives, then it is accepted
+- [x] Given a message with a missing, malformed or incorrect signature, when it arrives, then it is rejected and logged
+- [x] Given a `SigningCertURL` not on an `amazonaws.com` host over HTTPS, when it arrives, then it is rejected **without** fetching the URL — that is the classic bypass
+- [x] Given a `SubscriptionConfirmation`, when it arrives, then it is verified before the subscription is confirmed
+- [x] Given verification fails, when the request completes, then no account state changed
+- [x] **Added during implementation:** given a validly-signed message from a topic that is not ours, then it is rejected
 
-**Technical notes**
-- `aws/aws-sdk-php` is already a dependency and ships `Aws\Sns\MessageValidator`. Use it
-  rather than hand-rolling certificate handling.
-- The dead `verifyWithAwsSdk()` shell should go in the same change, not linger beside a
-  working implementation.
+**Technical notes — two corrections to what this item originally assumed**
+
+1. **`aws/aws-sdk-php` does *not* ship `Aws\Sns\MessageValidator`.** The installed
+   `src/Sns/` holds only `SnsClient` and exceptions. AWS publishes the validator as a
+   separate package, `aws/aws-php-sns-message-validator`, now added as a dependency. Its
+   host pattern is stricter than the criterion above asked for — it requires
+   `sns.<region>.amazonaws.com`, not merely any `amazonaws.com` host.
+
+2. **A valid signature is not sufficient**, and this item did not originally say so.
+   Anyone can create their own SNS topic and have AWS sign messages for it, so signature
+   verification alone would accept a validly-signed message from a stranger's topic. The
+   `TopicArn` is therefore checked against `services.aws.sns_arn`, and **fails closed**
+   when no topic is configured. This is the check that is usually missed.
+
+**Also fixed, and it mattered:** SNS posts JSON with `Content-Type: text/plain`, so Laravel
+never parsed the body into the input bag. `$request->input('Message')` was always empty,
+which means the callback returned 400 for every real notification. The endpoint could not
+have worked as written — the SQS path is what has been carrying account linking.
+
+The dead `verifyWithAwsSdk()` shell is gone.
 
 ---
 
