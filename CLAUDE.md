@@ -102,6 +102,7 @@ php artisan scan:validate-rules
 | Infrastructure | `docs/practices/infrastructure.md` |
 | Integrations | `docs/practices/integration.md` |
 | Six-phase process | `docs/processes/feature-development.md` |
+| Release process | `docs/processes/release.md` |
 | Full checklist | `docs/processes/practices-checklist.md` |
 | User story template | `docs/templates/user-story-template.md` |
 

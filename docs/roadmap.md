@@ -399,6 +399,15 @@ pull an image that nobody publishes. Full reasoning in **D-8**.
 **Verified locally:** the contributor path builds and tags both images; `install.sh`
 creates `.env`, generates `APP_KEY`, pins `TOPS_IMAGE_TAG`, and is idempotent on re-run.
 
+**Revised 2026-07-31** — the release is no longer cut straight off a push to `develop`.
+It is a two-phase, pull-request-gated process: **Prepare release**
+(`.github/workflows/release.yml`, run manually) bumps `VERSION`, writes the
+`CHANGELOG.md` entry, and opens a `release/vX.Y.Z` pull request against `develop`;
+merging that PR triggers **Tag and release** (`.github/workflows/tag-release.yml`),
+which publishes the images, cuts the tag and creates the GitHub release. The
+`workflow_run` gate on Tests is gone — the release PR carries its own Tests run, and
+merging it is the gate. Documented in `docs/processes/release.md`.
+
 **Not yet verified:** the pull-and-run path, which needs images on Docker Hub, and the
 workflow itself, which only runs on `develop`.
 
