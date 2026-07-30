@@ -22,6 +22,40 @@ This document was moved out of the root README on 2026-07-30 (roadmap N-3). It w
 roughly 80 lines of the first thing a new operator read, describing a path almost
 nobody takes.
 
+## Run against SQLite instead of MySQL
+
+`.env.example` defaults to MySQL, but you can run the whole dev app against a local
+SQLite file — no MySQL server to manage. The test suite already runs on in-memory
+SQLite (`phpunit.xml`); this is the same, but for the running app.
+
+1. **Install the `pdo_sqlite` extension** for your PHP. On Debian/Ubuntu with PHP 8.3:
+   ```bash
+   sudo apt-get install php8.3-sqlite3
+   ```
+   Verify it loaded:
+   ```bash
+   php -m | grep sqlite
+   ```
+
+2. **Create the database file:**
+   ```bash
+   cd app && touch database/database.sqlite
+   ```
+
+3. **Point `.env` at SQLite.** Set `DB_CONNECTION=sqlite` (and remove or blank the
+   MySQL `DB_HOST`/`DB_DATABASE`/`DB_USERNAME` lines — they are ignored for sqlite).
+   `DB_DATABASE` defaults to `database/database.sqlite`, so you can leave it unset. The
+   `SESSION_DRIVER`, `QUEUE_CONNECTION` and `CACHE_STORE=database` defaults work fine on
+   SQLite — their tables are created by the standard migrations.
+
+4. **Migrate:**
+   ```bash
+   php artisan migrate
+   ```
+
+Then start the processes below as normal. Note the shipped Docker app image only
+bundles `pdo_mysql`, so this host-PHP path is the supported way to run on SQLite.
+
 ## The processes
 
 **Terminal 1 (Laravel)**:
