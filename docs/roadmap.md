@@ -78,6 +78,7 @@ Decisions already made, so we don't relitigate them. Each has a trigger for revi
 | **D-6** | **No billing, plans, or licence gating.** | 2026-07-29 | No revenue model yet (D-1). | A commercial model is chosen. |
 | **D-7** | **Apache-2.0, with trademark held separately and a DCO for contributions.** | 2026-07-29 | See below — this one has enough reasoning behind it to warrant its own section. | Effectively never; the DCO is what makes it durable. |
 | **D-8** | **Ship prebuilt images from Docker Hub, cut by a real release pipeline.** `install.sh` pulls tagged images; it never builds. | 2026-07-30 | See below — this is the biggest single change to how TOPS is delivered. | A registry other than Docker Hub is chosen, or images stop being the distribution unit. |
+| **D-9** | **No application-level encryption at rest. `iam_role_arn` is stored plaintext; encryption is the host's job.** | 2026-07-30 | See below — deliberately reducing encryption on a security product needs its reasoning on the record. | A field is introduced that is genuinely a credential (an access key, a token, a password). Then encrypt *that* and revisit key rotation. |
 
 ### D-7 in full: licensing
 
@@ -177,6 +178,46 @@ likely thing to go wrong on a machine we cannot see.
 and the build-from-source path keeps working — it moves to `install-build.sh` plus
 `docker-compose.build.yml`. Contributors are explicitly not asked to pull images to work
 on the code.
+
+### D-9 in full: encryption at rest, and why we removed some
+
+**Context.** `APP_KEY` leaked on 2026-07-30 in `infra/scripts/test/app.env`. Rotating it was
+not safe, because `aws_accounts.iam_role_arn` was encrypted with `Crypt` and a new key would
+have made every stored ARN unreadable — silently, because the accessor caught decryption
+failures and returned the ciphertext. The first plan was a rotation command. Instead we
+removed the reason to need one.
+
+**The ARN is not a credential.** `arn:aws:iam::123456789012:role/X` is an identifier.
+Assuming that role additionally requires `sts:AssumeRole` permission, a trust policy naming
+the caller, and the ExternalId. On its own it grants nothing; the realistic exposure from
+plaintext is reconnaissance — account IDs and role names.
+
+**The protection was already inconsistent.** `external_id` — the ExternalId that actually
+gates `AssumeRole` — is stored plaintext in the very next column, and is part of a composite
+index, so it cannot be encrypted without breaking lookups. Encrypting the identifier while
+the shared secret sits in the clear beside it is not a security boundary.
+
+**And it protected little.** In the single-host Docker deployment, `APP_KEY` is in `.env` on
+the same machine as MySQL. Anyone who can read the database can almost certainly read the
+key. Encryption at rest is real when the key lives somewhere the data does not — a KMS, a
+separate host — which is exactly what a self-hoster's disk encryption and database
+permissions provide, and what we now delegate to them.
+
+**What it bought.** Rotating `APP_KEY` is now `php artisan key:generate` — native Laravel,
+no data migration, no bespoke command, no registry of encrypted fields, no guard test to
+keep that registry honest. The only consequences are that users are logged out and
+outstanding email-verification links stop working, because both derive from `APP_KEY`.
+
+**`APP_KEY` itself is not optional and was never a candidate for removal.** Two independent
+uses make it mandatory: `bootstrap/app.php:26` encrypts cookies, so the encrypter is
+resolved on every web request; and `MustVerifyEmail` is live, so verification links are
+signed URLs HMAC'd with the key. An app without it throws `MissingAppKeyException` on boot.
+Password hashes are unaffected — bcrypt does not use `APP_KEY`.
+
+**Rejected:** the `APP_KEY` rotation command, specified in full at
+[`docs/features/app-key-rotation.md`](./features/app-key-rotation.md) and kept as a record.
+If a genuine credential is ever stored, that design is the starting point — including the
+`APP_PREVIOUS_KEYS` sequencing, which is the part worth not rediscovering.
 
 ## At a Glance
 
@@ -598,6 +639,11 @@ Blocking nothing today, but each one shapes the plan:
 
 ## Changelog
 
+- **2026-07-30** — `APP_KEY` leaked in a tracked infra env file. Response recorded as D-9:
+  rather than build the `APP_KEY` rotation command that the leak seemed to demand, the
+  encryption that made rotation dangerous was removed. `iam_role_arn` is now plaintext,
+  rotation is `php artisan key:generate`, and the rotation design is kept as a documented
+  rejection.
 - **2026-07-30** — **The repo went public**, ahead of D-4's intended sequencing. Verified
   the install one-liner resolves (`raw.githubusercontent.com` does follow the rename
   redirect, so both old and new URLs serve). Four deferrals were keyed to this moment and

@@ -1,3 +1,15 @@
+# These patterns were here all along and did nothing, because .gitignore has no
+# effect on files git is already tracking. prod/app.env and test/app.env were
+# committed before the rules existed, so they stayed tracked — and went public
+# with the repo on 2026-07-30, carrying a Firebase service-account private key,
+# a database password and an APP_KEY. Untracked on 2026-07-30.
+#
+# The files themselves are not source: pullenv.sh fetches them from
+# s3://$ENV-tops-deploy/app/app.env, which is the source of truth. If you need
+# them locally, pull them — never commit them back.
+#
+# If you add an env file here, confirm it is actually ignored:
+#   git check-ignore -v <path>     # silent output means it is TRACKED
 *.env
 app.env
 */app.env
