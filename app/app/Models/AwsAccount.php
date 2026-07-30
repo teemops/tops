@@ -8,7 +8,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Facades\Crypt;
 
 class AwsAccount extends Model
 {
@@ -47,29 +46,21 @@ class AwsAccount extends Model
         });
     }
 
-    /**
-     * Encrypt IAM Role ARN when setting
+    /*
+     * iam_role_arn is stored plaintext — see roadmap decision D-9.
+     *
+     * It was encrypted with Crypt, which meant APP_KEY could not be rotated
+     * without a bespoke re-encryption command. The protection was inconsistent
+     * anyway: external_id, the ExternalId that actually gates sts:AssumeRole, is
+     * stored plaintext and indexed one column over, and in a single-host
+     * deployment APP_KEY lives in .env beside the database. An ARN on its own
+     * grants nothing — assuming the role needs sts:AssumeRole permission, a trust
+     * policy naming the caller, and that ExternalId.
+     *
+     * Encryption at rest is now the host's job: disk encryption and database
+     * permissions. Rotating APP_KEY is `php artisan key:generate` and touches no
+     * application data.
      */
-    public function setIamRoleArnAttribute($value)
-    {
-        if ($value === null) {
-            $this->attributes['iam_role_arn'] = null;
-            return;
-        }
-        $this->attributes['iam_role_arn'] = Crypt::encryptString($value);
-    }
-
-    /**
-     * Decrypt IAM Role ARN when getting
-     */
-    public function getIamRoleArnAttribute($value)
-    {
-        try {
-            return Crypt::decryptString($value);
-        } catch (\Exception $e) {
-            return $value; // Return encrypted value if decryption fails
-        }
-    }
 
     /**
      * Get the organization that owns the AWS account
