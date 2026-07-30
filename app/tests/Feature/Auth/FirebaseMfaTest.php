@@ -11,6 +11,13 @@ class FirebaseMfaTest extends TestCase
     {
         parent::setUp();
 
+        // Firebase is an opt-in path (roadmap D-2) and is off by default, so
+        // EnsureFirebaseAuthEnabled 404s these routes unless the flag is on. Set it
+        // explicitly rather than inheriting whatever the ambient .env says: these
+        // tests are about the opt-in path, and they should pass or fail on their own
+        // terms rather than on how the machine happens to be configured.
+        config(['features.firebase_auth' => true]);
+
         // The controller depends on the Firebase client; these tests only exercise
         // request validation, which runs before any Firebase call is made.
         $this->instance(FirebaseAuth::class, $this->createMock(FirebaseAuth::class));

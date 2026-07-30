@@ -25,6 +25,19 @@ TOPS_REPO="${TOPS_REPO:-teemops/tops}"
 TOPS_DIR="${TOPS_DIR:-tops}"
 TOPS_VERSION="${TOPS_VERSION:-}"
 
+# Where the release tarball is unpacked before being moved into place. Cleaned up
+# by a single EXIT trap: a `trap ... RETURN` inside the download function is not
+# scoped to it — it fires on every later function return too, by which point a
+# `local` temp path is out of scope and `set -u` aborts a run that had already
+# succeeded. That bug shipped in v0.1.0 and printed an error after a working
+# install.
+DOWNLOAD_DIR=""
+cleanup() {
+  [[ -n "${DOWNLOAD_DIR:-}" && -d "${DOWNLOAD_DIR:-}" ]] && rm -rf "$DOWNLOAD_DIR"
+  return 0
+}
+trap cleanup EXIT
+
 # `bash <(curl ...)` makes BASH_SOURCE a /dev/fd entry, so the script's own path
 # tells us nothing about whether a checkout exists. Look for the files we
 # actually need instead.
@@ -106,16 +119,15 @@ fetch_release() {
   fi
 
   local url="https://github.com/${TOPS_REPO}/archive/refs/tags/v${TOPS_VERSION}.tar.gz"
-  local tmp
-  tmp="$(mktemp -d)"
-  trap 'rm -rf "$tmp"' RETURN
 
-  curl -fsSL "$url" -o "$tmp/tops.tar.gz" \
+  DOWNLOAD_DIR="$(mktemp -d)"
+
+  curl -fsSL "$url" -o "$DOWNLOAD_DIR/tops.tar.gz" \
     || die "Download failed: $url"
 
   mkdir -p "$TOPS_DIR"
   # --strip-components drops the repo-name-and-tag wrapper directory GitHub adds.
-  tar -xzf "$tmp/tops.tar.gz" -C "$TOPS_DIR" --strip-components=1
+  tar -xzf "$DOWNLOAD_DIR/tops.tar.gz" -C "$TOPS_DIR" --strip-components=1
 
   cd "$TOPS_DIR"
   log "Unpacked into $PWD"
