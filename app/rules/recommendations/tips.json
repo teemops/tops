@@ -130,20 +130,224 @@
             ]
         },
         {
-            "name": "tops-rec-008",
-            "recommendation": "DNSSEC for Route53",
-            "impact": "Potential malicious domain resolution",
+            "name": "tops-rec-009",
+            "recommendation": "Lock down the root user",
+            "impact": "Full, unrestricted control of the AWS account. Root cannot be scoped down by any policy, and its actions cannot be prevented — only detected afterwards.",
             "links": [
-                "https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/domain-configure-dnssec.html",
-                "https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/dns-configuring-dnssec.html"
+                "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_root-user.html",
+                "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_mfa_enable.html",
+                "https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#lock-away-credentials"
             ],
-            "description": "Enable DNSSEC for Route53 Public Hosted Zones",
+            "description": "The root user should have MFA enabled and no access keys. Day-to-day work belongs to IAM users and roles.",
             "steps": [
-                "Select Route53 Public Hosted Zone",
-                "Enable DNSSEC"
+                "Sign in as root and open My Security Credentials",
+                "Delete every key listed under Access keys — nothing should be using them",
+                "Choose Assign MFA device and register a hardware key or authenticator app",
+                "Store the MFA recovery method where more than one person can reach it",
+                "Create an IAM user or role with scoped permissions for the work root was doing",
+                "Set a CloudWatch alarm on root sign-in so future use is noticed"
             ],
             "rules": [
-                "tops-route53-001"
+                "tops-iam-011",
+                "tops-iam-012",
+                "cis-1.4",
+                "cis-1.5"
+            ]
+        },
+        {
+            "name": "tops-rec-010",
+            "recommendation": "Remove administrative permissions from IAM users",
+            "impact": "One stolen credential becomes a full account compromise. Standing admin also removes any audit signal that a privileged action was intended.",
+            "links": [
+                "https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#grant-least-privilege",
+                "https://docs.aws.amazon.com/IAM/latest/UserGuide/access-analyzer-policy-generation.html",
+                "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_groups.html"
+            ],
+            "description": "Users should hold only the permissions their work needs, granted through groups rather than attached directly.",
+            "steps": [
+                "List what the user actually calls: IAM Access Analyzer can generate a policy from their recent CloudTrail activity",
+                "Create a customer managed policy from that, or start from a narrow AWS managed policy rather than one ending in FullAccess",
+                "Put the policy on a group and add the user to it",
+                "Detach AdministratorAccess, any *FullAccess policy, and any inline policy using '*'",
+                "If admin is genuinely required, make it a role the user assumes deliberately instead of standing access"
+            ],
+            "rules": [
+                "tops-iam-008",
+                "tops-iam-009",
+                "tops-iam-010",
+                "cis-1.16"
+            ]
+        },
+        {
+            "name": "tops-rec-011",
+            "recommendation": "Stop S3 buckets being publicly readable",
+            "impact": "Anyone on the internet can list and download objects. Most large data exposures are a bucket nobody meant to leave open.",
+            "links": [
+                "https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-block-public-access.html",
+                "https://docs.aws.amazon.com/AmazonS3/latest/userguide/acl-overview.html",
+                "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-s3.html"
+            ],
+            "description": "Buckets should have Block Public Access fully enabled and no public ACL grants.",
+            "steps": [
+                "Check first whether anything legitimately serves public content from this bucket",
+                "S3 > bucket > Permissions > Access control list: remove grants to Everyone and to Authenticated users",
+                "S3 > bucket > Permissions > Block public access: enable all four settings",
+                "Enable Block Public Access at the account level so new buckets inherit it",
+                "For content that must be public, put CloudFront in front with an origin access control and keep the bucket private"
+            ],
+            "rules": [
+                "tops-s3-004",
+                "cis-2.1.4"
+            ]
+        },
+        {
+            "name": "tops-rec-012",
+            "recommendation": "Encrypt RDS databases at rest",
+            "impact": "Snapshots, storage volumes and backups are readable by anyone who obtains them. Encryption cannot be added later without a migration.",
+            "links": [
+                "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Overview.Encryption.html",
+                "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_CopySnapshot.html"
+            ],
+            "description": "RDS instances and clusters should have encryption at rest enabled. It cannot be toggled on an existing database.",
+            "steps": [
+                "Take a snapshot of the instance or cluster",
+                "Copy the snapshot, ticking Enable encryption and choosing a KMS key",
+                "Restore a new database from the encrypted copy",
+                "Repoint the application and verify it reads and writes correctly",
+                "Delete the unencrypted original and its snapshots only once the new one is confirmed"
+            ],
+            "rules": [
+                "tops-rds-002",
+                "tops-rds-005",
+                "cis-2.3.1"
+            ]
+        },
+        {
+            "name": "tops-rec-013",
+            "recommendation": "Take databases off the public internet",
+            "impact": "The database is reachable from any address, leaving only its password between an attacker and the data.",
+            "links": [
+                "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_VPC.WorkingWithRDSInstanceinaVPC.html",
+                "https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html"
+            ],
+            "description": "RDS instances should not be publicly accessible; reach them from inside the VPC.",
+            "steps": [
+                "Identify what currently connects from outside the VPC before changing anything",
+                "RDS > database > Modify > Connectivity: set Public access to No",
+                "Restrict the security group to the application's security group rather than a CIDR range",
+                "For human access use Session Manager port forwarding, a VPN, or a bastion host"
+            ],
+            "rules": [
+                "tops-rds-001",
+                "cis-2.3.3"
+            ]
+        },
+        {
+            "name": "tops-rec-014",
+            "recommendation": "Close administrative ports to the internet",
+            "impact": "SSH and RDP open to 0.0.0.0/0 are scanned and brute-forced continuously, within minutes of being exposed.",
+            "links": [
+                "https://docs.aws.amazon.com/vpc/latest/userguide/vpc-security-groups.html",
+                "https://docs.aws.amazon.com/vpc/latest/userguide/vpc-network-acls.html",
+                "https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager.html"
+            ],
+            "description": "No security group or network ACL should allow 0.0.0.0/0 to reach port 22 or 3389.",
+            "steps": [
+                "Find the offending rules: EC2 > Security Groups, and VPC > Network ACLs",
+                "Replace 0.0.0.0/0 with the specific ranges that need administrative access",
+                "Better: remove inbound SSH and RDP entirely and use Systems Manager Session Manager, which needs no open port and logs every session",
+                "Empty the default security group of every VPC so nothing uses it by accident",
+                "Remember network ACLs are stateless — return traffic needs a matching outbound rule"
+            ],
+            "rules": [
+                "tops-ec2-001",
+                "cis-5.1",
+                "cis-5.2",
+                "cis-5.3",
+                "cis-5.4"
+            ]
+        },
+        {
+            "name": "tops-rec-015",
+            "recommendation": "Make CloudTrail a reliable audit record",
+            "impact": "Without a complete, tamper-evident trail there is no way to reconstruct what happened during an incident — and no way to prove what did not happen.",
+            "links": [
+                "https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-concepts.html",
+                "https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-log-file-validation-intro.html",
+                "https://docs.aws.amazon.com/awscloudtrail/latest/userguide/send-cloudtrail-events-to-cloudwatch-logs.html"
+            ],
+            "description": "CloudTrail should be logging in all regions, with log file validation on and delivery to CloudWatch Logs.",
+            "steps": [
+                "CloudTrail > Trails: create a trail with Apply trail to all regions enabled, or edit the existing one",
+                "Confirm logging is actually started — a trail can exist and be stopped",
+                "Enable log file validation so tampering can be detected afterwards",
+                "Send the trail to CloudWatch Logs so you can alarm on activity instead of reading logs later",
+                "Encrypt the trail with a KMS customer managed key, allowing CloudTrail to encrypt and your readers to decrypt"
+            ],
+            "rules": [
+                "tops-cloudtrail-001",
+                "tops-cloudtrail-002",
+                "cis-3.1",
+                "cis-3.2"
+            ]
+        },
+        {
+            "name": "tops-rec-016",
+            "recommendation": "Require IMDSv2 on EC2 instances",
+            "impact": "IMDSv1 lets a server-side request forgery bug in an application read the instance's IAM role credentials — the standard path from a web vulnerability to AWS access.",
+            "links": [
+                "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-instance-metadata-service.html",
+                "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instance-metadata-transition-to-version-2.html"
+            ],
+            "description": "Instance metadata should require session tokens (IMDSv2) rather than allowing unauthenticated IMDSv1 requests.",
+            "steps": [
+                "Check your SDK versions first — anything current speaks IMDSv2, but very old SDKs and hand-rolled metadata calls do not",
+                "EC2 > instance > Actions > Instance settings > Modify instance metadata options",
+                "Set IMDSv2 to Required",
+                "Set the hop limit to 1 unless the workload is containerised, in which case 2",
+                "Bake the same setting into launch templates and AMIs so new instances inherit it"
+            ],
+            "rules": [
+                "tops-ec2-006"
+            ]
+        },
+        {
+            "name": "tops-rec-017",
+            "recommendation": "Authenticate Lambda function URLs",
+            "impact": "A function URL with no authentication is a public endpoint. Anyone who finds it can invoke the function and be billed to your account.",
+            "links": [
+                "https://docs.aws.amazon.com/lambda/latest/dg/urls-auth.html",
+                "https://docs.aws.amazon.com/lambda/latest/dg/urls-configuration.html"
+            ],
+            "description": "Lambda function URLs should use AWS_IAM auth, unless the endpoint is deliberately public.",
+            "steps": [
+                "Confirm whether this endpoint is meant to be public",
+                "Lambda > function > Configuration > Function URL > Edit: set Auth type to AWS_IAM",
+                "Grant lambda:InvokeFunctionUrl to the specific callers that need it",
+                "If it must stay public, put API Gateway or CloudFront in front so you get throttling and WAF"
+            ],
+            "rules": [
+                "tops-lambda-001"
+            ]
+        },
+        {
+            "name": "tops-rec-018",
+            "recommendation": "Review KMS keys scheduled for deletion",
+            "impact": "When the key is deleted, everything encrypted with it becomes permanently unreadable. There is no recovery afterwards — only the waiting period.",
+            "links": [
+                "https://docs.aws.amazon.com/kms/latest/developerguide/deleting-keys.html",
+                "https://docs.aws.amazon.com/kms/latest/developerguide/deleting-keys-determining-usage.html"
+            ],
+            "description": "A key pending deletion should be confirmed as genuinely unused before the window elapses.",
+            "steps": [
+                "KMS > customer managed keys: note the scheduled deletion date",
+                "Check CloudTrail for recent Decrypt and GenerateDataKey calls against the key",
+                "Look for encrypted resources still referencing it — EBS volumes, RDS snapshots, S3 buckets, Secrets Manager secrets",
+                "If anything still depends on it, choose Cancel key deletion immediately",
+                "If it is genuinely unused, record why it was deleted before the window closes"
+            ],
+            "rules": [
+                "tops-kms-001"
             ]
         }
     ]

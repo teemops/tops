@@ -10,6 +10,7 @@
             "method": "getAccountSummary",
             "description": "Ensure no 'root' user account access key exists. Root access keys grant unrestricted access and cannot be scoped down.",
             "severity": "critical",
+            "remediation": "Delete the root user's access keys. Sign in as root, open My Security Credentials, and delete any key under Access keys. Root keys cannot be scoped down, so nothing should use them — create an IAM user or role with only the permissions the task needs instead.",
             "condition": "($data['SummaryMap']['AccountAccessKeysPresent'] ?? 0) > 0"
         },
         {
@@ -19,6 +20,7 @@
             "method": "getAccountSummary",
             "description": "Ensure MFA is enabled for the 'root' user account.",
             "severity": "critical",
+            "remediation": "Enable MFA on the root user. Sign in as root, open My Security Credentials, choose Assign MFA device, and register a hardware key or authenticator app. Store the recovery method somewhere the whole team cannot lose it.",
             "condition": "($data['SummaryMap']['AccountMFAEnabled'] ?? 0) == 0"
         },
         {
@@ -28,6 +30,7 @@
             "method": "getAccountPasswordPolicy",
             "description": "Ensure the IAM password policy requires a minimum password length of 14 or greater.",
             "severity": "medium",
+            "remediation": "Set the IAM password policy minimum length to 14 or more: IAM > Account settings > Password policy > Edit. With the CLI: aws iam update-account-password-policy --minimum-password-length 14.",
             "condition": "$data === false || ($data['PasswordPolicy']['MinimumPasswordLength'] ?? 0) < 14"
         },
         {
@@ -37,6 +40,7 @@
             "method": "getAccountPasswordPolicy",
             "description": "Ensure the IAM password policy prevents reuse of the previous 24 passwords.",
             "severity": "low",
+            "remediation": "Prevent password reuse in the IAM password policy: IAM > Account settings > Password policy, and set Remember password to 24. With the CLI: aws iam update-account-password-policy --password-reuse-prevention 24.",
             "condition": "$data === false || ($data['PasswordPolicy']['PasswordReusePrevention'] ?? 0) < 24"
         },
         {
@@ -46,6 +50,7 @@
             "method": "listAccessKeys",
             "description": "Ensure IAM user access keys are rotated every 90 days or less.",
             "severity": "medium",
+            "remediation": "Rotate the access key: create a second key for the user, update whatever consumes it, confirm the new key works, then deactivate and delete the old one. Deactivate before deleting so you can reverse it if something still holds the old key.",
             "condition": "count(array_filter($data['AccessKeyMetadata'] ?? [], function($k){ return isset($k['CreateDate']) && (time() - strtotime((string)$k['CreateDate'])) > 7776000; })) > 0"
         },
         {
@@ -55,6 +60,7 @@
             "method": "listAttachedUserPolicies",
             "description": "Ensure IAM users receive permissions only through groups; policies should not be attached directly to users.",
             "severity": "low",
+            "remediation": "Move the user's permissions into a group. Create or pick a group with the right policies, add the user to it, then detach the policies attached directly to the user. Managing access on groups keeps it reviewable as people join and leave.",
             "condition": "count($data['AttachedPolicies'] ?? []) > 0"
         },
         {
@@ -64,6 +70,7 @@
             "method": "listAttachedUserPolicies",
             "description": "Ensure IAM policies that allow full '*:*' administrative privileges are not attached directly to users.",
             "severity": "high",
+            "remediation": "Detach the administrative policy from the user and grant only what they need. Replace '*:*' or AdministratorAccess with a scoped policy, or add the user to a group holding one. If they genuinely need admin, use a role they assume deliberately rather than standing access.",
             "condition": "isset($data['AttachedPolicies']) && count(array_filter($data['AttachedPolicies'] ?? [], function($policy) { return ($policy['PolicyName'] ?? '') == 'AdministratorAccess' || strpos($policy['PolicyArn'] ?? '', 'AdministratorAccess') !== false; })) > 0"
         },
         {
@@ -73,6 +80,7 @@
             "method": "getBucketEncryption",
             "description": "Ensure S3 buckets employ encryption-at-rest via a default server-side encryption configuration.",
             "severity": "medium",
+            "remediation": "Enable default encryption on the bucket: S3 > bucket > Properties > Default encryption. SSE-S3 needs no key management; SSE-KMS gives you an audit trail and key policies. Existing objects are not re-encrypted — copy them in place if they must be covered.",
             "condition": "$data === false || empty($data['ServerSideEncryptionConfiguration']['Rules'] ?? [])"
         },
         {
@@ -82,6 +90,7 @@
             "method": "getPublicAccessBlock",
             "description": "Ensure S3 buckets are configured with 'Block Public Access' fully enabled at the bucket level.",
             "severity": "high",
+            "remediation": "Turn on all four Block Public Access settings for the bucket, and at the account level so new buckets inherit it: S3 > bucket > Permissions > Block public access > Edit. Check for a bucket policy or ACL that legitimately serves public content before enabling.",
             "condition": "$data === false || !isset($data['PublicAccessBlockConfiguration']) || ($data['PublicAccessBlockConfiguration']['BlockPublicAcls'] ?? false) == false || ($data['PublicAccessBlockConfiguration']['BlockPublicPolicy'] ?? false) == false || ($data['PublicAccessBlockConfiguration']['IgnorePublicAcls'] ?? false) == false || ($data['PublicAccessBlockConfiguration']['RestrictPublicBuckets'] ?? false) == false"
         },
         {
@@ -91,6 +100,7 @@
             "method": "describeDBInstances",
             "description": "Ensure encryption at rest is enabled for RDS instances.",
             "severity": "high",
+            "remediation": "Encryption cannot be enabled on an existing RDS instance. Take a snapshot, copy the snapshot with encryption enabled, restore from the copy, then repoint your application and delete the unencrypted original once verified.",
             "condition": "isset($data['DBInstanceIdentifier']) && ($data['StorageEncrypted'] ?? false) == false"
         },
         {
@@ -100,6 +110,7 @@
             "method": "describeDBInstances",
             "description": "Ensure the Auto Minor Version Upgrade feature is enabled for RDS instances.",
             "severity": "low",
+            "remediation": "Enable Auto minor version upgrade: RDS > database > Modify > Maintenance. Pair it with a maintenance window you are happy to be restarted in, since minor upgrades apply during that window.",
             "condition": "isset($data['DBInstanceIdentifier']) && ($data['AutoMinorVersionUpgrade'] ?? false) == false"
         },
         {
@@ -109,6 +120,7 @@
             "method": "describeDBInstances",
             "description": "Ensure RDS instances are not publicly accessible.",
             "severity": "high",
+            "remediation": "Set Public access to No: RDS > database > Modify > Connectivity. Reach the database from inside the VPC instead — a bastion host, VPN, or Session Manager port forwarding. Confirm what currently connects from outside before changing it.",
             "condition": "isset($data['DBInstanceIdentifier']) && ($data['PubliclyAccessible'] ?? false) == true"
         },
         {
@@ -118,6 +130,7 @@
             "method": "describeTrails",
             "description": "Ensure CloudTrail is enabled in all regions by using a multi-region trail.",
             "severity": "high",
+            "remediation": "Create a multi-region trail, or edit the existing one and enable Apply trail to all regions: CloudTrail > Trails. A single-region trail leaves activity in every other region unrecorded, including regions you do not use.",
             "condition": "isset($data['TrailARN']) && ($data['IsMultiRegionTrail'] ?? false) == false"
         },
         {
@@ -127,6 +140,7 @@
             "method": "describeTrails",
             "description": "Ensure CloudTrail log file validation is enabled to detect tampering with log files.",
             "severity": "high",
+            "remediation": "Enable log file validation on the trail: CloudTrail > trail > Edit > Additional settings. It writes digest files so you can prove afterwards whether logs were altered or deleted — which only helps if it was on before the incident.",
             "condition": "isset($data['TrailARN']) && ($data['LogFileValidationEnabled'] ?? false) == false"
         },
         {
@@ -136,6 +150,7 @@
             "method": "describeTrails",
             "description": "Ensure CloudTrail trails are integrated with CloudWatch Logs for real-time monitoring.",
             "severity": "medium",
+            "remediation": "Send the trail to CloudWatch Logs: CloudTrail > trail > Edit > CloudWatch Logs. This is what lets you alarm on activity rather than reading logs after the fact; it needs a log group and an IAM role, both of which the console offers to create.",
             "condition": "isset($data['TrailARN']) && empty($data['CloudWatchLogsLogGroupArn'] ?? '')"
         },
         {
@@ -145,6 +160,7 @@
             "method": "describeTrails",
             "description": "Ensure CloudTrail logs are encrypted at rest using KMS customer managed keys.",
             "severity": "medium",
+            "remediation": "Encrypt the trail with a KMS customer managed key: CloudTrail > trail > Edit > Log file SSE-KMS encryption. The key policy must allow CloudTrail to encrypt and your log readers to decrypt, or the trail stops delivering.",
             "condition": "isset($data['TrailARN']) && empty($data['KmsKeyId'] ?? '')"
         },
         {
@@ -154,6 +170,7 @@
             "method": "getKeyRotationStatus",
             "description": "Ensure rotation for KMS customer managed keys is enabled.",
             "severity": "medium",
+            "remediation": "Enable automatic annual rotation on the KMS key: KMS > customer managed key > Key rotation > Edit. AWS keeps the old key material so data encrypted earlier stays readable; nothing needs re-encrypting.",
             "condition": "isset($data['KeyRotationEnabled']) && $data['KeyRotationEnabled'] === false"
         },
         {
@@ -163,6 +180,7 @@
             "method": "describeFlowLogs",
             "description": "Ensure VPC flow logging is enabled in all VPCs.",
             "severity": "medium",
+            "remediation": "Create a flow log for the VPC: VPC > your VPC > Flow logs > Create flow log, sending to CloudWatch Logs or S3. Without it there is no record of accepted and rejected traffic, which is usually the first thing wanted during an investigation.",
             "condition": "count($data['FlowLogs'] ?? []) == 0"
         },
         {
@@ -172,6 +190,7 @@
             "method": "describeNetworkAcls",
             "description": "Ensure no Network ACL allows ingress from 0.0.0.0/0 to remote server administration ports (22, 3389).",
             "severity": "high",
+            "remediation": "Remove the 0.0.0.0/0 inbound rule covering port 22 or 3389 from the network ACL, and restrict it to the ranges that need administrative access. Remember NACLs are stateless, so return traffic needs a matching outbound rule.",
             "condition": "isset($data['NetworkAcls']) && count(array_filter($data['NetworkAcls'] ?? [], function($nacl){ return count(array_filter($nacl['Entries'] ?? [], function($e){ $ingress = ($e['Egress'] ?? true) === false; $allow = ($e['RuleAction'] ?? '') === 'allow'; $open = ($e['CidrBlock'] ?? '') === '0.0.0.0/0'; $from = $e['PortRange']['From'] ?? null; $to = $e['PortRange']['To'] ?? null; $admin = ($from === null && $to === null) || ($from !== null && $to !== null && (($from <= 22 && $to >= 22) || ($from <= 3389 && $to >= 3389))); return $ingress && $allow && $open && $admin; })) > 0; })) > 0"
         },
         {
@@ -181,6 +200,7 @@
             "method": "describeSecurityGroups",
             "description": "Ensure no security group allows ingress from 0.0.0.0/0 to port 22 (SSH).",
             "severity": "high",
+            "remediation": "Remove the 0.0.0.0/0 rule for port 22 from the security group and allow only known ranges. Better still, drop inbound SSH entirely and use Systems Manager Session Manager, which needs no open port and logs every session.",
             "condition": "isset($data['SecurityGroups']) && count(array_filter($data['SecurityGroups'] ?? [], function($sg){ return count(array_filter($sg['IpPermissions'] ?? [], function($p){ $open = count(array_filter($p['IpRanges'] ?? [], function($r){ return ($r['CidrIp'] ?? '') === '0.0.0.0/0'; })) > 0; $from = $p['FromPort'] ?? null; $to = $p['ToPort'] ?? null; $covers = ($from === null && $to === null) || ($from !== null && $to !== null && $from <= 22 && $to >= 22); return $open && $covers; })) > 0; })) > 0"
         },
         {
@@ -190,6 +210,7 @@
             "method": "describeSecurityGroups",
             "description": "Ensure no security group allows ingress from 0.0.0.0/0 to port 3389 (RDP).",
             "severity": "high",
+            "remediation": "Remove the 0.0.0.0/0 rule for port 3389 from the security group and allow only known ranges. Session Manager also handles RDP via port forwarding, which avoids exposing it at all.",
             "condition": "isset($data['SecurityGroups']) && count(array_filter($data['SecurityGroups'] ?? [], function($sg){ return count(array_filter($sg['IpPermissions'] ?? [], function($p){ $open = count(array_filter($p['IpRanges'] ?? [], function($r){ return ($r['CidrIp'] ?? '') === '0.0.0.0/0'; })) > 0; $from = $p['FromPort'] ?? null; $to = $p['ToPort'] ?? null; $covers = ($from === null && $to === null) || ($from !== null && $to !== null && $from <= 3389 && $to >= 3389); return $open && $covers; })) > 0; })) > 0"
         },
         {
@@ -199,6 +220,7 @@
             "method": "describeSecurityGroups",
             "description": "Ensure the default security group of every VPC restricts all traffic (no inbound or outbound rules).",
             "severity": "medium",
+            "remediation": "Remove every inbound and outbound rule from the VPC's default security group so nothing can use it accidentally, and attach purpose-built groups instead. The default group cannot be deleted, so emptying it is the fix.",
             "condition": "isset($data['SecurityGroups']) && count(array_filter($data['SecurityGroups'] ?? [], function($sg){ return ($sg['GroupName'] ?? '') === 'default' && ((count($sg['IpPermissions'] ?? []) > 0) || (count($sg['IpPermissionsEgress'] ?? []) > 0)); })) > 0"
         }
     ]

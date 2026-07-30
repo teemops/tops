@@ -17,6 +17,13 @@ class ValidateScanRulesTest extends TestCase
     /** @var string[] */
     private array $created = [];
 
+    /**
+     * Files that already existed and must be put back, not deleted.
+     *
+     * @var array<string, string>
+     */
+    private array $restore = [];
+
     protected function tearDown(): void
     {
         foreach ($this->created as $path) {
@@ -27,8 +34,28 @@ class ValidateScanRulesTest extends TestCase
             }
         }
 
+        foreach ($this->restore as $path => $contents) {
+            File::put($path, $contents);
+        }
+
         ServiceRegistry::flush();
         parent::tearDown();
+    }
+
+    /**
+     * Swap tips.json for a fixture, remembering the real one so tearDown restores
+     * it. There is only one recommendations file, so unlike rulesets this cannot be
+     * tested by adding an extra file alongside.
+     */
+    private function replaceRecommendations(array $recommendations): void
+    {
+        $path = base_path('rules/recommendations/tips.json');
+        $this->restore[$path] = File::get($path);
+
+        File::put($path, json_encode(
+            ['recommendations' => $recommendations],
+            JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES
+        ));
     }
 
     private function writeService(string $name, array $document): void
@@ -120,6 +147,80 @@ class ValidateScanRulesTest extends TestCase
 
         $this->artisan('scan:validate-rules')
             ->expectsOutputToContain('which no tasks.json collects')
+            ->assertFailed();
+    }
+
+    /**
+     * Roadmap N-4. This was a warning until 2026-07-30, which is exactly how 39
+     * rules — every CIS rule among them — ended up producing findings with no fix
+     * text. A warning nobody reads is not a guard rail.
+     */
+    public function test_it_rejects_a_rule_with_no_remediation(): void
+    {
+        $this->writeRuleset('fixtureremediation', [[
+            'rule' => 'fixture-remediation-001',
+            'name' => 'No remediation',
+            'service' => 's3',
+            'method' => 'getPublicAccessBlock',
+            'severity' => 'high',
+            'condition' => 'true',
+        ]]);
+
+        $this->artisan('scan:validate-rules')
+            ->expectsOutputToContain("has no 'remediation'")
+            ->assertFailed();
+    }
+
+    public function test_it_rejects_a_rule_whose_remediation_is_only_whitespace(): void
+    {
+        $this->writeRuleset('fixtureblankremediation', [[
+            'rule' => 'fixture-remediation-002',
+            'name' => 'Blank remediation',
+            'service' => 's3',
+            'method' => 'getPublicAccessBlock',
+            'severity' => 'high',
+            'remediation' => "   \n\t ",
+            'condition' => 'true',
+        ]]);
+
+        $this->artisan('scan:validate-rules')
+            ->expectsOutputToContain("has no 'remediation'")
+            ->assertFailed();
+    }
+
+    /**
+     * tips.json referenced a rule that no ruleset defined (tops-route53-001) for
+     * months. Nothing checked it, so the guidance simply never appeared.
+     */
+    public function test_it_rejects_a_recommendation_referencing_an_unknown_rule(): void
+    {
+        $this->replaceRecommendations([[
+            'name' => 'fixture-rec-001',
+            'recommendation' => 'Fixture',
+            'description' => 'Fixture recommendation',
+            'links' => ['https://example.com'],
+            'steps' => ['Do the thing'],
+            'rules' => ['tops-does-not-exist-001'],
+        ]]);
+
+        $this->artisan('scan:validate-rules')
+            ->expectsOutputToContain('which no ruleset defines')
+            ->assertFailed();
+    }
+
+    public function test_it_rejects_a_recommendation_referencing_no_rules(): void
+    {
+        $this->replaceRecommendations([[
+            'name' => 'fixture-rec-002',
+            'recommendation' => 'Fixture',
+            'description' => 'Fixture recommendation',
+            'links' => ['https://example.com'],
+            'steps' => ['Do the thing'],
+            'rules' => [],
+        ]]);
+
+        $this->artisan('scan:validate-rules')
+            ->expectsOutputToContain('references no rules')
             ->assertFailed();
     }
 
