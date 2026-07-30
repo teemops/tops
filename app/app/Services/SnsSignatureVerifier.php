@@ -2,96 +2,129 @@
 
 namespace App\Services;
 
+use Aws\Sns\Message;
+use Aws\Sns\MessageValidator;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
+/**
+ * Verifies that an inbound SNS message really came from AWS, and from our topic.
+ *
+ * Roadmap N-6. This replaces a stub that checked three JSON field names and
+ * returned true, on a route that is unauthenticated by design and that activates
+ * an AWS account with a caller-supplied IAM role ARN.
+ *
+ * Two independent checks, and both are needed:
+ *
+ *  1. **Cryptographic signature**, via AWS's own aws/aws-php-sns-message-validator.
+ *     Proves AWS signed the message. The signing certificate URL is constrained
+ *     by the package to `sns.<region>.amazonaws.com`, which closes the classic
+ *     bypass of pointing SigningCertURL at attacker-controlled storage that
+ *     merely lives on an amazonaws.com host.
+ *
+ *  2. **Topic allowlist.** A valid signature only proves *AWS* sent it — anyone
+ *     can create their own SNS topic and have AWS sign messages for it. Without
+ *     comparing TopicArn against our own topic, step 1 alone would accept a
+ *     validly-signed message from a stranger's topic. This is the check that is
+ *     usually missed.
+ */
 class SnsSignatureVerifier
 {
+    private MessageValidator $validator;
+
     /**
-     * Verify SNS message signature
-     * 
-     * Note: This is a simplified version. In production, you should:
-     * 1. Download the certificate from the SigningCertURL
-     * 2. Verify the certificate chain
-     * 3. Verify the signature using the certificate
-     * 4. Check the certificate's validity period
+     * @param MessageValidator|null $validator Injectable so tests can supply a
+     *                                         cert-fetching callable instead of
+     *                                         reaching out to AWS.
      */
+    public function __construct(?MessageValidator $validator = null)
+    {
+        $this->validator = $validator ?? new MessageValidator();
+    }
+
     public function verify(Request $request): bool
     {
-        // For now, we'll do basic validation
-        // In production, implement full AWS SNS signature verification
-        
-        $messageType = $request->header('x-amz-sns-message-type');
-        
-        if (!$messageType) {
-            return false;
+        $payload = $this->payload($request);
+
+        if ($payload === []) {
+            return $this->reject('body was empty or not JSON');
         }
 
-        // Handle subscription confirmation
-        if ($messageType === 'SubscriptionConfirmation') {
-            return true; // Allow subscription confirmation
+        try {
+            $message = new Message($payload);
+        } catch (\InvalidArgumentException $e) {
+            // Missing or malformed required keys — Type, MessageId, TopicArn,
+            // Timestamp, Signature, SigningCertURL, Message, and Token/SubscribeURL
+            // on the confirmation types.
+            return $this->reject('message was not a well-formed SNS envelope', [
+                'reason' => $e->getMessage(),
+            ]);
         }
 
-        // For notifications, we should verify the signature
-        // For MVP, we'll validate the message structure
-        $message = $request->input('Message');
-        
-        if (!$message) {
-            return false;
+        try {
+            $this->validator->validate($message);
+        } catch (\Throwable $e) {
+            // Covers InvalidSnsMessageException — bad signature, unreachable or
+            // untrusted certificate, disallowed SigningCertURL host.
+            return $this->reject('signature verification failed', [
+                'reason' => $e->getMessage(),
+                'type' => $payload['Type'] ?? null,
+                'topic_arn' => $payload['TopicArn'] ?? null,
+            ]);
         }
 
-        // Basic validation: check if message contains required fields
-        $decodedMessage = json_decode($message, true);
-        
-        if (!$decodedMessage) {
-            return false;
+        return $this->topicIsOurs($payload);
+    }
+
+    /**
+     * A signature proves AWS sent the message, not that we asked for it.
+     *
+     * Fails closed when no topic is configured: an unconfigured deployment has no
+     * legitimate SNS traffic to accept, so "we cannot tell whose topic this is"
+     * must not resolve to "allow".
+     */
+    private function topicIsOurs(array $payload): bool
+    {
+        $expected = config('services.aws.sns_arn');
+
+        if (empty($expected)) {
+            return $this->reject(
+                'no TOPS_SNS_ARN is configured, so the topic cannot be verified. '
+                . 'Run ./install-messaging.sh, or ignore this if you do not use the SNS callback'
+            );
         }
 
-        $requiredFields = ['TopsRoleArn', 'TopsExternalId', 'TopsUniqueId'];
-        
-        foreach ($requiredFields as $field) {
-            if (!isset($decodedMessage[$field])) {
-                Log::warning('SNS message missing required field', [
-                    'field' => $field,
-                    'message' => $decodedMessage,
-                ]);
-                return false;
-            }
+        if (! hash_equals((string) $expected, (string) ($payload['TopicArn'] ?? ''))) {
+            return $this->reject('message came from a topic that is not ours', [
+                'expected_topic_arn' => $expected,
+                'received_topic_arn' => $payload['TopicArn'] ?? null,
+            ]);
         }
 
-        // TODO: Implement full signature verification
-        // 1. Get SigningCertURL from request
-        // 2. Download certificate
-        // 3. Verify certificate chain
-        // 4. Verify signature using certificate
-        
         return true;
     }
 
     /**
-     * Verify SNS message signature using AWS SDK
-     * 
-     * This is a more complete implementation that should be used in production
+     * SNS posts JSON with `Content-Type: text/plain; charset=UTF-8`, so Laravel
+     * does not parse the body into the input bag and `$request->input()` comes
+     * back empty. Decode the raw body, falling back to the parsed input for
+     * clients that do send a JSON content type.
      */
-    public function verifyWithAwsSdk(Request $request): bool
+    private function payload(Request $request): array
     {
-        try {
-            // This would require AWS SDK for PHP
-            // For now, we'll use the basic validation above
-            
-            // In production, you would:
-            // 1. Parse the SNS message
-            // 2. Get the SigningCertURL
-            // 3. Download and verify the certificate
-            // 4. Verify the signature
-            
-            return $this->verify($request);
-        } catch (\Exception $e) {
-            Log::error('SNS signature verification failed', [
-                'error' => $e->getMessage(),
-            ]);
-            return false;
+        $decoded = json_decode($request->getContent(), true);
+
+        if (is_array($decoded) && $decoded !== []) {
+            return $decoded;
         }
+
+        return $request->all();
+    }
+
+    private function reject(string $why, array $context = []): bool
+    {
+        Log::warning("Rejected SNS callback: {$why}", $context);
+
+        return false;
     }
 }
-

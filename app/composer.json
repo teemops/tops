@@ -7,6 +7,7 @@
     "license": "Apache-2.0",
     "require": {
         "php": "^8.2",
+        "aws/aws-php-sns-message-validator": "^1.10",
         "aws/aws-sdk-php": "^3.369",
         "doctrine/dbal": "^4.4",
         "inertiajs/inertia-laravel": "^2.0",

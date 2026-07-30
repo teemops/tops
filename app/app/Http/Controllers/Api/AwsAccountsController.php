@@ -344,27 +344,35 @@ class AwsAccountsController extends Controller
      */
     public function snsCallback(Request $request): JsonResponse
     {
-        // Verify SNS signature
-        $verifier = new \App\Services\SnsSignatureVerifier();
+        // Verify the signature and that the message came from our own topic.
+        // Resolved from the container so tests can substitute the validator.
+        $verifier = app(\App\Services\SnsSignatureVerifier::class);
         if (!$verifier->verify($request)) {
-            Log::warning('SNS callback signature verification failed', [
-                'headers' => $request->headers->all(),
-            ]);
+            // The verifier logs why; repeating the headers here would add nothing
+            // and they are attacker-controlled on an unauthenticated route.
             return response()->json(['error' => 'Invalid signature'], 401);
         }
-        
+
+        // SNS posts JSON as text/plain, so Laravel leaves the input bag empty —
+        // read the envelope from the raw body. Falls back to parsed input for
+        // clients that do send a JSON content type.
+        $envelope = json_decode($request->getContent(), true);
+        if (!is_array($envelope) || $envelope === []) {
+            $envelope = $request->all();
+        }
+
         try {
-            $message = json_decode($request->input('Message'), true);
-            
+            $message = json_decode($envelope['Message'] ?? '', true);
+
             if (!$message) {
                 // Handle SNS subscription confirmation
-                if ($request->input('Type') === 'SubscriptionConfirmation') {
+                if (($envelope['Type'] ?? null) === 'SubscriptionConfirmation') {
                     // Subscribe to the topic
-                    $subscribeUrl = $request->input('SubscribeURL');
+                    $subscribeUrl = $envelope['SubscribeURL'] ?? null;
                     Log::info('SNS subscription confirmation', ['url' => $subscribeUrl]);
                     return response()->json(['status' => 'subscription_confirmed']);
                 }
-                
+
                 return response()->json(['error' => 'Invalid message format'], 400);
             }
 
