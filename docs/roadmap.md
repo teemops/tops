@@ -66,6 +66,12 @@ installation means compiling assets on the user's machine. It is not a fifth wis
 item; it is a prerequisite that was missing from the original plan. The rule still holds —
 N-3 and N-4 are now later than they were, and that is the price. See D-8.
 
+**And once more, on 2026-07-31.** N-10 (one installer, in colour) is the same shape of
+addition, and passes the same test: it is not a new capability, it is the install path N-3
+documented and N-5 rebuilt, finally presented as one thing. It went in *ahead* of N-7 —
+verifying the documented onboarding path is wasted effort a day before that path changes.
+The price is that N-7 moves by a day or two, knowingly.
+
 ---
 
 ## Decisions Log
@@ -76,7 +82,7 @@ Decisions already made, so we don't relitigate them. Each has a trigger for revi
 | --- | --- | --- | --- | --- |
 | **D-1** | **Open source, self-hosted first.** Hosted multi-tenant SaaS is not the focus. | 2026-07-29 | Removes the entire commercial layer from the roadmap; every hard dependency on a hosted service becomes an adoption barrier instead of an assumption. | A commercial model is chosen. |
 | **D-2** | **Firebase auth stays, opt-in and off by default.** Not removed. | 2026-07-29 | It's built and works; some self-hosters will want OAuth. The default path must never require a Firebase project. | Never — it stays optional. |
-| **D-3** | **AWS onboarding stays as-is** (`install.sh` + CFN + SNS/SQS); we document it better rather than simplifying it. | 2026-07-29 | With a handful of hand-held design partners the friction is tolerable, and we'll learn whether the SNS automation is actually valued before investing in replacing it. | **Public release**, or the first design partner who gives up during setup. |
+| **D-3** | **AWS onboarding stays as-is** (`install.sh` + CFN + SNS/SQS); we document it better rather than simplifying it. **Still true of the AWS architecture** — N-10 simplified the *script*, not what it deploys. | 2026-07-29 | With a handful of hand-held design partners the friction is tolerable, and we'll learn whether the SNS automation is actually valued before investing in replacing it. | **Public release**, or the first design partner who gives up during setup. |
 | ~~**D-4**~~ | ~~**Public repo release is a separate, later milestone.**~~ **Superseded 2026-07-30 — the repo is public.** | 2026-07-29 | Design partners were meant to come first, with public release held to a higher bar on security, docs and contributor experience. That sequencing did not happen. | **Done.** Its dependants are listed below. |
 | **D-5** | **MFA ships as new-device email OTP, not TOTP.** No authenticator app, no external OTP service. | 2026-07-29 | Delivers most of the protection (stolen password alone is insufficient) for a fraction of the work, and works on the native auth path where TOTP currently doesn't. | Design partners ask for authenticator-app support, or a compliance requirement forces it. |
 | **D-6** | **No billing, plans, or licence gating.** | 2026-07-29 | No revenue model yet (D-1). | A commercial model is chosen. |
@@ -277,7 +283,12 @@ Sizes are rough and relative, for one person: **XS** under a day · **S** a day 
 
 ### Now — the path to a design partner
 
-**Two items as of 2026-07-31**, against a **2026-08-31** deadline. N-5 closed the
+**Three items as of 2026-07-31**, against a **2026-08-31** deadline. **N-10** was added
+that day and is critical, not queued: the install experience is the first thing a design
+partner touches, and shipping it with two scripts and no warning about what lands in their
+AWS account undoes the work N-3 and N-5 did. It is sequenced *before* N-7, because N-7
+verifies the documented onboarding path and there is no sense verifying a path that is
+about to change. N-5 closed the
 same day it was found incomplete — v0.1.2 went through the fixed pipeline cleanly (see
 below), so the release process TOPS never had now exists and is proven. N-9 was found and
 closed the same day: the published default database passwords are gone, generated at
@@ -296,6 +307,7 @@ starts optimising for imagined users again with a month on the clock.
 | ~~**N-6**~~ | ~~SNS signature verification~~ | ✅ **Done** 2026-07-30 — real signature verification via AWS's validator package, plus a topic allowlist that fails closed. Promoted from X-2 that morning when going public expired its deferral. | — |
 | ~~**N-5**~~ | ~~Release pipeline + Docker Hub images~~ | ✅ **Done** 2026-07-31 — v0.1.2 went `prepare → merge → tag → publish` cleanly: tag content matches, images published on Docker Hub for both architectures, `latest` digest matches `v0.1.2`. See D-8 and below. | — |
 | **N-7** | Verify AWS onboarding end to end | Promoted from X-9. The milestone's literal unmet criterion: nobody has connected a real account and run a scan through the documented path. | S |
+| **N-10** | One installer, in colour | Two root install scripts is two decisions a first-time user has to get right before anything works, and neither script says what it is about to create in their AWS account. Time-to-first-scan is the metric; this is friction sitting directly on it. | S |
 | **N-9** | Generate real database passwords at install time | `docker-compose.yml` defaults `MYSQL_ROOT_PASSWORD` to `mysql` and `DB_PASSWORD` to `teemops_dev_password` — both published in `.env.docker.example`, in a public repo, with MySQL's port bound to the host by default. Generate them the way `install.sh` already generates `APP_KEY`. | S |
 | ~~**N-8**~~ | ~~Base image for the app container~~ | ✅ **Done** 2026-07-31 — `teem/tops-base:php8.3-1` published for both architectures and verified on Docker Hub; the app build pulls it instead of compiling. 48.5s → 13.8s on a cold clean build. Awaiting merge, and the CI number gets recorded after the next release. | — |
 | ~~**N-3**~~ | ~~Setup docs a stranger can follow~~ | ✅ **Done** 2026-07-30 — README rebuilt around the one-liner, vendor defaults purged from `.env.example`, nine-symptom troubleshooting section, installer verified end to end. | — |
@@ -546,6 +558,82 @@ than N-5's original scope and doesn't block the milestone: the failing-tests gat
 tag-already-exists no-op, and the `TOPS_IMAGE_TAG` rollback path have none of them been
 exercised for real yet (see the acceptance criteria above). Revisit opportunistically —
 none of the three is likely to bite before a design partner is in the door.
+
+---
+
+### N-10 · One installer, in colour
+
+*Added 2026-07-31 as critical, at Ben's call, and sequenced ahead of N-7. This is a
+user-experience defect, not a feature — the four questions in `docs/practices/product.md`
+all answer the same way, because this removes a script rather than adding one.*
+
+**Problem, from the user's side.** The repo root has `install.sh` and
+`install-messaging.sh`. A first-time user has to work out that there are two steps, which
+order they go in, and that the second one is the one that touches their AWS account. The
+names do not help: "messaging" is our word for it, not theirs — they are trying to *scan an
+AWS account*, and nothing on the tin says so.
+
+Worse, the second script asks for a region and then deploys CloudFormation, SQS, SNS and an
+S3 bucket into whatever account the ambient credentials happen to point at, without ever
+saying which account that is or what it is about to create. On a machine with several
+profiles that is a genuinely easy mistake to make, and an annoying one to unpick. It also
+fails late and unhelpfully — the credential check happens inside the installer container,
+after a build, rather than in the first second.
+
+And it is monochrome. That sounds cosmetic and partly is, but the old TeemOps installer set
+an expectation here, and a wall of undifferentiated text is measurably harder to scan for
+the one line that says what went wrong.
+
+**Shape of the work**
+
+| Piece | Detail |
+| --- | --- |
+| One script | `install.sh` does both phases. `install-messaging.sh` is deleted, not deprecated. |
+| Flags | `--aws` (no prompt), `--no-aws`, `--aws-only` (just phase 2, for a re-run or the contributor path), `--help`. |
+| The prompt | Before anything is created: the exact resource list, the cost shape, and that it is skippable. |
+| Credential check | `aws sts get-caller-identity` on the host, up front. Show the account **and the caller ARN**, and confirm before deploying. |
+| Failure mode | A missing or misconfigured AWS CLI **warns and skips**, leaving a working TOPS. It does not abort an install that has already succeeded. |
+| Colour | The original TeemOps palette, plus its ASCII banner. Off when stdout is not a terminal, and when `NO_COLOR` is set. |
+| Installer image | `docker-compose.install.yml` gains `image: teem/tops-installer`, so the AWS step pulls rather than builds — D-8's rule applied to the half of the install that was still exempt from it. |
+
+**Acceptance criteria**
+- [x] Given the repo root, when I look at it, then there is exactly one install script a user is asked to run
+- [x] Given I run `./install.sh`, when the app is up, then I am asked — once, in plain language — whether to connect an AWS account, and told what that creates
+- [x] Given my AWS CLI is not configured, when the AWS step runs, then I get the red "check your AWS CLI configuration" warning and a working TOPS, not a failed install
+- [x] Given my AWS CLI *is* configured, when the AWS step runs, then I see the account ID and caller ARN and must confirm before anything is deployed
+- [x] Given I pipe the script into `bash` with no terminal, when it reaches a prompt, then it declines and carries on rather than hanging
+- [x] Given I already installed TOPS, when I want to connect an account later, then one documented command does it (`./install.sh --aws-only`)
+- [x] Given a non-UTF-8 terminal, when the banner prints, then it is plain text rather than mojibake
+- [ ] Given a real AWS account, when I accept the prompt, then the stacks deploy and the app picks up `generated/teemops.env` — **folds into N-7**; nothing here has been run against a real account
+
+**What shipped.** `install.sh` absorbed `install-messaging.sh`, which is deleted. The AWS
+step is `setup_aws()`: intro, `check_aws_identity()`, region resolution, confirmation,
+`docker compose run --rm installer`, then `docker compose up -d` so the new
+`generated/teemops.env` is actually loaded — a step users previously had to know to do
+themselves. README, `docker-compose.README.md`, `DEBUG.md`, `.env.docker.example`,
+`install-build.sh` and `SnsSignatureVerifier`'s error message all now name one script.
+
+`tests/install-flow.test.sh` covers it — 22 checks, `aws` stubbed, no containers, no AWS
+calls, running in CI beside `install-secrets.test.sh`. It asserts the paths that only a
+stranger hits: no AWS CLI, a CLI that fails, no region configured anywhere, no terminal to
+prompt on, and a non-UTF-8 locale.
+
+**Two things worth recording**
+1. **The credential check must not be fatal.** The obvious reading of the reference script
+   is `exit 1` when `get-caller-identity` fails. Here that would kill a run whose app half
+   had already succeeded, leaving the user with a working TOPS and an error message. It
+   warns and skips instead, and tells them the one command to come back with. `--aws`
+   asked for it explicitly, so that mode does still fail hard.
+2. **`resolve_aws_region` sets a variable rather than echoing one.** `read -p` writes its
+   prompt to stderr, so `region=$(resolve_aws_region)` *looks* safe — but it is one
+   redirect away from capturing the prompt into the region name and deploying to
+   `AWS region to deploy into [us-east-1]:`. Not worth the cleverness.
+
+**Deliberately not done.** The internal `docker/installer/scripts/install-messaging.sh`
+keeps its name — it lives inside the image, no user ever types it, and renaming it would
+touch the Dockerfile and entrypoint for no user-visible gain. `install-build.sh` also stays:
+it is the contributor path, it needs PHP and Node, and merging it into `install.sh` would
+put four host prerequisites back in front of the people D-8 removed them for.
 
 ---
 

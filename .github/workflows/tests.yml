@@ -92,7 +92,7 @@ jobs:
           retention-days: 14
 
   install-secrets:
-    name: Install secrets
+    name: Installer
     runs-on: ubuntu-latest
     timeout-minutes: 5
     # Repo root, not app/ — this exercises install.sh and docker-compose.yml.
@@ -107,6 +107,10 @@ jobs:
       # stack refuses to come up with a database password missing.
       - name: Check generated database passwords
         run: tests/install-secrets.test.sh
+
+      # The AWS CLI is stubbed, so nothing here calls AWS or costs anything.
+      - name: Check the install flow
+        run: tests/install-flow.test.sh
 
   frontend:
     name: Frontend build

@@ -1,6 +1,10 @@
-# Phase 2: AWS messaging installer (run via ./install-messaging.sh)
+# AWS messaging installer — driven by ./install.sh's AWS step, not run by hand.
 services:
   installer:
+    # Published image first (install.sh pulls it); the build stanza is the
+    # fallback for a working tree ahead of the last release, and the path
+    # install-build.sh uses.
+    image: teem/tops-installer:${TOPS_IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: docker/installer/Dockerfile

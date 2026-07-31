@@ -98,31 +98,39 @@ Maildev UI: http://localhost:8090
 
 ## Phase 2: AWS messaging (SQS + SNS)
 
-Deploy real AWS queues in a single region and wire them into the app:
-
-1. Set `TOPS_DEPLOYMENT_REGION` in `.env` (e.g. `us-east-1`).
-2. Configure AWS credentials (`~/.aws/credentials` is mounted into containers).
-3. Run the installer:
+Deploy real AWS queues in a single region and wire them into the app. `install.sh`
+offers this at the end of a normal install; run it on its own any time with:
 
 ```bash
-./install-messaging.sh
-docker compose up -d --build
+./install.sh --aws-only
 ```
+
+It reads `aws sts get-caller-identity` first and shows you the account and region
+before it creates anything, so you cannot deploy into the wrong account by accident.
+Prerequisites are the AWS CLI, configured, with permission to create the resources
+below — `~/.aws` is mounted into the installer container. The region is remembered in
+`.env` as `TOPS_DEPLOYMENT_REGION`, so a re-run does not ask again.
 
 This creates:
 
 | AWS resource | Purpose |
 |--------------|---------|
-| SQS `teemops_main` | CloudFormation custom-resource callbacks (child account linking) |
+| CloudFormation `teemops-core-docker` | Queues and the deployment bucket (deployed with SAM) |
+| CloudFormation `teemops-messaging-{env}` | The SNS topic and its subscription |
+| SQS `teemops_main` (+ dead-letter queue) | CloudFormation custom-resource callbacks (child account linking) |
 | SQS `teemops_audit` / `teemops_audit_region` | Scan job queues |
 | SNS `teemops-sns` | Publishes to `teemops_main` in your deployment region |
 | S3 `{env}-{account-id}-tops-deploy` | Deployment artifact bucket |
 
-Output is written to `generated/teemops.env` (gitignored). The app and worker load it automatically. After install, the worker runs database + SQS consumers via supervisord.
+All of it is pay-per-use and idle between scans. To remove it, delete the two
+CloudFormation stacks (empty the S3 bucket first — CloudFormation will not delete a
+bucket with objects in it).
+
+Output is written to `generated/teemops.env` (gitignored). The app and worker load it automatically, and `install.sh` restarts the stack for you. After install, the worker runs database + SQS consumers via supervisord.
 
 Logs: `generated/install.log`
 
-On EC2 without mounted credentials, set `TOPS_INSTALLER_NETWORK=host` in `.env` before `./install-messaging.sh`.
+On EC2 without mounted credentials, set `TOPS_INSTALLER_NETWORK=host` in `.env` before running the AWS step.
 
 ## Phase 3: Add an AWS account (end to end)
 
@@ -140,7 +148,7 @@ Once messaging is installed, connecting a customer AWS account works without any
 5. The modal is polling `GET /api/aws-accounts/{id}` and flips to **Account connected** on its own, then closes and refreshes the list — no manual refresh needed.
 
 **Fallbacks**
-- If messaging hasn't been installed, "Add AWS Account" returns a clear message to run `./install-messaging.sh` first.
+- If messaging hasn't been installed, "Add AWS Account" returns a clear message to run `./install.sh` first.
 - If CloudFormation is slow or fails, the modal offers **Enter details manually** (paste the AWS account ID + IAM role ARN).
 
 ## Services

@@ -90,7 +90,7 @@ class SnsSignatureVerifier
         if (empty($expected)) {
             return $this->reject(
                 'no TOPS_SNS_ARN is configured, so the topic cannot be verified. '
-                . 'Run ./install-messaging.sh, or ignore this if you do not use the SNS callback'
+                . 'Run ./install.sh, or ignore this if you do not use the SNS callback'
             );
         }
 
