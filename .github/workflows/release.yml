@@ -23,6 +23,10 @@ name: Prepare release
 # requests opened with the default GITHUB_TOKEN do not trigger other workflows,
 # so without it the release PR opens with no Tests run attached and you have to
 # push an empty commit or re-run Tests by hand to get a green check.
+#
+# That is a convenience, not the gate. tag-release.yml re-checks Tests against
+# the merge commit before it publishes anything, so a release PR merged without
+# a visible tick still cannot ship a red build.
 
 on:
   workflow_dispatch:
@@ -74,10 +78,22 @@ jobs:
           set -euo pipefail
           CURRENT="$(tr -d '[:space:]' < VERSION)"
 
+          # Bump from whichever is higher, the VERSION file or the newest tag.
+          # They are normally equal, but a publish that failed part-way through
+          # can leave a version already spent — bumping from VERSION alone would
+          # then hand out a number that already has images on Docker Hub.
+          LATEST_TAG="$(git tag -l 'v*' | sed 's/^v//' \
+            | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1 || true)"
+          BASE="$(printf '%s\n%s\n' "$CURRENT" "${LATEST_TAG:-0.0.0}" | sort -V | tail -n 1)"
+
+          if [ "$BASE" != "$CURRENT" ]; then
+            echo "::warning::VERSION is $CURRENT but v$BASE is already tagged — bumping from $BASE."
+          fi
+
           if [ -n "$INPUT_VERSION" ]; then
             NEXT="$(printf '%s' "$INPUT_VERSION" | sed 's/^v//')"
           else
-            IFS=. read -r major minor patch <<<"$CURRENT"
+            IFS=. read -r major minor patch <<<"$BASE"
             case "$RELEASE_TYPE" in
               major) major=$((major + 1)); minor=0; patch=0 ;;
               minor) minor=$((minor + 1)); patch=0 ;;
@@ -86,13 +102,14 @@ jobs:
             NEXT="${major}.${minor}.${patch}"
           fi
 
-          if [ "$CURRENT" = "$NEXT" ]; then
-            echo "::error::Next version ($NEXT) is the same as the current version ($CURRENT)."
+          if ! printf '%s' "$NEXT" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::'$NEXT' is not a x.y.z version."
             exit 1
           fi
 
-          if ! printf '%s' "$NEXT" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-            echo "::error::'$NEXT' is not a x.y.z version."
+          if [ "$(printf '%s\n%s\n' "$NEXT" "$BASE" | sort -V | tail -n 1)" != "$NEXT" ] \
+            || [ "$NEXT" = "$BASE" ]; then
+            echo "::error::Next version ($NEXT) must be higher than the current one ($BASE)."
             exit 1
           fi
 
@@ -102,13 +119,13 @@ jobs:
           fi
 
           {
-            echo "current=$CURRENT"
+            echo "current=$BASE"
             echo "next=$NEXT"
             echo "tag=v$NEXT"
             echo "branch=release/v$NEXT"
           } >> "$GITHUB_OUTPUT"
 
-          echo "Preparing release $CURRENT -> $NEXT (tag v$NEXT)"
+          echo "Preparing release $BASE -> $NEXT (tag v$NEXT)"
 
       - name: Write VERSION
         env:
@@ -209,10 +226,12 @@ jobs:
 
           Merging this PR triggers \`tag-release.yml\`, which:
 
-          1. Builds and pushes \`teem/tops\`, \`teem/tops-backup\` and \`teem/tops-installer\`
-             for amd64 and arm64, tagged \`$TAG\` and \`latest\`.
-          2. Creates the annotated tag \`$TAG\` (tags are not blocked by branch protection).
-          3. Cuts the GitHub release for \`$TAG\`, using this changelog entry as the notes.
+          1. Waits for Tests on the merge commit and refuses to publish unless it is green.
+          2. Builds and pushes \`teem/tops\`, \`teem/tops-backup\` and \`teem/tops-installer\`
+             for amd64 and arm64, tagged \`$TAG\`.
+          3. Creates the annotated tag \`$TAG\` (tags are not blocked by branch protection).
+          4. Cuts the GitHub release for \`$TAG\`, using this changelog entry as the notes.
+          5. Moves \`latest\` onto \`$TAG\` — last, so a failed publish cannot strand it.
 
           Check that Tests is green and the CHANGELOG.md entry reads correctly, then merge to ship.
           EOF
