@@ -35,9 +35,9 @@ curl -fsSL https://raw.githubusercontent.com/teemops/tops/develop/install.sh -o 
 less install.sh && bash install.sh
 ```
 
-Either way it pulls the published images from Docker Hub, generates a `.env` with its own
-application key, starts the stack, waits until it answers, and prints the URL. Re-running
-it is safe — an existing `.env` and your data are left alone.
+It pulls the published images from Docker Hub, generates a `.env` with its own application
+key, starts the stack, waits until it answers, then asks whether you want to connect an AWS
+account. Re-running it is safe — an existing `.env` and your data are left alone.
 
 Then open **http://localhost:8080** and register. The first account you create is yours.
 Sign-up and password-reset emails are captured locally at **http://localhost:8090** instead
@@ -48,22 +48,28 @@ default login is ordinary email and password.
 
 ## Scanning a real AWS account
 
-Connecting an AWS account is a separate, deliberate second step, because it deploys real
-resources into your account. Run this from the directory the installer created — it prints
-the path when it finishes, and it is `tops/` unless you set `TOPS_DIR`:
+The installer offers this as a second, explicit step, because it deploys real resources
+into your account. Say yes when asked, or come back to it later from the directory the
+installer created — it prints the path when it finishes, and it is `tops/` unless you set
+`TOPS_DIR`:
 
 ```bash
-./install-messaging.sh
+./install.sh --aws-only
 ```
 
-This creates SQS queues, an SNS topic and an S3 bucket in a region you choose, then wires
-them into your instance. **Read [docker-compose.README.md](docker-compose.README.md) first**
-— it lists exactly what gets created and how to remove it. You will need AWS credentials
-available locally and permission to create those resources.
+Either way it tells you which AWS account it is about to deploy into — it reads that from
+`aws sts get-caller-identity` — and lists what it creates before doing anything: two
+CloudFormation stacks, SQS queues, an SNS topic and an S3 bucket, in a region you choose.
+[docker-compose.README.md](docker-compose.README.md) has the same list plus how to remove
+it. You will need the AWS CLI configured with permission to create those resources; if it
+is not, the installer says so and skips the step rather than failing halfway.
 
 Once it finishes, **AWS Accounts → Add AWS Account** in the UI walks you through a
 CloudFormation stack that grants TOPS a read-only audit role in the account you want
 scanned. Then start a scan; findings appear as they are produced.
+
+Other flags: `--aws` sets it up without asking (for scripted installs) and `--no-aws` skips
+the question entirely. `./install.sh --help` lists them.
 
 ## Upgrading and rolling back
 
@@ -93,8 +99,8 @@ version instead: `TOPS_VERSION=0.1.0 ./install.sh`.
 **It started but the page does not load.** Follow the application log with
 `docker compose logs -f app`. MySQL takes a few seconds longer than the app on a first run.
 
-**"Add AWS Account" says messaging is not configured.** `./install-messaging.sh` has not run
-yet, or it failed partway. Its log is `generated/install.log`.
+**"Add AWS Account" says messaging is not configured.** The installer's AWS step has not run
+yet, or it failed partway — run `./install.sh --aws-only`. Its log is `generated/install.log`.
 
 **A scan stays "Running".** Region scans are processed by the worker — check it is alive
 with `docker compose logs -f worker`. To clear scans already stuck:

@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
-# TOPS installer — runs the published Docker images. Builds nothing.
+# TOPS installer — the only install script you need.
 #
-# The only host dependency is Docker. No PHP, no Composer, no Node, no npm.
+# It runs the published Docker images (it builds nothing), then offers to
+# connect your AWS account. The only host dependency is Docker; the AWS step
+# additionally wants the AWS CLI, so it can tell you which account you are
+# about to deploy into.
 #
 # From a clone:
 #
@@ -16,14 +19,74 @@
 #   curl -fsSL https://raw.githubusercontent.com/teemops/tops/develop/install.sh -o install.sh
 #   less install.sh && bash install.sh
 #
-# Contributors building from source want ./install-build.sh instead.
-# Connecting an AWS account is a separate, later step: ./install-messaging.sh.
+# Options:
+#
+#   --aws        set up AWS messaging without asking first
+#   --no-aws     install TOPS only, and do not offer the AWS step
+#   --aws-only   skip the install and run just the AWS step (re-runnable)
+#   --help       print this and exit
+#
+# Contributors building from source want ./install-build.sh instead. It builds
+# the images from your working tree; come back to `./install.sh --aws-only`
+# when you want to connect an account.
 
 set -euo pipefail
 
 TOPS_REPO="${TOPS_REPO:-teemops/tops}"
 TOPS_DIR="${TOPS_DIR:-tops}"
 TOPS_VERSION="${TOPS_VERSION:-}"
+
+# ask | yes | no — what to do about the AWS step. Overridden by the flags above.
+AWS_MODE="ask"
+INSTALL_APP=1
+
+# --- Colour ------------------------------------------------------------------
+# Same palette as the original TeemOps installer, so the two look like the same
+# product. Suppressed when stdout is not a terminal (piped into a log or a file)
+# and when NO_COLOR is set, per https://no-color.org.
+COLORS_RED=$'\033[0;31m'
+COLORS_YELLOW=$'\033[1;33m'
+COLORS_GREEN=$'\033[0;32m'
+COLORS_BLUE=$'\033[0;34m'
+COLORS_CYAN=$'\033[0;36m'
+COLORS_BOLD=$'\033[1m'
+COLORS_DIM=$'\033[2m'
+COLORS_NC=$'\033[0m'
+
+if [[ ! -t 1 || -n "${NO_COLOR:-}" ]]; then
+  COLORS_RED= COLORS_YELLOW= COLORS_GREEN= COLORS_BLUE= COLORS_CYAN=
+  COLORS_BOLD= COLORS_DIM= COLORS_NC=
+fi
+
+# The banner is box-drawing characters, which turn into mojibake on a non-UTF-8
+# terminal. A garbled logo is a worse first impression than no logo.
+banner() {
+  if [[ "${LC_ALL:-${LC_CTYPE:-${LANG:-}}}" == *[Uu][Tt][Ff]* ]]; then
+    printf '%s' "$COLORS_CYAN"
+    cat <<'ART'
+
+  ████████╗ ██████╗ ██████╗ ███████╗
+  ╚══██╔══╝██╔═══██╗██╔══██╗██╔════╝
+     ██║   ██║   ██║██████╔╝███████╗
+     ██║   ██║   ██║██╔═══╝ ╚════██║
+     ██║   ╚██████╔╝██║     ███████║
+     ╚═╝    ╚═════╝ ╚═╝     ╚══════╝
+ART
+    printf '%s' "$COLORS_NC"
+  else
+    printf '\n%s  T O P S%s\n' "$COLORS_CYAN$COLORS_BOLD" "$COLORS_NC"
+  fi
+
+  printf '%s  Open-source AWS security scanning · Apache-2.0 · no limits, no paid tier%s\n\n' \
+    "$COLORS_DIM" "$COLORS_NC"
+}
+
+log()   { printf '%s\n' "$*"; }
+step()  { printf '\n%s==> %s%s\n' "$COLORS_BLUE$COLORS_BOLD" "$*" "$COLORS_NC"; }
+ok()    { printf '%s✓%s %s\n' "$COLORS_GREEN" "$COLORS_NC" "$*"; }
+note()  { printf '%s%s%s\n' "$COLORS_DIM" "$*" "$COLORS_NC"; }
+warn()  { printf '%s! %s%s\n' "$COLORS_YELLOW" "$*" "$COLORS_NC" >&2; }
+die()   { printf '%sError: %s%s\n' "$COLORS_RED" "$*" "$COLORS_NC" >&2; exit 1; }
 
 # Where the release tarball is unpacked before being moved into place. Cleaned up
 # by a single EXIT trap: a `trap ... RETURN` inside the download function is not
@@ -45,13 +108,70 @@ have_checkout() {
   [[ -f docker-compose.yml && -d docker/mysql/conf.d ]]
 }
 
-log()  { printf '%s\n' "$*"; }
-step() { printf '\n==> %s\n' "$*"; }
-die()  { printf 'Error: %s\n' "$*" >&2; exit 1; }
-
 require() {
   command -v "$1" >/dev/null 2>&1 || die "$2"
 }
+
+# Asks a yes/no question. Answers "no" without asking when there is no terminal
+# to ask on — piping this script into bash must never hang waiting on a prompt.
+confirm() {
+  local reply=""
+  [[ -t 0 ]] || return 1
+  read -rp "${COLORS_BOLD}$1 [y/N] ${COLORS_NC}" reply || true
+  [[ "$reply" =~ ^[Yy]([Ee][Ss])?$ ]]
+}
+
+# --- .env helpers ------------------------------------------------------------
+# First match wins, the same way Compose reads the file.
+env_get() { grep -E "^${2}=" "$1" 2>/dev/null | head -n 1 | cut -d= -f2- || true; }
+
+env_set() {
+  local file="$1" key="$2" value="$3"
+  if grep -qE "^${key}=" "$file"; then
+    sed -i.bak "s|^${key}=.*|${key}=${value}|" "$file" && rm -f "$file.bak"
+  else
+    printf '%s=%s\n' "$key" "$value" >> "$file"
+  fi
+}
+
+usage() {
+  cat <<EOF
+TOPS installer — runs the published Docker images, then offers to connect
+your AWS account.
+
+  ./install.sh              install TOPS, then ask about the AWS step
+  ./install.sh --aws        install TOPS and set up AWS without asking
+  ./install.sh --no-aws     install TOPS only
+  ./install.sh --aws-only   run just the AWS step, in an existing install
+  ./install.sh --help       this
+
+Environment: TOPS_VERSION pins a release, TOPS_DIR chooses the install
+directory, NO_COLOR turns off colour.
+
+Building from your working tree instead? Use ./install-build.sh.
+EOF
+}
+
+parse_args() {
+  while (( $# > 0 )); do
+    case "$1" in
+      --aws)      AWS_MODE="yes" ;;
+      --no-aws)   AWS_MODE="no" ;;
+      --aws-only) AWS_MODE="yes"; INSTALL_APP=0 ;;
+      -h|--help)  usage; exit 0 ;;
+      *)          die "Unknown option: $1 (try --help)" ;;
+    esac
+    shift
+  done
+
+  # --aws-only --no-aws asks for nothing at all. Say so rather than exiting 0
+  # having done no work, which reads like a success.
+  if (( ! INSTALL_APP )) && [[ "$AWS_MODE" == "no" ]]; then
+    die "--aws-only and --no-aws contradict each other — there would be nothing to do."
+  fi
+}
+
+# --- Phase 1: run TOPS -------------------------------------------------------
 
 preflight() {
   step "Checking prerequisites"
@@ -59,13 +179,13 @@ preflight() {
   require docker "Docker is not installed. Install it from https://docs.docker.com/get-docker/ and run this again."
 
   if ! docker info >/dev/null 2>&1; then
-    cat >&2 <<'EOF'
-Error: the Docker daemon is not reachable from this user.
+    cat >&2 <<EOF
+${COLORS_RED}Error: the Docker daemon is not reachable from this user.${COLORS_NC}
 
 Check that Docker is running and that your account can access the socket.
 On Linux:
 
-  sudo usermod -aG docker $USER
+  sudo usermod -aG docker \$USER
 
 Then log out and back in (or run: newgrp docker).
 EOF
@@ -77,7 +197,7 @@ EOF
   docker compose version >/dev/null 2>&1 \
     || die "Docker Compose v2 is required (the 'docker compose' subcommand). Update Docker Desktop, or install the compose plugin."
 
-  log "Docker and Compose v2 are available."
+  ok "Docker and Compose v2 are available."
 }
 
 resolve_version() {
@@ -130,7 +250,7 @@ fetch_release() {
   tar -xzf "$DOWNLOAD_DIR/tops.tar.gz" -C "$TOPS_DIR" --strip-components=1
 
   cd "$TOPS_DIR"
-  log "Unpacked into $PWD"
+  ok "Unpacked into $PWD"
 }
 
 # Writes to a temp file and moves it into place, so an interrupted run cannot
@@ -150,20 +270,11 @@ write_env() {
   tmp="$(mktemp)"
   cp .env "$tmp"
 
-  set_var() {
-    local key="$1" value="$2"
-    if grep -qE "^${key}=" "$tmp"; then
-      sed -i.bak "s|^${key}=.*|${key}=${value}|" "$tmp" && rm -f "$tmp.bak"
-    else
-      printf '%s=%s\n' "$key" "$value" >> "$tmp"
-    fi
-  }
-
   # One stable APP_KEY, shared by the app and worker containers: the worker
   # encrypts IAM role ARNs that the app has to decrypt, so this must never
   # rotate once data exists.
   if ! grep -qE '^APP_KEY=base64:.+' "$tmp"; then
-    set_var APP_KEY "base64:$(openssl rand -base64 32)"
+    env_set "$tmp" APP_KEY "base64:$(openssl rand -base64 32)"
     log "Generated APP_KEY"
   else
     log "APP_KEY already set — keeping it."
@@ -176,13 +287,13 @@ write_env() {
   # database rather than changing anything.
   local mysql_password="" key existing
   for key in MYSQL_ROOT_PASSWORD MYSQL_PASSWORD TOPS_BACKUP_PASSWORD; do
-    # `|| true` because grep exits 1 when the key is absent altogether, and
-    # under `set -o pipefail` that would abort the install rather than generate
-    # the missing password — which is the whole point of this loop.
-    existing="$(grep -E "^${key}=" "$tmp" | head -n 1 | cut -d= -f2- || true)"
+    # env_get swallows grep's exit 1 when the key is absent altogether, which
+    # under `set -o pipefail` would otherwise abort the install rather than
+    # generate the missing password — the whole point of this loop.
+    existing="$(env_get "$tmp" "$key")"
     if [[ -z "$existing" ]]; then
       existing="$(openssl rand -base64 32)"
-      set_var "$key" "$existing"
+      env_set "$tmp" "$key" "$existing"
       log "Generated $key"
     else
       log "$key already set — keeping it."
@@ -195,14 +306,14 @@ write_env() {
   # DB_PASSWORD is the same account as MYSQL_PASSWORD — Laravel's name for it —
   # so it always follows, whether the password was just generated or already
   # there from an earlier run.
-  set_var DB_PASSWORD "$mysql_password"
+  env_set "$tmp" DB_PASSWORD "$mysql_password"
 
   # Finished backups are chowned to this uid:gid so ~/.tops/backups stays
   # readable from the host shell without sudo. Detected rather than hardcoded,
   # because macOS, WSL and multi-user hosts all disagree about 1000.
-  set_var TOPS_BACKUP_UID "$(id -u)"
-  set_var TOPS_BACKUP_GID "$(id -g)"
-  set_var TOPS_BACKUP_TZ "$(
+  env_set "$tmp" TOPS_BACKUP_UID "$(id -u)"
+  env_set "$tmp" TOPS_BACKUP_GID "$(id -g)"
+  env_set "$tmp" TOPS_BACKUP_TZ "$(
     cat /etc/timezone 2>/dev/null \
       || (readlink -f /etc/localtime 2>/dev/null | sed 's|.*/zoneinfo/||') \
       || echo UTC
@@ -210,7 +321,7 @@ write_env() {
 
   # Pin the images to the version we just installed, so a later `docker compose
   # up` cannot silently jump to a newer release.
-  set_var TOPS_IMAGE_TAG "v${TOPS_VERSION}"
+  env_set "$tmp" TOPS_IMAGE_TAG "v${TOPS_VERSION}"
 
   mv "$tmp" .env
   log "Pinned images to v${TOPS_VERSION} (change TOPS_IMAGE_TAG in .env to move)"
@@ -233,8 +344,8 @@ check_name_conflicts() {
 
     cat >&2 <<EOF
 
-Error: a container named '${name}' already exists, from a different TOPS
-install (compose project '${existing}', this one is '${project}').
+${COLORS_RED}Error: a container named '${name}' already exists, from a different TOPS
+install (compose project '${existing}', this one is '${project}').${COLORS_NC}
 
 Docker will not let two containers share a name. Either stop that install:
 
@@ -247,6 +358,12 @@ EOF
   done
 }
 
+app_port() {
+  local port
+  port="$(env_get .env APP_PORT)"
+  printf '%s' "${port:-8080}"
+}
+
 start_stack() {
   check_name_conflicts
 
@@ -257,15 +374,12 @@ start_stack() {
   docker compose up -d
 
   step "Waiting for the application to answer"
-  local port
-  port="$(grep -E '^APP_PORT=' .env 2>/dev/null | cut -d= -f2 || true)"
-  port="${port:-8080}"
+  local port i
+  port="$(app_port)"
 
-  local i
   for i in $(seq 1 60); do
     if curl -fsS "http://localhost:${port}/health" >/dev/null 2>&1; then
-      log "Healthy."
-      APP_PORT_RESOLVED="$port"
+      ok "Healthy."
       return 0
     fi
     sleep 2
@@ -273,7 +387,7 @@ start_stack() {
 
   cat >&2 <<EOF
 
-TOPS started but did not answer on http://localhost:${port}/health within two minutes.
+${COLORS_RED}TOPS started but did not answer on http://localhost:${port}/health within two minutes.${COLORS_NC}
 
 Check the logs:
 
@@ -283,43 +397,223 @@ EOF
   exit 1
 }
 
-main() {
-  preflight
+# --- Phase 2: connect an AWS account -----------------------------------------
 
-  if have_checkout; then
-    log "Running inside an existing TOPS checkout."
-    resolve_version
-  else
-    resolve_version
-    fetch_release
+aws_intro() {
+  cat <<EOF
+
+${COLORS_YELLOW}${COLORS_BOLD}Connecting an AWS account${COLORS_NC}
+
+To scan a real AWS account, TOPS needs a few messaging resources in an account
+you own. This step deploys them with CloudFormation, into one region:
+
+  ${COLORS_CYAN}CloudFormation${COLORS_NC}  2 stacks — teemops-core-docker and teemops-messaging
+  ${COLORS_CYAN}SQS${COLORS_NC}             3 queues plus a dead-letter queue
+  ${COLORS_CYAN}SNS${COLORS_NC}             1 topic, which notifies TOPS when an account is linked
+  ${COLORS_CYAN}S3${COLORS_NC}              1 bucket, for deployment artefacts and the child-account template
+
+These are pay-per-use and idle when you are not scanning, so the running cost is
+cents per month at typical volumes. docker-compose.README.md lists exactly what
+is created and how to remove it.
+
+${COLORS_DIM}You can skip this. TOPS runs fine without it — you just cannot scan yet, and
+you can come back later with: ./install.sh --aws-only${COLORS_NC}
+
+EOF
+}
+
+# Confirms which account we are about to deploy into, and proves the CLI can
+# talk to AWS at all. Getting this wrong means CloudFormation stacks in the
+# wrong account, which is tedious to unpick — so it is worth showing the caller
+# identity rather than assuming it.
+AWS_ACCOUNT_ID=""
+check_aws_identity() {
+  if ! command -v aws >/dev/null 2>&1; then
+    warn "The AWS CLI is not installed, so the account you are deploying into cannot be checked."
+    note "  Install it: https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html"
+    return 1
   fi
 
-  write_env
-  start_stack
+  # One call, two fields, tab separated — cheaper than asking twice, and the ARN
+  # is what tells you whether you are an assumed role or a long-lived user.
+  local identity
+  if ! identity="$(aws sts get-caller-identity --query '[Account,Arn]' --output text 2>/dev/null)"; then
+    printf '%sFailed to get AWS account ID. Please check your AWS CLI configuration.%s\n' \
+      "$COLORS_RED" "$COLORS_NC" >&2
+    note "  Run 'aws configure', or set AWS_PROFILE / AWS_ACCESS_KEY_ID, then try again."
+    return 1
+  fi
+
+  AWS_ACCOUNT_ID="$(printf '%s' "$identity" | cut -f1)"
+  ok "AWS account ${COLORS_BOLD}${AWS_ACCOUNT_ID}${COLORS_NC} — $(printf '%s' "$identity" | cut -f2)"
+}
+
+# Region order of preference: what is already in .env (so a re-run is a no-op),
+# then the environment, then the CLI's own configured region, then whatever the
+# user types. Sets AWS_REGION_RESOLVED rather than echoing, so the prompt cannot
+# end up inside the value.
+AWS_REGION_RESOLVED=""
+resolve_aws_region() {
+  local region reply=""
+  region="$(env_get .env TOPS_DEPLOYMENT_REGION)"
+  region="${region:-${AWS_DEFAULT_REGION:-}}"
+
+  if [[ -z "$region" ]] && command -v aws >/dev/null 2>&1; then
+    region="$(aws configure get region 2>/dev/null || true)"
+  fi
+
+  if [[ -t 0 ]]; then
+    read -rp "${COLORS_BOLD}AWS region to deploy into${COLORS_NC} [${region:-none set}]: " reply || true
+    region="${reply:-$region}"
+  fi
+
+  AWS_REGION_RESOLVED="$region"
+  [[ -n "$region" ]] || return 1
+
+  # This is the one value a user types that then gets written into .env and
+  # substituted into a sed replacement. A stray `&` or `|` would either corrupt
+  # the file or abort the install with a sed error nobody can act on, so reject
+  # anything that is not shaped like a region before it gets that far.
+  if [[ ! "$region" =~ ^[a-z0-9-]+$ ]]; then
+    warn "'$region' is not a valid AWS region name (expected something like us-east-1)."
+    return 1
+  fi
+}
+
+setup_aws() {
+  local region tmp
+  local -a compose
+
+  have_checkout || die "The AWS step must run from a TOPS directory (the one install.sh created)."
+  [[ -f .env ]] || die "No .env here. Run ./install.sh first."
+
+  aws_intro
+
+  if [[ "$AWS_MODE" == "ask" ]] && ! confirm "Set up AWS messaging now?"; then
+    return 1
+  fi
+
+  step "Checking your AWS credentials"
+  if ! check_aws_identity; then
+    if [[ "$AWS_MODE" == "yes" ]]; then
+      die "AWS credentials are not usable. Fix the CLI configuration and re-run: ./install.sh --aws-only"
+    fi
+    warn "Skipping the AWS step."
+    return 1
+  fi
+
+  resolve_aws_region \
+    || die "No AWS region set. Run 'aws configure', or set TOPS_DEPLOYMENT_REGION in .env."
+  region="$AWS_REGION_RESOLVED"
+
+  if [[ "$AWS_MODE" == "ask" ]] \
+    && ! confirm "Deploy into account ${AWS_ACCOUNT_ID}, region ${region}?"; then
+    warn "Skipping the AWS step."
+    return 1
+  fi
+
+  tmp="$(mktemp)"
+  cp .env "$tmp"
+  env_set "$tmp" TOPS_DEPLOYMENT_REGION "$region"
+  mv "$tmp" .env
+
+  compose=(docker compose -f docker-compose.yml -f docker-compose.install.yml --profile install)
+
+  step "Deploying AWS messaging into ${AWS_ACCOUNT_ID} (${region})"
+  # Published image first, so this path stays true to "install.sh builds
+  # nothing". A working tree ahead of the last release has no image to pull, so
+  # fall back to building the installer locally — it needs no PHP or Node.
+  if ! "${compose[@]}" pull installer >/dev/null 2>&1; then
+    note "No published installer image for this version — building it locally."
+    "${compose[@]}" build installer
+  fi
+
+  "${compose[@]}" run --rm installer
+
+  if (( INSTALL_APP )); then
+    step "Restarting TOPS with the new configuration"
+    docker compose up -d
+  fi
+
+  ok "AWS messaging is deployed. Details are in generated/teemops.env, log in generated/install.log."
+}
+
+# --- Output ------------------------------------------------------------------
+
+summary() {
+  local aws_done="$1" port
+  port="$(app_port)"
+
+  printf '\n%s%sTOPS %s is running.%s\n\n' "$COLORS_GREEN" "$COLORS_BOLD" "$TOPS_VERSION" "$COLORS_NC"
+  printf '  %sOpen%s      http://localhost:%s\n' "$COLORS_BOLD" "$COLORS_NC" "$port"
+  printf '  %sMail UI%s   http://localhost:8090   %s(sign-up and reset emails land here)%s\n' \
+    "$COLORS_BOLD" "$COLORS_NC" "$COLORS_DIM" "$COLORS_NC"
+
+  if [[ "$aws_done" == "yes" ]]; then
+    cat <<EOF
+
+Register the first account in the browser, then connect an account to scan:
+${COLORS_BOLD}AWS Accounts → Add AWS Account${COLORS_NC} walks you through a CloudFormation stack
+that grants TOPS a read-only audit role.
+EOF
+  else
+    cat <<EOF
+
+Register the first account in the browser. When you are ready to scan a real
+AWS account, run this from ${COLORS_BOLD}$(pwd)${COLORS_NC}:
+
+  ${COLORS_CYAN}./install.sh --aws-only${COLORS_NC}
+EOF
+  fi
 
   cat <<EOF
 
-TOPS ${TOPS_VERSION} is running.
-
-  Open      http://localhost:${APP_PORT_RESOLVED}
-  Mail UI   http://localhost:8090   (sign-up and reset emails land here)
-
-Register the first account in the browser, then to scan a real AWS account:
-
-  cd $(pwd)
-  ./install-messaging.sh
-
-That step deploys SQS, SNS and an S3 bucket into your own AWS account — read
-docker-compose.README.md before running it, so you know what it creates and how
-to remove it.
-
-Useful commands:
+${COLORS_DIM}Useful commands:
 
   docker compose logs -f app     follow the application log
   docker compose down            stop TOPS (your data is kept)
-  docker compose pull && docker compose up -d    upgrade in place
+  docker compose pull && docker compose up -d    upgrade in place${COLORS_NC}
 
 EOF
+}
+
+main() {
+  parse_args "$@"
+
+  banner
+  preflight
+
+  if (( INSTALL_APP )); then
+    if have_checkout; then
+      log "Running inside an existing TOPS checkout."
+      resolve_version
+    else
+      resolve_version
+      fetch_release
+    fi
+
+    write_env
+    start_stack
+  else
+    have_checkout || die "Run --aws-only from the TOPS directory the installer created."
+  fi
+
+  local aws_done="no"
+  if [[ "$AWS_MODE" != "no" ]] && setup_aws; then
+    aws_done="yes"
+  fi
+
+  if (( INSTALL_APP )); then
+    summary "$aws_done"
+  elif [[ "$aws_done" == "yes" ]]; then
+    cat <<EOF
+
+Restart TOPS so it picks up the new configuration:
+
+  ${COLORS_CYAN}docker compose up -d${COLORS_NC}    ${COLORS_DIM}(or ./install-build.sh if you build from source)${COLORS_NC}
+
+EOF
+  fi
 }
 
 # Only install when executed. Sourcing this file defines the functions without

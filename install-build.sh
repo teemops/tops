@@ -81,6 +81,9 @@ After changing PHP or frontend code, rebuild and restart:
 
 To scan a real AWS account, deploy the messaging stack:
 
-  ./install-messaging.sh
+  ./install.sh --aws-only
+
+That step only talks to AWS — it will not pull or start published images over
+the ones you just built.
 
 EOF

@@ -250,7 +250,7 @@ most of it blocks the first external contributor or self-hoster.
    `TOPS_DEPLOYMENT_REGION`, and `install.sh` deploys real SNS/SQS into an account you
    control. A self-hoster cannot connect an AWS account without doing this first.
 4. ~~**Vendor-owned defaults baked into `.env.example`**~~ ✅ **Resolved 2026-07-30** — every
-   AWS and Firebase value is blank, with a comment saying `install-messaging.sh` writes the
+   AWS and Firebase value is blank, with a comment saying the installer's AWS step writes the
    real ones into `generated/teemops.env`. Was: the CloudFormation template URL
    points at `storage.teemops.com` (`:88`), and a Teemops AWS account ID plus SQS ARNs
    are hard-coded (`:89-93`).

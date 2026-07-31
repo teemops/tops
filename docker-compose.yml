@@ -70,10 +70,10 @@ services:
       # NOTE: QUEUE_CONNECTION / SCAN_QUEUE_CONNECTION / SCAN_REGION_QUEUE_CONNECTION
       # are deliberately NOT set here. `environment:` overrides `env_file:`, so
       # setting them would clobber the sqs-* values that generated/teemops.env
-      # provides after ./install-messaging.sh, silently sending scan jobs to the database
+      # provides after install.sh's AWS step, silently sending scan jobs to the database
       # queue while the workers poll SQS. They come from env_file layering instead:
       # .env (database, Phase 1) -> generated/teemops.env (sqs-*, from
-      # ./install-messaging.sh).
+      # ./install.sh --aws-only).
       MAIL_MAILER: smtp
       MAIL_HOST: maildev
       MAIL_PORT: "1025"
