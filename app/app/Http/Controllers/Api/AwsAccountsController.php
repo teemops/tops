@@ -85,15 +85,15 @@ class AwsAccountsController extends Controller
     private function awsMessagingConfigError(): ?string
     {
         if (! config('services.aws.parent_account_id')) {
-            return 'AWS messaging not configured (missing AWS_PARENT_ACCOUNT_ID). Run ./install.sh first.';
+            return 'AWS messaging not configured (missing AWS_PARENT_ACCOUNT_ID). Run ./install-messaging.sh post install for AWS Setup.';
         }
 
         if (! config('services.aws.cloudformation_template_url')) {
-            return 'AWS messaging not configured (missing TOPS_CFN_TEMPLATE_URL). Run ./install.sh first.';
+            return 'AWS messaging not configured (missing TOPS_CFN_TEMPLATE_URL). Run ./install-messaging.sh post install for AWS Setup.';
         }
 
         if (! config('services.aws.deployment_region')) {
-            return 'AWS messaging not configured (missing TOPS_DEPLOYMENT_REGION). Set it in .env and run ./install.sh.';
+            return 'AWS messaging not configured (missing TOPS_DEPLOYMENT_REGION). Run ./install-messaging.sh post install for AWS Setup.';
         }
 
         return null;
