@@ -64,6 +64,16 @@ Outputs:
   TopsMainQueueArn:
     Description: Main SQS queue ARN
     Value: !GetAtt SqsStack.Outputs.TopsMainQueueArn
+  # sqs.cfn.yaml has always exported these two; this template forgot to pass them
+  # up, so the installer — which requires them — died with "Missing
+  # CloudFormation output: main_dlq_name" after both stacks had deployed fine.
+  # config/services.php and aws:redrive-dlq both read them.
+  TopsMainDlqName:
+    Description: Dead-letter queue name for teemops_main (redrive with aws:redrive-dlq)
+    Value: !GetAtt SqsStack.Outputs.TopsMainDlqName
+  TopsMainDlqArn:
+    Description: Dead-letter queue ARN for teemops_main
+    Value: !GetAtt SqsStack.Outputs.TopsMainDlqArn
   TopsAuditQueueName:
     Description: Audit scan queue name
     Value: !GetAtt SqsStack.Outputs.TopsAuditQueueName

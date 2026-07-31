@@ -173,6 +173,129 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+step "A region the account cannot use is caught at the prompt"
+
+# Issue #56: a region that passes the shape check but is not enabled for the
+# account fails every call there with InvalidClientTokenId. Catching it here
+# saves starting a container to produce a message about credentials that are
+# fine.
+stub_aws 'for arg in "$@"; do [[ "$arg" == "ap-southeast-6" ]] && exit 255; done
+exit 0'
+
+if PATH="$STUB:$PATH" in_installer 'check_region_usable us-west-2' "$ENVDIR" </dev/null >/dev/null 2>&1; then
+  pass "a usable region passes"
+else
+  fail "check_region_usable rejected a region the stub accepts"
+fi
+
+if PATH="$STUB:$PATH" in_installer 'check_region_usable ap-southeast-6' "$ENVDIR" </dev/null >/dev/null 2>&1; then
+  fail "a region the account cannot use was accepted"
+else
+  pass "a region the account cannot use is rejected"
+fi
+
+# No AWS CLI, no opinion — check_aws_identity has already warned about that, and
+# blocking the install a second time for the same reason helps nobody.
+if env -i PATH=/usr/bin:/bin HOME="$WORK" bash -c \
+     ". '$INSTALLER'; check_region_usable ap-southeast-6" </dev/null >/dev/null 2>&1; then
+  pass "with no AWS CLI installed the check stands aside"
+else
+  fail "check_region_usable blocked the install when no AWS CLI is present"
+fi
+
+# ---------------------------------------------------------------------------
+step "A failing AWS installer is never reported as a success"
+
+# The bug behind issue #56's second act: main calls setup_aws as an `if`
+# condition, which switches errexit off for the whole function, so a failed
+# `docker compose run installer` fell straight through to the "AWS messaging is
+# deployed" line. The user was told the install worked and found out otherwise
+# in the UI. These checks run setup_aws the same way main does — inside a
+# condition — because run any other way the bug is invisible.
+AWSDIR="$WORK/awsdir"
+mkdir -p "$AWSDIR/docker/mysql/conf.d" "$AWSDIR/generated"
+touch "$AWSDIR/docker-compose.yml"
+printf 'TOPS_DEPLOYMENT_REGION=us-west-2\n' > "$AWSDIR/.env"
+
+stub_aws 'case "$*" in
+  *get-caller-identity*) printf "848310106659\tarn:aws:iam::848310106659:user/ben\n" ;;
+esac
+exit 0'
+
+# `docker compose run --rm installer` fails; everything else it is asked to do
+# succeeds, so only the installer's own exit status is under test.
+stub_docker() { printf '%s\n' "#!/usr/bin/env bash" "$1" > "$STUB/docker"; chmod +x "$STUB/docker"; }
+stub_docker 'for arg in "$@"; do
+  if [[ "$arg" == "run" ]]; then
+    echo "[installer] ERROR: AWS credentials not configured." >&2
+    exit 1
+  fi
+done
+exit 0'
+
+out="$(PATH="$STUB:$PATH" bash -c "
+  cd '$AWSDIR'
+  . '$INSTALLER'
+  AWS_MODE=yes
+  INSTALL_APP=0
+  if setup_aws; then echo '<<REPORTED-SUCCESS>>'; fi
+" </dev/null 2>&1 || true)"
+
+if [[ "$out" != *"<<REPORTED-SUCCESS>>"* ]]; then
+  pass "a failing installer is not reported as success"
+else
+  fail "setup_aws returned success after the installer failed: $out"
+fi
+
+if [[ "$out" != *"AWS messaging is deployed"* ]]; then
+  pass "the 'AWS messaging is deployed' line is not printed after a failure"
+else
+  fail "install.sh claimed 'AWS messaging is deployed' after a failed install: $out"
+fi
+
+if [[ "$out" == *"install.log"* ]]; then
+  pass "the failure points at generated/install.log"
+else
+  fail "the failure message does not say where to look: $out"
+fi
+
+# The installer can also exit 0 having written nothing — a silent no-op that
+# leaves the UI with no configuration and no reason given.
+stub_docker 'exit 0'
+out="$(PATH="$STUB:$PATH" bash -c "
+  cd '$AWSDIR'
+  . '$INSTALLER'
+  AWS_MODE=yes
+  INSTALL_APP=0
+  if setup_aws; then echo '<<REPORTED-SUCCESS>>'; fi
+" </dev/null 2>&1 || true)"
+
+if [[ "$out" != *"<<REPORTED-SUCCESS>>"* ]]; then
+  pass "an installer that writes no teemops.env is not reported as success"
+else
+  fail "setup_aws reported success with no generated/teemops.env: $out"
+fi
+
+# And the success path still succeeds, so the checks above are not just refusing
+# everything.
+printf 'AWS_PARENT_ACCOUNT_ID=848310106659\n' > "$AWSDIR/generated/teemops.env"
+out="$(PATH="$STUB:$PATH" bash -c "
+  cd '$AWSDIR'
+  . '$INSTALLER'
+  AWS_MODE=yes
+  INSTALL_APP=0
+  if setup_aws; then echo '<<REPORTED-SUCCESS>>'; fi
+" </dev/null 2>&1 || true)"
+
+if [[ "$out" == *"<<REPORTED-SUCCESS>>"* ]]; then
+  pass "a real success is still reported as success"
+else
+  fail "setup_aws failed on the happy path: $out"
+fi
+
+rm -f "$STUB/docker"
+
+# ---------------------------------------------------------------------------
 step "No prompt can hang a non-interactive install"
 
 # `bash <(curl ...)` keeps a terminal, but piping into bash does not. A prompt

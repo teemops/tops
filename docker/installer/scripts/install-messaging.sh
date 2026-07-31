@@ -19,13 +19,38 @@ die() {
   exit 1
 }
 
+# .env is a Compose env file, not a shell script: its values are literal, and
+# unquoted values containing spaces are normal there. `source` executed them.
+# The cron schedules are the case that bit us — TOPS_BACKUP_FULL_CRON=0 17 * * *
+# assigned `0`, then ran `17` with the `*` globbed against /workspace, and under
+# `set -e` the whole install died before deploying a single stack. The user saw
+# "line 80: 17: command not found" and then a UI reporting a missing
+# AWS_PARENT_ACCOUNT_ID, because generated/teemops.env was never written.
+#
+# So parse the file the way Compose reads it: KEY=rest-of-line, taken literally,
+# with at most one layer of surrounding quotes removed. Nothing is executed.
+#
+# Literal means TOPS_BACKUP_DIR=${HOME}/.tops/backups stays unexpanded — that is
+# the only such value in the file, Compose expands it itself when it reads .env
+# for interpolation, and nothing in this script consumes it.
 load_dotenv() {
-  if [[ -f "${ROOT}/.env" ]]; then
-    set -a
-    # shellcheck disable=SC1091
-    source "${ROOT}/.env"
-    set +a
-  fi
+  [[ -f "${ROOT}/.env" ]] || return 0
+
+  local line key value
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    # Blanks, comments, and anything that is not a KEY=VALUE assignment.
+    if [[ ! "$line" =~ ^[[:space:]]*([A-Za-z_][A-Za-z0-9_]*)=(.*)$ ]]; then
+      continue
+    fi
+    key="${BASH_REMATCH[1]}"
+    value="${BASH_REMATCH[2]}"
+
+    if [[ "$value" =~ ^\"(.*)\"$ || "$value" =~ ^\'(.*)\'$ ]]; then
+      value="${BASH_REMATCH[1]}"
+    fi
+
+    export "${key}=${value}"
+  done < "${ROOT}/.env"
 }
 
 require_region() {
@@ -35,8 +60,28 @@ require_region() {
 }
 
 validate_aws_auth() {
-  if ! aws sts get-caller-identity --output json > "${ROOT}/generated/caller-identity.json" 2>>"$LOG_FILE"; then
-    die "AWS credentials not configured. Mount ~/.aws or set AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY."
+  local err_file="${ROOT}/generated/sts-error.log" err
+  if ! aws sts get-caller-identity --output json \
+      > "${ROOT}/generated/caller-identity.json" 2>"$err_file"; then
+    err="$(tr -d '\r' < "$err_file" | grep -v '^[[:space:]]*$' | tail -n 3)"
+    cat "$err_file" >> "$LOG_FILE"
+
+    # A region the account has not opted into rejects perfectly good credentials
+    # with InvalidClientTokenId. That reads as a credentials problem and is not
+    # one — it sent the reporter of issue #56 looking at their ~/.aws mount
+    # while the real answer was that they had typed an opt-in region. Whatever
+    # the cause, show what AWS actually said rather than guessing for it.
+    if [[ "$err" == *InvalidClientTokenId* ]]; then
+      die "AWS rejected these credentials in ${AWS_DEFAULT_REGION}.
+That usually means the region is not enabled for this account rather than that
+the credentials are wrong — opt-in regions (ap-southeast-3 and up, ap-east-*,
+me-*, af-*, il-*, eu-south-*) must be enabled under Account → AWS Regions in the
+console. Pick a region you already use, or enable this one, then re-run.
+AWS said: ${err}"
+    fi
+
+    die "Could not authenticate with AWS. Mount ~/.aws, or set AWS_ACCESS_KEY_ID
+and AWS_SECRET_ACCESS_KEY. AWS said: ${err}"
   fi
   local account_id
   account_id="$(python3 -c "import json; print(json.load(open('${ROOT}/generated/caller-identity.json'))['Account'])")"
@@ -185,4 +230,9 @@ main() {
   log "Messaging install complete."
 }
 
-main "$@"
+# Only deploy when executed. Sourcing defines the functions without running
+# anything, which is how tests/install-messaging.test.sh exercises load_dotenv
+# and validate_aws_auth without deploying a stack.
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+  main "$@"
+fi
