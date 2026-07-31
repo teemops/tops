@@ -24,6 +24,46 @@ else
   echo "WARNING: $ENV_FILE not found — copy .env.docker.example to .env so a shared APP_KEY can be generated." >&2
 fi
 
+# Database passwords, on the same rule as APP_KEY: generated here so no real
+# value is ever committed, and stable once set. MySQL bakes MYSQL_ROOT_PASSWORD
+# and MYSQL_PASSWORD into its datadir on first init and never reads them again,
+# so rotating either later locks you out instead of changing anything.
+if [[ -f "$ENV_FILE" ]]; then
+  MYSQL_PASSWORD_VALUE=""
+  for key in MYSQL_ROOT_PASSWORD MYSQL_PASSWORD TOPS_BACKUP_PASSWORD; do
+    # `|| true` because grep exits 1 when the key is absent altogether, and
+    # under `set -o pipefail` that would abort the build rather than generate
+    # the missing password.
+    value="$(grep -E "^${key}=" "$ENV_FILE" | head -n 1 | cut -d= -f2- || true)"
+    if [[ -z "$value" ]]; then
+      value="$(openssl rand -base64 32)"
+      if grep -qE "^${key}=" "$ENV_FILE"; then
+        sed -i "s|^${key}=.*|${key}=${value}|" "$ENV_FILE"
+      else
+        echo "${key}=${value}" >> "$ENV_FILE"
+      fi
+      echo "Generated $key in $ENV_FILE"
+    fi
+    if [[ "$key" == MYSQL_PASSWORD ]]; then
+      MYSQL_PASSWORD_VALUE="$value"
+    fi
+  done
+
+  # Laravel's name for the same account as MYSQL_PASSWORD, so it always follows.
+  if grep -qE '^DB_PASSWORD=' "$ENV_FILE"; then
+    sed -i "s|^DB_PASSWORD=.*|DB_PASSWORD=${MYSQL_PASSWORD_VALUE}|" "$ENV_FILE"
+  else
+    echo "DB_PASSWORD=${MYSQL_PASSWORD_VALUE}" >> "$ENV_FILE"
+  fi
+
+  # install-build.sh creates .env with a plain `cp`, so its mode comes from the
+  # umask — 0644 on a typical host. That was harmless when the file held only
+  # example values; now it holds the real database passwords. install.sh's .env
+  # is already 0600 (it writes through mktemp), so this just makes the
+  # build-from-source path match.
+  chmod 600 "$ENV_FILE"
+fi
+
 # The backup container runs as root (MySQL's datadir is 0640 mysql:mysql and
 # unreadable otherwise) and chowns finished backups back to this uid:gid, so
 # ~/.tops/backups stays readable and deletable from the host shell without

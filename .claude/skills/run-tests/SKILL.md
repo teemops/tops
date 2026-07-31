@@ -65,6 +65,18 @@ Playwright covers critical flows only. It needs the app running — see
 npx playwright test
 ```
 
+## Install scripts
+
+Not PHP, and run from the repo root rather than `app/`. Proves the database passwords are
+generated at install time and never shipped in the repo. Starts no containers and touches
+no working-tree file — everything happens in a throwaway directory:
+
+```bash
+tests/install-secrets.test.sh
+```
+
+The Compose section of it needs `docker compose` and skips itself when that is missing.
+
 ## Reporting results
 
 Report what actually happened. If tests fail, show the failure output and say which
