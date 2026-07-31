@@ -3,24 +3,12 @@
 # Build context is the repo root. Run docker/scripts/prepare-build.sh first so
 # app/vendor and app/public/build exist on the host.
 
-FROM php:8.3-fpm-bookworm
-
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-        nginx \
-        supervisor \
-        libzip-dev \
-        libpng-dev \
-        libonig-dev \
-        libxml2-dev \
-        curl \
-    && docker-php-ext-install \
-        bcmath \
-        opcache \
-        pdo_mysql \
-        zip \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+# nginx, supervisor and the compiled PHP extensions live in the base image, so
+# they are pulled rather than rebuilt on every release. Built from
+# docker/base/Dockerfile; pinned so a base rebuild never silently changes what
+# this produces. Bumping the pin and publishing the new base tag happen in the
+# same PR — see docs/processes/release.md.
+FROM teem/tops-base:php8.3-1
 
 COPY docker/app/nginx.conf /etc/nginx/nginx.conf
 COPY docker/app/default-site.conf /etc/nginx/conf.d/default.conf

@@ -88,11 +88,40 @@ built from (the app image carries `sha-<commit>`, so it is always identifiable) 
 delete the orphaned Docker Hub tags. Phase 1 will refuse to reissue the number once
 a tag exists for it.
 
+## Base image for the app container
+
+`docker/app/Dockerfile` builds `FROM teem/tops-base:<tag>` — nginx, supervisor and
+four compiled PHP extensions, defined in `docker/base/Dockerfile`. None of that
+changes release to release, so a release pulls it instead of rebuilding it for two
+architectures with arm64 under QEMU.
+
+This is not part of a release. It happens on its own, rarely, when the PHP version,
+the package list or the extension list changes.
+
+1. Edit `docker/base/Dockerfile` on a branch, and bump the pin in
+   `docker/app/Dockerfile` to the tag you are about to publish. Both changes go in
+   the **same PR** — a base tag with no app pointing at it, or a pin pointing at a
+   tag that does not exist, is a broken build for everyone who builds from source.
+2. Run `.github/workflows/publish-base.yml` from the Actions tab against that
+   branch, with the new tag as its input. It builds and pushes `linux/amd64` and
+   `linux/arm64`.
+3. Merge the PR once the image is on Docker Hub, not before. Until then, the pin
+   references a tag nobody can pull.
+
+Tags are immutable and the workflow refuses to publish over an existing one. That
+is what makes the pin worth having: republishing a base could otherwise change what
+the next app build produces without a diff to review. To correct a base, publish the
+next revision.
+
+The tag encodes the PHP version and a revision — `php8.3-1`, `php8.3-2`, then
+`php8.4-1` after a PHP bump. There is no `latest`, on purpose: the app image must
+always name the exact base it was built on.
+
 ## Secrets
 
 | Secret | Used by | Required |
 | --- | --- | --- |
-| `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN` | Phase 2 | Yes. A scoped Docker Hub access token, never an account password. |
+| `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN` | Phase 2, and the base image workflow | Yes. A scoped Docker Hub access token, never an account password. |
 | `RELEASE_TOKEN` | Phase 1 | Optional PAT with `repo` scope. Pull requests opened with the default `GITHUB_TOKEN` do not trigger other workflows, so without it the release PR arrives with no Tests run attached. Convenience only — Phase 2 re-checks Tests on the merge commit either way. |
 
 ## Version pinning

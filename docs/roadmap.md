@@ -298,7 +298,7 @@ users again with a month on the clock.
 | ~~**N-5**~~ | ~~Release pipeline + Docker Hub images~~ | ✅ **Done** 2026-07-31 — v0.1.2 went `prepare → merge → tag → publish` cleanly: tag content matches, images published on Docker Hub for both architectures, `latest` digest matches `v0.1.2`. See D-8 and below. | — |
 | **N-7** | Verify AWS onboarding end to end | Promoted from X-9. The milestone's literal unmet criterion: nobody has connected a real account and run a scan through the documented path. | S |
 | **N-9** | Generate real database passwords at install time | `docker-compose.yml` defaults `MYSQL_ROOT_PASSWORD` to `mysql` and `DB_PASSWORD` to `teemops_dev_password` — both published in `.env.docker.example`, in a public repo, with MySQL's port bound to the host by default. Generate them the way `install.sh` already generates `APP_KEY`. | S |
-| **N-8** | Base image for the app container | `docker/app/Dockerfile` recompiles nginx, supervisor and four PHP extensions from source on every build, for both architectures — the reason `tag-release.yml` budgets 45 minutes. Split the rarely-changing OS layer into a published `teem/tops-base` image. N-5's clean release (v0.1.2) has now shipped, so this is unblocked — still sequenced behind N-7 and N-9. | M |
+| ~~**N-8**~~ | ~~Base image for the app container~~ | ✅ **Done** 2026-07-31 — `teem/tops-base:php8.3-1` published for both architectures and verified on Docker Hub; the app build pulls it instead of compiling. 48.5s → 13.8s on a cold clean build. Awaiting merge, and the CI number gets recorded after the next release. | — |
 | ~~**N-3**~~ | ~~Setup docs a stranger can follow~~ | ✅ **Done** 2026-07-30 — README rebuilt around the one-liner, vendor defaults purged from `.env.example`, nine-symptom troubleshooting section, installer verified end to end. | — |
 | ~~**N-4**~~ | ~~Remediation for every finding~~ | ✅ **Done** 2026-07-30 — all 74 rules carry a remediation, all 28 critical/high rules carry step-by-step guidance, and `scan:validate-rules` now fails rather than warns. | — |
 
@@ -632,11 +632,10 @@ the same pattern applied to three more variables.
 
 ---
 
-### N-8 · Base image for the app container
+### ~~N-8 · Base image for the app container~~ ✅ Done 2026-07-31
 
-*Added 2026-07-31, unblocked the same day — N-5's clean release (v0.1.2) shipped, so it's
-safe to change what the app image builds from without that being in flight at the same time
-as verifying the pipeline itself. Still sequenced behind N-7.*
+*Added 2026-07-31, unblocked and built the same day. Started ahead of its sequencing behind
+N-7 and N-9, at Ben's call — those two remain the critical path to the design-partner target.*
 
 **Problem:** `docker/app/Dockerfile:8-23` installs `nginx`, `supervisor` and four `-dev`
 libraries via `apt-get`, then compiles `bcmath`, `opcache`, `pdo_mysql` and `zip` via
@@ -668,18 +667,33 @@ self-hoster who builds from source (`install-build.sh`).
   something that moves a few times a year.
 
 **Acceptance criteria**
-- [ ] Given `docker/app/Dockerfile`, when it builds, then it starts `FROM teem/tops-base:<tag>`
-      and contains no `apt-get` or `docker-php-ext-install` step
-- [ ] Given `teem/tops-base`, when it's built, then it's published for `linux/amd64` and
-      `linux/arm64`
-- [ ] Given a base-image change is needed, when someone makes it, then a documented process
+- [x] Given `docker/app/Dockerfile`, when it builds, then it starts `FROM teem/tops-base:<tag>`
+      and contains no `apt-get` or `docker-php-ext-install` step — pinned to
+      `teem/tops-base:php8.3-1`
+- [x] Given `teem/tops-base`, when it's built, then it's published for `linux/amd64` and
+      `linux/arm64` — pushed manually 2026-07-31 and verified against the registry with
+      `docker buildx imagetools inspect`: index digest `sha256:71c4a842…`, one manifest per
+      architecture. `.github/workflows/publish-base.yml` is there for the next one.
+- [x] Given a base-image change is needed, when someone makes it, then a documented process
       publishes a new `teem/tops-base` tag and the app Dockerfile's pin is bumped in the
-      same PR
-- [ ] Given a release with an unchanged base tag, when `tag-release.yml` builds the app
-      image, then it no longer compiles PHP extensions — measure the before/after time and
-      record it here once landed
-- [ ] Given a contributor running `install-build.sh` for the first time, when the app image
-      builds, then it pulls `teem/tops-base` rather than compiling extensions locally
+      same PR — `docs/processes/release.md`, "Base image for the app container". Tags are
+      immutable and the workflow refuses to overwrite one, which is what makes the pin mean
+      anything.
+- [x] Given a release with an unchanged base tag, when `tag-release.yml` builds the app
+      image, then it no longer compiles PHP extensions — measured locally on native amd64,
+      `--no-cache` both times: **48.5s → 7.1s** warm, **13.8s** cold including the pull. That
+      is the cheap architecture; the arm64 leg in CI compiles the same extensions under QEMU,
+      so the release-path saving should be larger. **Still to record: the real CI before/after,
+      after the first release through this.** The 45-minute budget in `tag-release.yml` can
+      probably come down then — leave it until there is a number behind it.
+- [x] Given a contributor running `install-build.sh` for the first time, when the app image
+      builds, then it pulls `teem/tops-base` rather than compiling extensions locally —
+      verified by deleting the local base image and rebuilding: the build pulled
+      `teem/tops-base:php8.3-1` from Docker Hub and compiled nothing, in 13.8s total
+
+**Verified equivalent, not just faster:** app images built from the old and new Dockerfiles
+have an identical `php -m` and an identical `dpkg -l`. The base image is the old lines 6-23
+moved, not rewritten.
 
 **Technical notes**
 - `docker/backup/Dockerfile` and `docker/installer/Dockerfile` are out of scope — neither
@@ -687,7 +701,13 @@ self-hoster who builds from source (`install-build.sh`).
   prebuilt), so there's no equivalent win there.
 - `docker-compose.build.yml` needs no change: it still builds `docker/app/Dockerfile` from
   the working tree, which will just pull `teem/tops-base` as its first layer instead of
-  `php:8.3-fpm-bookworm`.
+  `php:8.3-fpm-bookworm`. Confirmed — no change was needed.
+- The base image has no `latest` tag, deliberately. The app must always name the exact base
+  it was built on; a floating tag would put the thing the pin exists to prevent back within
+  reach.
+- `publish-base.yml` sets no buildx cache. It runs a few times a year, so the cache would be
+  cold every time anyway — and caching the layer whose rebuild this change removes from the
+  release path is the wrong thing to spend complexity on.
 
 ---
 
@@ -947,6 +967,17 @@ Blocking nothing today, but each one shapes the plan:
   Fix mirrors the `APP_KEY` pattern `install.sh` already has: generate once, at install
   time, never ship a real value. Scoped to passwords only, not un-publishing the port
   (Ben's call) — that stays a separate future hardening item.
+- **2026-07-31** — **N-8 done.** `docker/base/Dockerfile` holds the old app Dockerfile's lines
+  6-23 verbatim, `docker/app/Dockerfile` is pinned to `teem/tops-base:php8.3-1`, and
+  `.github/workflows/publish-base.yml` publishes future revisions for both architectures with
+  a hard refusal to overwrite an existing tag. Ben pushed the first base manually; verified
+  against the registry, not just the workflow — both `linux/amd64` and `linux/arm64` under
+  index `sha256:71c4a842…`. Deleting the local copy and rebuilding proved the contributor
+  path: the app image pulls the base and compiles nothing, 48.5s → 13.8s cold on native
+  amd64, with identical `php -m` and `dpkg -l` to the old image. The arm64 leg under QEMU is
+  where the real saving lands, so the CI number and any cut to `tag-release.yml`'s 45-minute
+  budget wait for the next release. Started ahead of its sequencing, at Ben's call — **N-7 and
+  N-9 remain the critical path** to 5 design partners by 2026-08-31.
 - **2026-07-31** — **N-5 closed.** v0.1.2 went through the fixed release pipeline cleanly:
   PR #47 merged, `develop`'s `VERSION` and `CHANGELOG.md` landed correctly, `Tag and
   release` ran to completion for the first time, and all three images are on Docker Hub for
