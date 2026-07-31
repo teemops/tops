@@ -1,63 +1,63 @@
-name: Release
+name: Prepare release
 
-# Cuts a release whenever `develop` moves and the test suite passed.
+# Phase 1 of the release process.
 #
-# Steps, in order:
-#   1. Bump the patch version in VERSION (unless VERSION was bumped by hand,
-#      in which case that value is used as-is).
-#   2. Tag v<version> and cut the GitHub release — that gives the downloadable
-#      source zip for free.
-#   3. Build and push the three images to Docker Hub, for amd64 and arm64.
+# Bumps VERSION, writes the CHANGELOG.md entry, and opens a release pull request
+# against `develop`. It deliberately does NOT push to `develop`, tag, or publish
+# anything — that keeps `develop` a PR-only branch and puts a human review in
+# front of every release.
 #
-# It is gated on the Tests workflow: `workflow_run` fires after Tests finishes,
-# and the job exits early unless the conclusion was success. A red build
-# publishes nothing.
+# When the release PR is merged, `.github/workflows/tag-release.yml` takes over:
+# it builds and pushes the images, creates the `v<version>` tag, and cuts the
+# GitHub release. Tags live in refs/tags/* and are not subject to branch
+# protection, so that step works even with `develop` locked down.
 #
-# Re-running against an unchanged VERSION is a no-op — the tag already exists.
+# Tests are not re-run here. The release PR is an ordinary pull request, so the
+# Tests workflow runs against it — merging a red release PR is a human decision,
+# not something this workflow can paper over.
 #
-# `latest` tracks `develop`: every release here moves it. That is deliberate —
-# there is no separate stable channel, and `develop` is the integration branch.
-# The safety net is that install.sh pins TOPS_IMAGE_TAG to the version it
-# installed, so users do not silently float onto a newer build; moving forward
-# is an explicit `docker compose pull`.
+# Run it from the Actions tab ("Run workflow"), pick a release type, or give an
+# explicit version to override the automatic bump.
 #
-# Requires two repository secrets: DOCKERHUB_USERNAME and DOCKERHUB_TOKEN
-# (a scoped Docker Hub access token, never an account password).
+# RELEASE_TOKEN (optional repository secret, a PAT with `repo` scope): pull
+# requests opened with the default GITHUB_TOKEN do not trigger other workflows,
+# so without it the release PR opens with no Tests run attached and you have to
+# push an empty commit or re-run Tests by hand to get a green check.
 
 on:
-  workflow_run:
-    workflows: ["Tests"]
-    types: [completed]
-    branches: [develop]
   workflow_dispatch:
     inputs:
       release_type:
         description: "Semver bump applied to VERSION"
         type: choice
-        options: [patch, minor, major]
+        options:
+          - patch
+          - minor
+          - major
         default: patch
+      version:
+        description: "Explicit version (e.g. 1.2.3). Overrides release_type when set."
+        type: string
+        required: false
+        default: ""
+      dry_run:
+        description: "Preview the release without opening a pull request"
+        type: boolean
+        default: false
 
 concurrency:
-  group: release
+  group: release-prepare
   cancel-in-progress: false
 
 permissions:
   contents: write
-
-env:
-  APP_IMAGE: teem/tops
-  BACKUP_IMAGE: teem/tops-backup
-  INSTALLER_IMAGE: teem/tops-installer
+  pull-requests: write
 
 jobs:
-  release:
-    name: Tag, release, and publish images
+  prepare:
+    name: Open release pull request
     runs-on: ubuntu-latest
-    timeout-minutes: 45
-    # Publishing is skipped unless the tests that triggered this actually passed.
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      github.event.workflow_run.conclusion == 'success'
+    timeout-minutes: 15
 
     steps:
       - uses: actions/checkout@v4
@@ -68,15 +68,15 @@ jobs:
       - name: Compute the next version
         id: version
         env:
-          RELEASE_TYPE: ${{ inputs.release_type || 'patch' }}
+          INPUT_VERSION: ${{ inputs.version }}
+          RELEASE_TYPE: ${{ inputs.release_type }}
         run: |
           set -euo pipefail
           CURRENT="$(tr -d '[:space:]' < VERSION)"
 
-          # A hand-edited VERSION with no matching tag ships as-is; otherwise
-          # bump automatically. That keeps "every merge releases" true without
-          # taking away deliberate minor and major bumps.
-          if git rev-parse "v$CURRENT" >/dev/null 2>&1; then
+          if [ -n "$INPUT_VERSION" ]; then
+            NEXT="$(printf '%s' "$INPUT_VERSION" | sed 's/^v//')"
+          else
             IFS=. read -r major minor patch <<<"$CURRENT"
             case "$RELEASE_TYPE" in
               major) major=$((major + 1)); minor=0; patch=0 ;;
@@ -84,140 +84,166 @@ jobs:
               *)     patch=$((patch + 1)) ;;
             esac
             NEXT="${major}.${minor}.${patch}"
-            echo "VERSION $CURRENT is already tagged — bumping to $NEXT"
-          else
-            NEXT="$CURRENT"
-            echo "VERSION $CURRENT has no tag yet — releasing it as-is"
           fi
 
-          echo "version=$NEXT" >> "$GITHUB_OUTPUT"
-          echo "tag=v$NEXT" >> "$GITHUB_OUTPUT"
+          if [ "$CURRENT" = "$NEXT" ]; then
+            echo "::error::Next version ($NEXT) is the same as the current version ($CURRENT)."
+            exit 1
+          fi
 
-      - name: Set up PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.3'
-          extensions: bcmath, mbstring, sockets, zip
-          coverage: none
+          if ! printf '%s' "$NEXT" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::'$NEXT' is not a x.y.z version."
+            exit 1
+          fi
 
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: npm
-          cache-dependency-path: app/package-lock.json
+          if git rev-parse "v$NEXT" >/dev/null 2>&1; then
+            echo "::error::Tag v$NEXT already exists."
+            exit 1
+          fi
 
-      # The app image expects app/vendor and app/public/build to exist — the
-      # same contract contributors satisfy locally. The runner has PHP and Node,
-      # so this reuses the existing script rather than duplicating the build
-      # inside the Dockerfile.
-      - name: Build host artifacts
-        run: ./docker/scripts/prepare-build.sh
+          {
+            echo "current=$CURRENT"
+            echo "next=$NEXT"
+            echo "tag=v$NEXT"
+            echo "branch=release/v$NEXT"
+          } >> "$GITHUB_OUTPUT"
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+          echo "Preparing release $CURRENT -> $NEXT (tag v$NEXT)"
 
-      - name: Set up Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Build and push the app image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: docker/app/Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: |
-            ${{ env.APP_IMAGE }}:${{ steps.version.outputs.tag }}
-            ${{ env.APP_IMAGE }}:latest
-            ${{ env.APP_IMAGE }}:sha-${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build and push the backup image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: docker/backup/Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: |
-            ${{ env.BACKUP_IMAGE }}:${{ steps.version.outputs.tag }}
-            ${{ env.BACKUP_IMAGE }}:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build and push the installer image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: docker/installer/Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: |
-            ${{ env.INSTALLER_IMAGE }}:${{ steps.version.outputs.tag }}
-            ${{ env.INSTALLER_IMAGE }}:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      # Everything below only runs once all three images are pushed. Tagging
-      # first would mean a failed image build leaves a dangling tag: the next
-      # run would see v<version> already exists, bump past it, and that version
-      # would be burned forever with nothing published under it.
-      - name: Write VERSION and push
+      - name: Write VERSION
         env:
-          VERSION: ${{ steps.version.outputs.version }}
+          NEXT: ${{ steps.version.outputs.next }}
+        run: echo "$NEXT" > VERSION
+
+      # The changelog is assembled from the pull requests merged into develop
+      # since the last tag. That is the honest record of what shipped, and it
+      # needs no commit-message convention to be enforced.
+      - name: Generate the changelog entry
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          set -euo pipefail
+          PREVIOUS_TAG="$(git tag --sort=-v:refname | head -n 1 || true)"
+          RELEASE_DATE="$(date -u +%Y-%m-%d)"
+
+          if [ -n "$PREVIOUS_TAG" ]; then
+            SINCE_ISO="$(git log -1 --format=%aI "$PREVIOUS_TAG")"
+            echo "Collecting pull requests merged since $PREVIOUS_TAG ($SINCE_ISO)"
+            PR_JSON="$(
+              gh pr list \
+                --repo "${{ github.repository }}" \
+                --state merged \
+                --base develop \
+                --limit 200 \
+                --json number,title,url,mergedAt,author \
+                --search "merged:>=$SINCE_ISO"
+            )"
+            PR_JSON="$(echo "$PR_JSON" | jq --arg since "$SINCE_ISO" '
+              [ .[] | select(.mergedAt > $since) ] | sort_by(.mergedAt)
+            ')"
+          else
+            echo "First release — collecting every merged pull request"
+            PR_JSON="$(
+              gh pr list \
+                --repo "${{ github.repository }}" \
+                --state merged \
+                --base develop \
+                --limit 200 \
+                --json number,title,url,mergedAt,author
+            )"
+            PR_JSON="$(echo "$PR_JSON" | jq 'sort_by(.mergedAt)')"
+          fi
+
+          {
+            echo "## [$TAG] - $RELEASE_DATE"
+            echo
+            if [ "$(echo "$PR_JSON" | jq 'length')" -eq 0 ]; then
+              echo "- Maintenance release."
+            else
+              echo "$PR_JSON" | jq -r '.[] | "- \(.title) ([#\(.number)](\(.url))) (@\(.author.login))"'
+            fi
+            echo
+          } > /tmp/release-entry.md
+
+          echo "Generated changelog entry:"
+          cat /tmp/release-entry.md
+
+      - name: Prepend the entry to CHANGELOG.md
+        run: |
+          set -euo pipefail
+          if [ ! -f CHANGELOG.md ]; then
+            printf '# Changelog\n\n' > CHANGELOG.md
+          fi
+          tmp="$(mktemp)"
+          cat /tmp/release-entry.md CHANGELOG.md > "$tmp"
+          mv "$tmp" CHANGELOG.md
+
+      - name: Open the release pull request
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
+          BRANCH: ${{ steps.version.outputs.branch }}
+          TAG: ${{ steps.version.outputs.tag }}
+          NEXT: ${{ steps.version.outputs.next }}
+          CURRENT: ${{ steps.version.outputs.current }}
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # [skip ci] stops this push re-triggering Tests, which would in turn
-          # re-trigger this workflow.
-          if [ "$(tr -d '[:space:]' < VERSION)" != "$VERSION" ]; then
-            echo "$VERSION" > VERSION
-            git add VERSION
-            git commit -m "chore(release): v$VERSION [skip ci]"
-            git push origin develop
+          git checkout -B "$BRANCH"
+          git add -A
+          if git diff --staged --quiet; then
+            echo "::error::No release changes to commit."
+            exit 1
           fi
+          git commit -m "chore(release): $TAG"
+          git push --force-with-lease origin "$BRANCH"
 
-      - name: Create the tag
-        env:
-          TAG: ${{ steps.version.outputs.tag }}
-          VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          set -euo pipefail
-          git tag -a "$TAG" -m "Release $VERSION"
-          git push origin "$TAG"
+          BODY="$(cat <<EOF
+          Automated release prepared by the **Prepare release** workflow.
 
-      - name: Cut the GitHub release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: ${{ steps.version.outputs.tag }}
-        run: |
-          set -euo pipefail
-          gh release create "$TAG" \
-            --repo "${{ github.repository }}" \
-            --target develop \
-            --title "$TAG" \
-            --generate-notes
+          - Version: \`$CURRENT\` → \`$NEXT\`
+          - Tag cut on merge: \`$TAG\`
+
+          Merging this PR triggers \`tag-release.yml\`, which:
+
+          1. Builds and pushes \`teem/tops\`, \`teem/tops-backup\` and \`teem/tops-installer\`
+             for amd64 and arm64, tagged \`$TAG\` and \`latest\`.
+          2. Creates the annotated tag \`$TAG\` (tags are not blocked by branch protection).
+          3. Cuts the GitHub release for \`$TAG\`, using this changelog entry as the notes.
+
+          Check that Tests is green and the CHANGELOG.md entry reads correctly, then merge to ship.
+          EOF
+          )"
+
+          if EXISTING="$(gh pr list --repo "${{ github.repository }}" --head "$BRANCH" --json url --jq '.[0].url')" && [ -n "$EXISTING" ]; then
+            echo "Updating the existing release PR: $EXISTING"
+            gh pr edit "$EXISTING" --title "chore(release): $TAG" --body "$BODY"
+          else
+            URL="$(gh pr create \
+              --repo "${{ github.repository }}" \
+              --base develop \
+              --head "$BRANCH" \
+              --title "chore(release): $TAG" \
+              --body "$BODY")"
+            echo "Opened the release PR: $URL"
+          fi
 
       - name: Summary
         run: |
           {
-            echo "### Released ${{ steps.version.outputs.tag }}"
+            echo "### Release prepared: ${{ steps.version.outputs.tag }}"
             echo
-            echo "| Image | Tags |"
-            echo "| --- | --- |"
-            echo "| \`${{ env.APP_IMAGE }}\` | \`${{ steps.version.outputs.tag }}\`, \`latest\` |"
-            echo "| \`${{ env.BACKUP_IMAGE }}\` | \`${{ steps.version.outputs.tag }}\`, \`latest\` |"
-            echo "| \`${{ env.INSTALLER_IMAGE }}\` | \`${{ steps.version.outputs.tag }}\`, \`latest\` |"
+            echo "- Previous version: \`${{ steps.version.outputs.current }}\`"
+            echo "- New version: \`${{ steps.version.outputs.next }}\`"
+            echo "- Release branch: \`${{ steps.version.outputs.branch }}\`"
+            echo "- Dry run: \`${{ inputs.dry_run }}\`"
             echo
-            echo "Install: \`bash <(curl -fsSL https://raw.githubusercontent.com/${{ github.repository }}/master/install.sh)\`"
+            if [ "${{ inputs.dry_run }}" = "true" ]; then
+              echo "Dry run — no pull request was opened."
+            else
+              echo "Merge the release PR to build the images, cut the tag, and publish the GitHub release."
+            fi
           } >> "$GITHUB_STEP_SUMMARY"

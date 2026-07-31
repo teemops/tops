@@ -1,0 +1,240 @@
+name: Tag and release
+
+# Phase 2 of the release process.
+#
+# Runs after a release PR (opened by .github/workflows/release.yml) is merged
+# into `develop`. It reads the freshly bumped VERSION, then:
+#
+#   1. Builds and pushes the three images to Docker Hub, for amd64 and arm64.
+#   2. Creates the annotated tag `v<version>` on `develop`. Tags live in
+#      refs/tags/* and are NOT subject to branch protection, so this works even
+#      though `develop` only accepts changes via pull request.
+#   3. Cuts the GitHub release for that tag — that gives the downloadable source
+#      zip for free — using the CHANGELOG.md entry as the notes.
+#
+# The release is keyed off VERSION: when it has no matching `v<version>` tag
+# yet, this workflow cuts it. Any other push touching VERSION is a no-op,
+# because the tag already exists.
+#
+# Images are pushed before the tag is created, deliberately. Tagging first would
+# mean a failed image build leaves a dangling tag: the next release would see
+# v<version> already exists, and that version would be burned with nothing
+# published under it.
+#
+# Tests are not re-run here. The release PR carries the Tests result, and
+# merging it is the human gate.
+#
+# `latest` tracks `develop`: every release here moves it. That is deliberate —
+# there is no separate stable channel, and `develop` is the integration branch.
+# The safety net is that install.sh pins TOPS_IMAGE_TAG to the version it
+# installed, so users do not silently float onto a newer build; moving forward
+# is an explicit `docker compose pull`.
+#
+# Requires two repository secrets: DOCKERHUB_USERNAME and DOCKERHUB_TOKEN
+# (a scoped Docker Hub access token, never an account password).
+
+on:
+  push:
+    branches: [develop]
+    paths:
+      - VERSION
+  # For re-running the publish after a failure. The version is read from VERSION
+  # either way, so this cannot cut a release no PR prepared.
+  workflow_dispatch:
+
+concurrency:
+  group: release-tag
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  APP_IMAGE: teem/tops
+  BACKUP_IMAGE: teem/tops-backup
+  INSTALLER_IMAGE: teem/tops-installer
+
+jobs:
+  tag-release:
+    name: Tag, release, and publish images
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: develop
+          fetch-depth: 0
+
+      - name: Determine the release version
+        id: version
+        run: |
+          set -euo pipefail
+          VERSION="$(tr -d '[:space:]' < VERSION)"
+          TAG="v$VERSION"
+
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists — nothing to release."
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "New version detected: $VERSION (tag $TAG)"
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Set up PHP
+        if: ${{ steps.version.outputs.release == 'true' }}
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: bcmath, mbstring, sockets, zip
+          coverage: none
+
+      - name: Set up Node
+        if: ${{ steps.version.outputs.release == 'true' }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      # The app image expects app/vendor and app/public/build to exist — the
+      # same contract contributors satisfy locally. The runner has PHP and Node,
+      # so this reuses the existing script rather than duplicating the build
+      # inside the Dockerfile.
+      - name: Build host artifacts
+        if: ${{ steps.version.outputs.release == 'true' }}
+        run: ./docker/scripts/prepare-build.sh
+
+      - name: Set up QEMU
+        if: ${{ steps.version.outputs.release == 'true' }}
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Buildx
+        if: ${{ steps.version.outputs.release == 'true' }}
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        if: ${{ steps.version.outputs.release == 'true' }}
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push the app image
+        if: ${{ steps.version.outputs.release == 'true' }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/app/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ env.APP_IMAGE }}:${{ steps.version.outputs.tag }}
+            ${{ env.APP_IMAGE }}:latest
+            ${{ env.APP_IMAGE }}:sha-${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push the backup image
+        if: ${{ steps.version.outputs.release == 'true' }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/backup/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ env.BACKUP_IMAGE }}:${{ steps.version.outputs.tag }}
+            ${{ env.BACKUP_IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push the installer image
+        if: ${{ steps.version.outputs.release == 'true' }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/installer/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ env.INSTALLER_IMAGE }}:${{ steps.version.outputs.tag }}
+            ${{ env.INSTALLER_IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Everything below only runs once all three images are pushed.
+      - name: Create the tag
+        if: ${{ steps.version.outputs.release == 'true' }}
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "Release $VERSION"
+          git push origin "$TAG"
+
+      - name: Extract the release notes from CHANGELOG.md
+        if: ${{ steps.version.outputs.release == 'true' }}
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          set -euo pipefail
+          : > /tmp/release-notes.md
+          if [ -f CHANGELOG.md ]; then
+            awk -v tag="$TAG" '
+              $0 ~ "^## \\[" tag "\\]" { capture=1; next }
+              capture && /^## \[/ { exit }
+              capture { print }
+            ' CHANGELOG.md > /tmp/release-notes.md || true
+          fi
+          if [ ! -s /tmp/release-notes.md ]; then
+            echo "No CHANGELOG section found for $TAG — GitHub will auto-generate notes."
+          fi
+
+      - name: Cut the GitHub release
+        if: ${{ steps.version.outputs.release == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if [ -s /tmp/release-notes.md ]; then
+            gh release create "$TAG" \
+              --repo "${{ github.repository }}" \
+              --target develop \
+              --title "$TAG" \
+              --notes-file /tmp/release-notes.md
+          else
+            gh release create "$TAG" \
+              --repo "${{ github.repository }}" \
+              --target develop \
+              --title "$TAG" \
+              --generate-notes
+          fi
+
+      - name: Summary
+        if: ${{ steps.version.outputs.release == 'true' }}
+        run: |
+          {
+            echo "### Released ${{ steps.version.outputs.tag }}"
+            echo
+            echo "| Image | Tags |"
+            echo "| --- | --- |"
+            echo "| \`${{ env.APP_IMAGE }}\` | \`${{ steps.version.outputs.tag }}\`, \`latest\` |"
+            echo "| \`${{ env.BACKUP_IMAGE }}\` | \`${{ steps.version.outputs.tag }}\`, \`latest\` |"
+            echo "| \`${{ env.INSTALLER_IMAGE }}\` | \`${{ steps.version.outputs.tag }}\`, \`latest\` |"
+            echo
+            echo "Install: \`bash <(curl -fsSL https://raw.githubusercontent.com/${{ github.repository }}/develop/install.sh)\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Nothing to release
+        if: ${{ steps.version.outputs.release != 'true' }}
+        run: |
+          echo "VERSION is ${{ steps.version.outputs.version }} and tag ${{ steps.version.outputs.tag }} already exists — no release was cut." \
+            >> "$GITHUB_STEP_SUMMARY"
