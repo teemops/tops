@@ -1,0 +1,91 @@
+name: Publish base image
+
+# Publishes teem/tops-base — the OS layer docker/app/Dockerfile builds on.
+#
+# Manual only, and deliberately so: its inputs are a PHP version, a package
+# list and an extension list, which change a few times a year. Detecting that
+# automatically would be more machinery than the thing it automates.
+#
+# Tags are immutable. docker/app/Dockerfile pins an explicit tag so that
+# republishing a base can never silently change what the next app build
+# produces — which only holds if a published tag is never overwritten. This
+# workflow refuses to publish over one.
+#
+# Full process, including how this pairs with bumping the pin:
+# docs/processes/release.md, "Base image for the app container".
+#
+# Requires DOCKERHUB_USERNAME and DOCKERHUB_TOKEN, the same secrets Phase 2 of
+# the release uses.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to publish, e.g. php8.3-2. Must not already exist.'
+        required: true
+        type: string
+
+concurrency:
+  group: publish-base
+  cancel-in-progress: false
+
+env:
+  BASE_IMAGE: teem/tops-base
+
+jobs:
+  publish-base:
+    name: Build and push teem/tops-base
+    runs-on: ubuntu-latest
+    # The slow compile this workflow exists to take off the release path.
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Refuse to overwrite an existing tag
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          if docker buildx imagetools inspect "${{ env.BASE_IMAGE }}:$TAG" >/dev/null 2>&1; then
+            echo "::error::${{ env.BASE_IMAGE }}:$TAG already exists. App images pin base tags, so they are never republished — pick the next revision."
+            exit 1
+          fi
+          echo "${{ env.BASE_IMAGE }}:$TAG is free."
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: docker/base
+          file: docker/base/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ env.BASE_IMAGE }}:${{ inputs.tag }}
+
+      - name: Summary
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          {
+            echo "### Published \`${{ env.BASE_IMAGE }}:$TAG\`"
+            echo
+            echo "Platforms: \`linux/amd64\`, \`linux/arm64\`"
+            echo
+            echo "Now bump the pin in \`docker/app/Dockerfile\`:"
+            echo
+            echo '```dockerfile'
+            echo "FROM ${{ env.BASE_IMAGE }}:$TAG"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
