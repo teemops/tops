@@ -37,13 +37,22 @@ const isFirebaseConfigured = () => {
     );
 };
 
+// Firebase auth is opt-in (FIREBASE_USER_AUTH). When it is off, this module is
+// still imported by the auth pages, so missing config is the expected state and
+// must not be reported as an error - it sends fresh installs hunting a red
+// herring. Anyone who does call into Firebase gets a thrown error either way.
+const firebaseAuthEnabled =
+    document.querySelector('meta[name="teemops-firebase-auth"]')?.getAttribute('content') !== '0';
+
 // Initialize Firebase
 let app: FirebaseApp | null = null;
 let auth: Auth | null = null;
 
 try {
     if (!isFirebaseConfigured()) {
-        console.error('Firebase configuration is missing. Please add VITE_FIREBASE_* variables to your .env file.');
+        if (firebaseAuthEnabled) {
+            console.warn('Firebase auth is enabled but configuration is missing. Add VITE_FIREBASE_* variables to your .env file and rebuild.');
+        }
     } else {
         if (getApps().length === 0) {
             app = initializeApp(firebaseConfig);

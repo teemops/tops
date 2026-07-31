@@ -8,6 +8,7 @@ use App\Models\OrganizationMember;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
+use Inertia\Testing\AssertableInertia;
 use Tests\TestCase;
 
 class HandleInertiaRequestsTest extends TestCase
@@ -90,6 +91,33 @@ class HandleInertiaRequestsTest extends TestCase
         $shared = $this->middleware->share($request);
 
         $this->assertEquals('administrator', $shared['organization_role']);
+    }
+
+    /**
+     * The unit tests above drive share() directly, so they cannot see what the
+     * organization middleware does to the request first. This one goes through
+     * the real stack: selecting an organization used to replace the request's
+     * user with the Organization, and the user menu rendered the org's name.
+     */
+    public function test_selecting_an_organization_shares_the_person_not_the_org(): void
+    {
+        $user = User::factory()->create(['name' => 'Ada Lovelace']);
+        $organization = Organization::factory()->default()->create([
+            'user_id' => $user->id,
+            'name' => "Ada Lovelace's Organization",
+        ]);
+
+        // withCookie() would encrypt the value, but this cookie is in the
+        // encryptCookies except list, so the middleware would read the ciphertext
+        // and never match an organization - the test would pass vacuously.
+        $this->actingAs($user)
+            ->withUnencryptedCookie('current_organization_id', $organization->org_id)
+            ->get('/organizations')
+            ->assertStatus(200)
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('auth.user.id', $user->id)
+                ->where('auth.user.name', 'Ada Lovelace')
+                ->where('auth.user.email', $user->email));
     }
 
     public function test_flash_messages_are_shared(): void

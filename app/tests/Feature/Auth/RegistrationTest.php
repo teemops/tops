@@ -31,6 +31,32 @@ class RegistrationTest extends TestCase
         $response->assertRedirect(route('verification.notice', absolute: false));
     }
 
+    /**
+     * A browser that was used against a previous install still holds a
+     * current_organization_id cookie naming an org that no longer exists in the
+     * fresh database. Signing up used to complete on the server and then bounce
+     * the redirect between /verify-email and /organizations until the browser
+     * gave up, surfacing as a network error with no account visible to the user.
+     */
+    public function test_new_users_can_register_with_a_stale_organization_cookie(): void
+    {
+        $response = $this->withUnencryptedCookie('current_organization_id', 'org-from-a-previous-install')
+            ->post('/register', [
+                'name' => 'Test User',
+                'email' => 'test@example.com',
+                'password' => 'password',
+                'password_confirmation' => 'password',
+            ]);
+
+        $this->assertAuthenticated();
+        $response->assertRedirect(route('verification.notice', absolute: false));
+
+        // Following that redirect must land on a page, not another redirect.
+        $this->withUnencryptedCookie('current_organization_id', 'org-from-a-previous-install')
+            ->get(route('verification.notice', absolute: false))
+            ->assertStatus(200);
+    }
+
     public function test_registration_requires_a_unique_email(): void
     {
         \App\Models\User::factory()->create(['email' => 'taken@example.com']);
