@@ -182,13 +182,13 @@ step "A region the account cannot use is caught at the prompt"
 stub_aws 'for arg in "$@"; do [[ "$arg" == "ap-southeast-6" ]] && exit 255; done
 exit 0'
 
-if in_installer 'check_region_usable us-west-2' "$ENVDIR" </dev/null >/dev/null 2>&1; then
+if PATH="$STUB:$PATH" in_installer 'check_region_usable us-west-2' "$ENVDIR" </dev/null >/dev/null 2>&1; then
   pass "a usable region passes"
 else
   fail "check_region_usable rejected a region the stub accepts"
 fi
 
-if in_installer 'check_region_usable ap-southeast-6' "$ENVDIR" </dev/null >/dev/null 2>&1; then
+if PATH="$STUB:$PATH" in_installer 'check_region_usable ap-southeast-6' "$ENVDIR" </dev/null >/dev/null 2>&1; then
   fail "a region the account cannot use was accepted"
 else
   pass "a region the account cannot use is rejected"
