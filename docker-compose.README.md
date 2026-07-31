@@ -18,9 +18,41 @@ bash <(curl -fsSL https://raw.githubusercontent.com/teemops/tops/develop/install
 ```
 
 It pulls `teem/tops` and `teem/tops-backup` from Docker Hub, writes a `.env` with
-a generated `APP_KEY`, pins `TOPS_IMAGE_TAG` to the version it installed, and
-starts the stack. Re-running it is safe — an existing `.env` and `APP_KEY` are
-left alone.
+a generated `APP_KEY` and generated database passwords, pins `TOPS_IMAGE_TAG` to
+the version it installed, and starts the stack. Re-running it is safe — an
+existing `.env`, `APP_KEY` and passwords are left alone.
+
+### Database passwords
+
+`MYSQL_ROOT_PASSWORD`, `MYSQL_PASSWORD` (mirrored to `DB_PASSWORD`) and
+`TOPS_BACKUP_PASSWORD` are blank in `.env.docker.example` and generated on first
+run, by `install.sh` or by `docker/scripts/prepare-build.sh` on the
+build-from-source path. Nothing in this repo is a working password, which
+matters because MySQL's port is published to the host by default. If any of the
+three is missing, the affected container refuses to start rather than falling
+back to a default.
+
+Do not rotate `MYSQL_ROOT_PASSWORD` or `MYSQL_PASSWORD` after the first
+`docker compose up`. MySQL writes them into its datadir when it initialises and
+never reads them again, so changing them in `.env` locks you out — the same trap
+as rotating `APP_KEY`. `TOPS_BACKUP_PASSWORD` is the exception: the backup
+container re-applies it on every start, so it can be changed freely.
+
+**Installs from v0.1.2 and earlier are not fixed retroactively.** Those `.env`
+files were written from an example that shipped real values, and `install.sh`
+never overwrites an existing `.env`. If you have one still running, rotate it by
+hand:
+
+```bash
+docker compose exec mysql mysql -uroot -p -e "ALTER USER 'root'@'localhost' IDENTIFIED BY 'new-root-password'; ALTER USER 'root'@'%' IDENTIFIED BY 'new-root-password'; ALTER USER 'teem'@'%' IDENTIFIED BY 'new-app-password';"
+```
+
+Both `root` accounts, not just one: the container's healthcheck connects over
+the socket as `root@localhost`, so rotating only `root@%` leaves MySQL reporting
+unhealthy. Then set `MYSQL_ROOT_PASSWORD`, `MYSQL_PASSWORD` and `DB_PASSWORD` in
+`.env` to match and run `docker compose up -d`. Take a backup first
+(`./backup.sh full`) — getting these out of step with the datadir is what locks
+you out.
 
 Upgrading, and rolling back:
 

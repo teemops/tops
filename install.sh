@@ -169,6 +169,34 @@ write_env() {
     log "APP_KEY already set — keeping it."
   fi
 
+  # Database passwords, same rule as APP_KEY: generated here, never shipped in
+  # the repo, and stable once set. MySQL writes MYSQL_ROOT_PASSWORD and
+  # MYSQL_PASSWORD into its datadir the first time it initialises and never
+  # reads them again, so rotating either one later locks you out of your own
+  # database rather than changing anything.
+  local mysql_password="" key existing
+  for key in MYSQL_ROOT_PASSWORD MYSQL_PASSWORD TOPS_BACKUP_PASSWORD; do
+    # `|| true` because grep exits 1 when the key is absent altogether, and
+    # under `set -o pipefail` that would abort the install rather than generate
+    # the missing password — which is the whole point of this loop.
+    existing="$(grep -E "^${key}=" "$tmp" | head -n 1 | cut -d= -f2- || true)"
+    if [[ -z "$existing" ]]; then
+      existing="$(openssl rand -base64 32)"
+      set_var "$key" "$existing"
+      log "Generated $key"
+    else
+      log "$key already set — keeping it."
+    fi
+    if [[ "$key" == MYSQL_PASSWORD ]]; then
+      mysql_password="$existing"
+    fi
+  done
+
+  # DB_PASSWORD is the same account as MYSQL_PASSWORD — Laravel's name for it —
+  # so it always follows, whether the password was just generated or already
+  # there from an earlier run.
+  set_var DB_PASSWORD "$mysql_password"
+
   # Finished backups are chowned to this uid:gid so ~/.tops/backups stays
   # readable from the host shell without sudo. Detected rather than hardcoded,
   # because macOS, WSL and multi-user hosts all disagree about 1000.
@@ -294,4 +322,10 @@ Useful commands:
 EOF
 }
 
-main "$@"
+# Only install when executed. Sourcing this file defines the functions without
+# running anything, which is how tests/install-secrets.test.sh exercises
+# write_env against a throwaway directory. `bash <(curl ...)` still runs: both
+# $0 and BASH_SOURCE are the same /dev/fd entry there.
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+  main "$@"
+fi

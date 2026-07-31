@@ -91,6 +91,23 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
+  install-secrets:
+    name: Install secrets
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Repo root, not app/ — this exercises install.sh and docker-compose.yml.
+    defaults:
+      run:
+        working-directory: .
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # No containers are started; `docker compose config` is used to prove the
+      # stack refuses to come up with a database password missing.
+      - name: Check generated database passwords
+        run: tests/install-secrets.test.sh
+
   frontend:
     name: Frontend build
     runs-on: ubuntu-latest

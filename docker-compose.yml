@@ -1,13 +1,19 @@
+# The three database passwords use `:?` rather than a default on purpose. This
+# repo is public and MySQL's port is published to the host, so a fallback value
+# here would be a known password on a reachable database for every install that
+# did not override it. Missing means the container refuses to start, which is
+# noisy and fixable; a silent default is neither. install.sh and
+# docker/scripts/prepare-build.sh generate all three into .env on first run.
 services:
   mysql:
     image: mysql:8.0
     container_name: teemops-mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-mysql}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?missing from .env; install.sh and docker/scripts/prepare-build.sh generate it}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-teemops}
       MYSQL_USER: ${MYSQL_USER:-teem}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-teemops_dev_password}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?missing from .env; install.sh and docker/scripts/prepare-build.sh generate it}
     ports:
       - "${MYSQL_PORT:-3306}:3306"
     volumes:
@@ -16,7 +22,7 @@ services:
       # See docker/mysql/conf.d/10-teemops-backup.cnf and docs/backups.md.
       - ./docker/mysql/conf.d:/etc/mysql/conf.d:ro
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-mysql}"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:?missing from .env; install.sh and docker/scripts/prepare-build.sh generate it}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -59,7 +65,7 @@ services:
       DB_PORT: "3306"
       DB_DATABASE: ${MYSQL_DATABASE:-teemops}
       DB_USERNAME: ${MYSQL_USER:-teem}
-      DB_PASSWORD: ${MYSQL_PASSWORD:-teemops_dev_password}
+      DB_PASSWORD: ${MYSQL_PASSWORD:?missing from .env; install.sh and docker/scripts/prepare-build.sh generate it}
       LOG_CHANNEL: ${LOG_CHANNEL:-stderr}
       # NOTE: QUEUE_CONNECTION / SCAN_QUEUE_CONNECTION / SCAN_REGION_QUEUE_CONNECTION
       # are deliberately NOT set here. `environment:` overrides `env_file:`, so
@@ -106,7 +112,7 @@ services:
       DB_PORT: "3306"
       DB_DATABASE: ${MYSQL_DATABASE:-teemops}
       DB_USERNAME: ${MYSQL_USER:-teem}
-      DB_PASSWORD: ${MYSQL_PASSWORD:-teemops_dev_password}
+      DB_PASSWORD: ${MYSQL_PASSWORD:?missing from .env; install.sh and docker/scripts/prepare-build.sh generate it}
       LOG_CHANNEL: ${LOG_CHANNEL:-stderr}
       # See the note on the app service: these queue-connection vars must come
       # from env_file layering, not `environment:`, or generated/teemops.env's
@@ -136,9 +142,9 @@ services:
     environment:
       DB_HOST: mysql
       DB_PORT: "3306"
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-mysql}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?missing from .env; install.sh and docker/scripts/prepare-build.sh generate it}
       TOPS_BACKUP_USER: ${TOPS_BACKUP_USER:-tops_backup}
-      TOPS_BACKUP_PASSWORD: ${TOPS_BACKUP_PASSWORD:-tops_backup_dev_password}
+      TOPS_BACKUP_PASSWORD: ${TOPS_BACKUP_PASSWORD:?missing from .env; install.sh and docker/scripts/prepare-build.sh generate it}
       # Drives both the cron schedule and the backup directory names, so "5pm"
       # means 5pm where you are rather than 5pm UTC.
       TZ: ${TOPS_BACKUP_TZ:-UTC}
@@ -176,9 +182,9 @@ services:
     environment:
       DB_HOST: mysql
       DB_PORT: "3306"
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-mysql}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?missing from .env; install.sh and docker/scripts/prepare-build.sh generate it}
       TOPS_BACKUP_USER: ${TOPS_BACKUP_USER:-tops_backup}
-      TOPS_BACKUP_PASSWORD: ${TOPS_BACKUP_PASSWORD:-tops_backup_dev_password}
+      TOPS_BACKUP_PASSWORD: ${TOPS_BACKUP_PASSWORD:?missing from .env; install.sh and docker/scripts/prepare-build.sh generate it}
       TZ: ${TOPS_BACKUP_TZ:-UTC}
       TOPS_BACKUP_UID: ${TOPS_BACKUP_UID:-1000}
       TOPS_BACKUP_GID: ${TOPS_BACKUP_GID:-1000}
