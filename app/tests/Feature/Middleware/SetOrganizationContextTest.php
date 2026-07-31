@@ -67,6 +67,25 @@ class SetOrganizationContextTest extends TestCase
     }
 
     /**
+     * The POST halves of the login and register routes are unnamed, so matching
+     * them by route name silently missed them and any client accepting any
+     * content type got a 401 instead of being able to sign up.
+     */
+    public function test_a_guest_can_post_to_login_and_register_expecting_json(): void
+    {
+        foreach (['login', 'register'] as $path) {
+            $request = Request::create('/'.$path, 'POST');
+            $request->headers->set('X-Requested-With', 'XMLHttpRequest');
+            $request->headers->set('Accept', '*/*');
+
+            [$response, $passedThrough] = $this->dispatch($request);
+
+            $this->assertEquals(200, $response->getStatusCode(), "POST /{$path} was blocked");
+            $this->assertNotNull($passedThrough, "POST /{$path} did not reach the controller");
+        }
+    }
+
+    /**
      * The Firebase sign-in endpoints are hit before a session exists, so they must
      * not be blocked by the JSON guard above.
      */
@@ -90,16 +109,174 @@ class SetOrganizationContextTest extends TestCase
         $this->assertEquals(404, $response->getStatusCode());
     }
 
-    public function test_an_unknown_organization_id_redirects_web_requests(): void
+    /**
+     * Selecting an organization must not change who is logged in. This used to
+     * swap the request's user for the Organization, so everything reading
+     * $request->user() - the sidebar's user menu included - showed the org's
+     * name and a null email in place of the person's.
+     */
+    public function test_selecting_an_organization_leaves_the_authenticated_user_alone(): void
     {
-        $this->actingAs(User::factory()->create());
+        $user = User::factory()->create();
+        $this->actingAs($user);
+        $organization = Organization::factory()->create(['user_id' => $user->id]);
+
+        $request = Request::create('/dashboard', 'GET', [], [
+            'current_organization_id' => $organization->org_id,
+        ]);
+        $request->setUserResolver(fn () => $user);
+
+        [, $passedThrough] = $this->dispatch($request);
+
+        $this->assertInstanceOf(User::class, $passedThrough->user());
+        $this->assertTrue($passedThrough->user()->is($user));
+        $this->assertSame($user->email, $passedThrough->user()->email);
+    }
+
+    /**
+     * The cookie rides along on every request including API calls, so a dead one
+     * must not 404 the sidebar's organization list - that showed the user "No
+     * organizations" when they in fact had one.
+     */
+    public function test_a_stale_organization_cookie_does_not_fail_api_requests(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+        $default = Organization::factory()->default()->create(['user_id' => $user->id]);
+
+        $request = Request::create('/api/organizations', 'GET', [], [
+            'current_organization_id' => 'org-from-a-previous-install',
+        ]);
+        $request->headers->set('Accept', 'application/json');
+
+        [$response, $passedThrough] = $this->dispatch($request);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertTrue($passedThrough->attributes->get('organization')->is($default));
+    }
+
+    /**
+     * Healing stops at access: a cookie naming an org the user is not in must
+     * still be refused on the API, so a write cannot be quietly redirected into
+     * a different tenant.
+     */
+    public function test_a_cookie_for_an_inaccessible_org_is_still_denied_on_the_api(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+        Organization::factory()->default()->create(['user_id' => $user->id]);
+        $someoneElses = Organization::factory()->create();
+
+        $request = Request::create('/api/aws-accounts', 'POST', [], [
+            'current_organization_id' => $someoneElses->org_id,
+        ]);
+        $request->headers->set('Accept', 'application/json');
+
+        [$response, $passedThrough] = $this->dispatch($request);
+
+        $this->assertEquals(403, $response->getStatusCode());
+        $this->assertNull($passedThrough);
+    }
+
+    /**
+     * A web request must never be redirected for a bad org id. This middleware
+     * runs on the whole web group, so the redirect target would hit it again and
+     * bounce forever - ERR_TOO_MANY_REDIRECTS on every page.
+     */
+    public function test_an_unknown_organization_id_does_not_redirect_web_requests(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+        $default = Organization::factory()->default()->create(['user_id' => $user->id]);
 
         $request = Request::create('/dashboard?org_id=no-such-org', 'GET');
 
+        [$response, $passedThrough] = $this->dispatch($request);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertTrue($passedThrough->attributes->get('organization')->is($default));
+    }
+
+    /**
+     * The regression that broke signup on a fresh install: a cookie left over
+     * from a previous install names an org that no longer exists.
+     */
+    public function test_a_stale_organization_cookie_falls_back_to_the_default_org(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+        $default = Organization::factory()->default()->create(['user_id' => $user->id]);
+
+        $request = Request::create('/verify-email', 'GET', [], [
+            'current_organization_id' => 'org-from-a-previous-install',
+        ]);
+
+        [$response, $passedThrough] = $this->dispatch($request);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertTrue($passedThrough->attributes->get('organization')->is($default));
+    }
+
+    public function test_a_stale_organization_cookie_is_cleared_from_the_browser(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+        Organization::factory()->default()->create(['user_id' => $user->id]);
+
+        $request = Request::create('/dashboard', 'GET', [], [
+            'current_organization_id' => 'org-from-a-previous-install',
+        ]);
+
         [$response] = $this->dispatch($request);
 
-        $this->assertEquals(302, $response->getStatusCode());
-        $this->assertEquals(route('organizations.index'), $response->headers->get('Location'));
+        $cleared = collect($response->headers->getCookies())
+            ->firstWhere(fn ($cookie) => $cookie->getName() === 'current_organization_id');
+
+        $this->assertNotNull($cleared, 'Expected the stale selection cookie to be cleared.');
+        $this->assertEmpty($cleared->getValue());
+    }
+
+    /**
+     * A brand new user signing up has no organization yet, so the stale cookie
+     * must not stop one being created for them.
+     */
+    public function test_a_stale_cookie_still_lets_a_new_user_get_a_default_org(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        $request = Request::create('/verify-email', 'GET', [], [
+            'current_organization_id' => 'org-from-a-previous-install',
+        ]);
+
+        [$response, $passedThrough] = $this->dispatch($request);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertNotNull($passedThrough->attributes->get('organization'));
+        $this->assertDatabaseHas('organizations', [
+            'user_id' => $user->id,
+            'is_default' => true,
+        ]);
+    }
+
+    /**
+     * Losing access to the selected org must not lock the user out either.
+     */
+    public function test_a_web_request_for_an_inaccessible_org_falls_back_to_the_default_org(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+        $default = Organization::factory()->default()->create(['user_id' => $user->id]);
+        $someoneElses = Organization::factory()->create();
+
+        $request = Request::create('/dashboard', 'GET', [], [
+            'current_organization_id' => $someoneElses->org_id,
+        ]);
+
+        [$response, $passedThrough] = $this->dispatch($request);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertTrue($passedThrough->attributes->get('organization')->is($default));
     }
 
     public function test_a_non_member_is_denied_access_to_an_organization(): void
