@@ -480,6 +480,17 @@ resolve_aws_region() {
   fi
 }
 
+# Shape is not usability: 'ap-southeast-6' looks like a region and is one, but an
+# account that has not opted into it gets InvalidClientTokenId from every call
+# there — which reads as a credentials problem and is not one. Ask now, while the
+# user is still at the prompt, rather than two minutes later inside the installer
+# container. check_aws_identity has already passed by this point, so a failure
+# here is about this region specifically. No CLI means no opinion.
+check_region_usable() {
+  command -v aws >/dev/null 2>&1 || return 0
+  aws sts get-caller-identity --region "$1" >/dev/null 2>&1
+}
+
 setup_aws() {
   local region tmp
   local -a compose
@@ -506,6 +517,11 @@ setup_aws() {
     || die "No AWS region set. Run 'aws configure', or set TOPS_DEPLOYMENT_REGION in .env."
   region="$AWS_REGION_RESOLVED"
 
+  check_region_usable "$region" || die "AWS rejected your credentials in ${region}, though they work in general.
+Opt-in regions (ap-southeast-3 and up, ap-east-*, me-*, af-*, il-*, eu-south-*)
+have to be enabled for the account first, under Account → AWS Regions in the
+console. Enable ${region} there, or re-run and choose a region you already use."
+
   if [[ "$AWS_MODE" == "ask" ]] \
     && ! confirm "Deploy into account ${AWS_ACCOUNT_ID}, region ${region}?"; then
     warn "Skipping the AWS step."
@@ -525,14 +541,30 @@ setup_aws() {
   # fall back to building the installer locally — it needs no PHP or Node.
   if ! "${compose[@]}" pull installer >/dev/null 2>&1; then
     note "No published installer image for this version — building it locally."
-    "${compose[@]}" build installer
+    "${compose[@]}" build installer \
+      || die "Could not build the installer image. The output above says why."
   fi
 
-  "${compose[@]}" run --rm installer
+  # Every failure below has to be checked by hand, because `set -e` is not in
+  # force here: main calls this function as an `if` condition, and bash disables
+  # errexit for the whole body of a function invoked that way. Without these
+  # checks a failed deploy fell through to the `ok` at the end of this function
+  # and was reported as "AWS messaging is deployed" — which is how issue #56
+  # reached the UI as a missing AWS_PARENT_ACCOUNT_ID instead of as a failed
+  # install.
+  "${compose[@]}" run --rm installer \
+    || die "The AWS installer failed — see generated/install.log for what AWS said.
+Nothing was written to generated/teemops.env, so TOPS still has no messaging
+configuration. Fix the cause and re-run: ./install.sh --aws-only"
+
+  [[ -s generated/teemops.env ]] \
+    || die "The AWS installer exited cleanly but wrote no generated/teemops.env.
+TOPS has no messaging configuration to load. See generated/install.log."
 
   if (( INSTALL_APP )); then
     step "Restarting TOPS with the new configuration"
-    docker compose up -d
+    docker compose up -d \
+      || die "AWS messaging deployed, but TOPS would not restart. Run: docker compose up -d"
   fi
 
   ok "AWS messaging is deployed. Details are in generated/teemops.env, log in generated/install.log."

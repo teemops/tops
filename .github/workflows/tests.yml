@@ -112,6 +112,12 @@ jobs:
       - name: Check the install flow
         run: tests/install-flow.test.sh
 
+      # The AWS installer reads .env without executing it, and reports what AWS
+      # actually said when a call fails (issue #56). The CLI is stubbed and no
+      # stack is deployed.
+      - name: Check the AWS installer's input handling
+        run: tests/install-messaging.test.sh
+
   frontend:
     name: Frontend build
     runs-on: ubuntu-latest
