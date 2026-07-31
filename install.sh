@@ -522,11 +522,10 @@ Opt-in regions (ap-southeast-3 and up, ap-east-*, me-*, af-*, il-*, eu-south-*)
 have to be enabled for the account first, under Account → AWS Regions in the
 console. Enable ${region} there, or re-run and choose a region you already use."
 
-  if [[ "$AWS_MODE" == "ask" ]] \
-    && ! confirm "Deploy into account ${AWS_ACCOUNT_ID}, region ${region}?"; then
-    warn "Skipping the AWS step."
-    return 1
-  fi
+  # No third confirmation here. "Set up AWS messaging now?" already took the
+  # decision, check_aws_identity printed the account this will deploy into, and
+  # the region prompt is itself an interactive step the user just answered.
+  # Asking again only teaches people to hit y without reading.
 
   tmp="$(mktemp)"
   cp .env "$tmp"

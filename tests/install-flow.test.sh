@@ -173,6 +173,20 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+step "The AWS step asks once, not twice"
+
+# aws_intro says exactly what will be created, check_aws_identity prints the
+# account it will go into, and the region prompt is itself an interactive step.
+# A second "are you sure" after all that only trains people to hit y without
+# reading it.
+confirms="$(sed -n '/^setup_aws()/,/^}/p' "$INSTALLER" | grep -cE '\bconfirm "')"
+if (( confirms == 1 )); then
+  pass "setup_aws asks exactly one yes/no question"
+else
+  fail "setup_aws asks $confirms yes/no questions, expected 1"
+fi
+
+# ---------------------------------------------------------------------------
 step "A region the account cannot use is caught at the prompt"
 
 # Issue #56: a region that passes the shape check but is not enabled for the
