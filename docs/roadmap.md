@@ -33,6 +33,10 @@ their own AWS accounts, and telling us what's wrong with it.
 **Done when:** a design partner can install TOPS from the documentation alone, connect an
 AWS account, run a scan, and act on the findings — without a call.
 
+**Target: 5 design partners by 2026-08-31.** Set 2026-07-31. Four weeks from today. This
+is what sizes the **Now** bucket below — everything in it is on the critical path to that
+date, and nothing else is.
+
 Note this milestone was **not** "the repo goes public" — public release was meant to be a
 later, higher-barred milestone (D-4). **The repo went public on 2026-07-30 anyway**, ahead
 of that sequencing, which promoted several items. See D-4 and N-6.
@@ -79,6 +83,7 @@ Decisions already made, so we don't relitigate them. Each has a trigger for revi
 | **D-7** | **Apache-2.0, with trademark held separately and a DCO for contributions.** | 2026-07-29 | See below — this one has enough reasoning behind it to warrant its own section. | Effectively never; the DCO is what makes it durable. |
 | **D-8** | **Ship prebuilt images from Docker Hub, cut by a real release pipeline.** `install.sh` pulls tagged images; it never builds. | 2026-07-30 | See below — this is the biggest single change to how TOPS is delivered. | A registry other than Docker Hub is chosen, or images stop being the distribution unit. |
 | **D-9** | **No application-level encryption at rest. `iam_role_arn` is stored plaintext; encryption is the host's job.** | 2026-07-30 | See below — deliberately reducing encryption on a security product needs its reasoning on the record. | A field is introduced that is genuinely a credential (an access key, a token, a password). Then encrypt *that* and revisit key rotation. |
+| **D-10** | **User documentation lives in a top-level `user-docs/` directory, not under `docs/`, and deploys to `docs.teemops.com`.** One site for technical and non-technical readers — no separate tracks. | 2026-07-31 | See below. | The content outgrows plain Markdown, or a contributor proposes a better home. |
 
 ### D-7 in full: licensing
 
@@ -219,6 +224,52 @@ Password hashes are unaffected — bcrypt does not use `APP_KEY`.
 If a genuine credential is ever stored, that design is the starting point — including the
 `APP_PREVIOUS_KEYS` sequencing, which is the part worth not rediscovering.
 
+### D-10 in full: where user documentation lives
+
+**Not `docs/`.** That directory is a contributor and maintainer knowledge base —
+practices, decisions, postmortems, roadmap, session notes — written in an internal
+engineering voice, and it should stay that way. Product documentation for the people
+*running* TOPS is a different audience with a different tone, and mixing the two either
+dilutes `docs/` or forces user docs to read like an engineering journal. A new top-level
+`user-docs/` directory keeps the split obvious: `docs/` is about building TOPS,
+`user-docs/` is about running it.
+
+**One site, not two.** The ask was explicit: technical and non-technical readers share the
+same docs, not a "developer docs" track and a "business user" track. In practice this means
+structuring by task (install, connect an account, run a scan, read a finding, manage your
+team) rather than by audience, with depth increasing as a page goes on — a non-technical
+reader gets what they need from the top of a page, a technical reader keeps scrolling.
+
+**`docs.teemops.com`, not `.teem.nz`.** `teemops.com` is the domain already wired into the
+live app — `MAIL_FROM_ADDRESS` defaults to `help@teemops.com`
+(`app/config/mail.php:114`), and `docs/architecture.md:117` names `app.teemops.com`.
+`teem.nz` only appears in `design/marketing/web/` — an unbuilt, pre-pivot marketing mockup
+that still has a paid "Start Free" pricing page, which contradicts D-6. That directory is
+stale and out of scope here; it's noted so the domain choice isn't relitigated by whoever
+next opens it.
+
+**Deployment: Cloudflare Pages**, connected to this repo, publishing `user-docs/`. This is
+not a new category of infrastructure — `design/marketing/web/DEPLOY.md` already proposes
+Cloudflare Pages for the marketing site; this applies the same plan to a second directory.
+
+**Format: plain Markdown, tooling decided later.** Per the product practices — ship the
+smallest working version, don't reach for a framework before there's content to render —
+the first pages should just be Markdown files. Pick the lightest static-site renderer
+(MkDocs- or Docsify-class, not a full framework like Docusaurus) once there's enough
+content to need navigation and search, not before. Locking in a generator today, before a
+single page is written, is exactly the kind of premature decision the practices docs warn
+against.
+
+**Relationship to N-3 and `README.md`.** N-3 already covers the minimum: install, connect
+an AWS account, run a first scan — that content stays in `README.md` because it's a
+GitHub-landing-page concern, and duplicating it into `user-docs/` would just give it a
+second place to drift out of sync. `user-docs/` picks up from "you're logged in" — findings
+and remediation, team management, scan profiles, insights — and once it exists,
+`README.md`'s setup section should trim to a summary that links out rather than being the
+canonical copy in two places.
+
+---
+
 ## At a Glance
 
 Sizes are rough and relative, for one person: **XS** under a day · **S** a day or two ·
@@ -226,17 +277,28 @@ Sizes are rough and relative, for one person: **XS** under a day · **S** a day 
 
 ### Now — the path to a design partner
 
-**Empty as of 2026-07-30.** Every item that stood between the code and a design partner has
-landed. What remains before handing TOPS to someone is not a build task: connect a real AWS
-account through the documented path (X-9) and find a partner. Pull from **Next** only after
-that, or the plan starts optimising for imagined users again.
+**Three items as of 2026-07-31**, against a **2026-08-31** deadline. N-5 closed the
+same day it was found incomplete — v0.1.2 went through the fixed pipeline cleanly (see
+below), so the release process TOPS never had now exists and is proven. N-7 (was X-9,
+promoted rather than left in Next — the milestone target makes it explicitly
+critical-path, not queued) and **N-9** (default database passwords published in a public
+repo — found 2026-07-31, security, not optional) are both critical-path: neither should
+still be true when the first design partner installs. N-8 doesn't block either of them —
+it's here rather than in Next because the four weeks after N-7 and N-9 close are exactly
+when releases need to go out fast in response to partner feedback, and a build that eats
+most of a 45-minute CI budget on every single one works against that. Pull anything else
+from **Next** only after N-7 and N-9 close, or the plan starts optimising for imagined
+users again with a month on the clock.
 
 | # | Feature | Why it's here | Size |
 | --- | --- | --- | :---: |
 | ~~**N-1**~~ | ~~Fix the clean-checkout build~~ | ✅ **Done** 2026-07-29 — `@vitejs/plugin-vue` on `^6`, `npm ci` clean, frontend CI job added. | — |
 | ~~**N-2**~~ | ~~Choose and add a licence~~ | ✅ **Done** 2026-07-29 — Apache-2.0, trademark held separately, DCO for contributions. See D-7. | — |
 | ~~**N-6**~~ | ~~SNS signature verification~~ | ✅ **Done** 2026-07-30 — real signature verification via AWS's validator package, plus a topic allowlist that fails closed. Promoted from X-2 that morning when going public expired its deferral. | — |
-| **N-5** | Release pipeline + Docker Hub images | Built 2026-07-30; blocked on Docker Hub secrets. TOPS had no version, tag, changelog or published artifact. See D-8. | L |
+| ~~**N-5**~~ | ~~Release pipeline + Docker Hub images~~ | ✅ **Done** 2026-07-31 — v0.1.2 went `prepare → merge → tag → publish` cleanly: tag content matches, images published on Docker Hub for both architectures, `latest` digest matches `v0.1.2`. See D-8 and below. | — |
+| **N-7** | Verify AWS onboarding end to end | Promoted from X-9. The milestone's literal unmet criterion: nobody has connected a real account and run a scan through the documented path. | S |
+| **N-9** | Generate real database passwords at install time | `docker-compose.yml` defaults `MYSQL_ROOT_PASSWORD` to `mysql` and `DB_PASSWORD` to `teemops_dev_password` — both published in `.env.docker.example`, in a public repo, with MySQL's port bound to the host by default. Generate them the way `install.sh` already generates `APP_KEY`. | S |
+| **N-8** | Base image for the app container | `docker/app/Dockerfile` recompiles nginx, supervisor and four PHP extensions from source on every build, for both architectures — the reason `tag-release.yml` budgets 45 minutes. Split the rarely-changing OS layer into a published `teem/tops-base` image. N-5's clean release (v0.1.2) has now shipped, so this is unblocked — still sequenced behind N-7 and N-9. | M |
 | ~~**N-3**~~ | ~~Setup docs a stranger can follow~~ | ✅ **Done** 2026-07-30 — README rebuilt around the one-liner, vendor defaults purged from `.env.example`, nine-symptom troubleshooting section, installer verified end to end. | — |
 | ~~**N-4**~~ | ~~Remediation for every finding~~ | ✅ **Done** 2026-07-30 — all 74 rules carry a remediation, all 28 critical/high rules carry step-by-step guidance, and `scan:validate-rules` now fails rather than warns. | — |
 
@@ -250,8 +312,10 @@ that, or the plan starts optimising for imagined users again.
 | **X-6** | Enforce DCO sign-off in CI | Sign-off is required in writing but unchecked. D-7's guarantee depends on provenance. **The repo is public, so an external PR can now arrive at any time.** | XS |
 | **X-5** | Reconcile member permissions | Code, comments and the plan doc disagree on who can manage members. | XS |
 | **X-8** | Publish a SHA256 for `install.sh` | N-3 documents the download-and-read form but cannot document a checksum, because the release workflow does not emit one. Small addition to `release.yml`. | XS |
-| **X-9** | Verify AWS onboarding end to end | N-3's one unmet criterion: nobody has connected a real account and run a scan through the documented path. Needs an AWS account and real spend. | S |
 | **X-7** | Clear the remaining npm audit backlog | 17 → **5**, criticals at 0 and gated in CI. What's left needs a `firebase` major bump; nothing reaches a running instance. | XS |
+
+~~**X-9** · Verify AWS onboarding end to end~~ — **promoted to N-7 in Now** on 2026-07-31.
+The design partner deadline makes it critical-path rather than queued.
 
 ### Later — real, but waiting on a trigger
 
@@ -260,11 +324,31 @@ that, or the plan starts optimising for imagined users again.
 | Scheduled / recurring scans | First design partner to ask. Likely the first request you get. | M |
 | Report export (PDF/CSV/JSON) | A partner asking. Solo engineers may be happy with the UI. | M |
 | Expand scanner coverage | Nothing — it's available now. Cheapest: rules for the four pilot services (DynamoDB, ELBv2, SNS, SQS) where plumbing exists. | Ongoing |
+| User documentation site | Nothing — it's available now. Built in parallel with feature work, not blocking it. See D-10. | Ongoing |
 | PCI ruleset | A decision: author it or delete it. Empty for six months. | M |
 | Sandbox rule conditions (`eval()`) | **Any feature accepting a ruleset we didn't write.** Community rules turn a condition into RCE. | M |
 | Simplify AWS onboarding | **Trigger fired** — D-3 named public release, which has happened. | M |
 | Contributor experience | **Trigger fired** — repo is public. | M |
 | Multi-cloud (Azure, GCP) | AWS being genuinely good first. | L |
+
+### User documentation site
+
+*Ongoing, in parallel with feature work — not a Now/Next gate. Full reasoning on location,
+domain and format in D-10.*
+
+Unlike the scanner-coverage backlog this doesn't have a natural per-item unit, so track it
+as a first slice plus continuous growth rather than a checklist.
+
+**First slice**
+- [ ] `user-docs/` exists with a handful of pages covering what N-3 doesn't: reading and
+      resolving a finding, switching scan profiles, managing organization members
+- [ ] Cloudflare Pages is connected and `docs.teemops.com` resolves to it
+- [ ] `README.md`'s setup section trims to a summary linking into `user-docs/`, so
+      installation instructions have exactly one canonical copy
+
+**After that:** a page per feature as it ships, written by whoever ships the feature —
+the same "tests ship with the change" discipline applied to docs. No dedicated
+documentation sprint; no page written for a feature that doesn't exist yet.
 
 ---
 
@@ -374,13 +458,13 @@ pull an image that nobody publishes. Full reasoning in **D-8**.
 | Script split | `install.sh` (pull and run, new) · `install-build.sh` (contributor build path, new) · `install-messaging.sh` (today's root `install.sh`, renamed). |
 
 **Acceptance criteria**
-- [ ] Given a machine with only Docker, when I run `install.sh`, then the stack starts from pulled images with no PHP, Composer, Node or npm present
-- [ ] Given a push to `develop` with passing tests, when the workflow runs, then a new tag, GitHub release and set of pushed images exist
-- [ ] Given a push to `develop` with failing tests, when the workflow runs, then nothing is tagged or published
-- [ ] Given the tag already exists, when the workflow re-runs, then it is a no-op rather than an error
-- [ ] Given I set `TOPS_IMAGE_TAG` to a previous version, when I restart, then I am running that version
-- [ ] Given I am a contributor, when I run `install-build.sh`, then the stack builds from my working tree exactly as it does today
-- [ ] Given an upgrade, when containers restart, then migrations apply automatically (the entrypoint already does this)
+- [ ] Given a machine with only Docker, when I run `install.sh`, then the stack starts from pulled images with no PHP, Composer, Node or npm present — images now exist to test this against; not yet run on a clean machine (folds into **N-7**)
+- [x] Given a push to `develop` with passing tests, when the workflow runs, then a new tag, GitHub release and set of pushed images exist — **confirmed 2026-07-31 by v0.1.2**
+- [ ] Given a push to `develop` with failing tests, when the workflow runs, then nothing is tagged or published — implemented (the Tests-gate step in `tag-release.yml`), not yet exercised against an actual red build
+- [ ] Given the tag already exists, when the workflow re-runs, then it is a no-op rather than an error — implemented, not yet re-run to confirm
+- [ ] Given I set `TOPS_IMAGE_TAG` to a previous version, when I restart, then I am running that version — not yet exercised
+- [x] Given I am a contributor, when I run `install-build.sh`, then the stack builds from my working tree exactly as it does today — verified locally 2026-07-30
+- [ ] Given an upgrade, when containers restart, then migrations apply automatically (the entrypoint already does this) — not yet exercised across a real version bump
 
 **Technical notes**
 - CI builds images by running `docker/scripts/prepare-build.sh` on the runner and then
@@ -433,9 +517,177 @@ repos, so the one-liner cannot be verified while D-4 is open — and GitHub only
 rename redirects for web and git operations, not for the raw host. Re-check the URL by hand
 the day the repo goes public.
 
-**Open — still needed**
-- `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` repository secrets.
-- Images pushed to Docker Hub, so the pull-and-run path can be tested end to end.
+**Resolved 2026-07-31** — `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` are configured, and
+`teem/tops` images are live on Docker Hub, multi-arch (amd64+arm64), so the pull-and-run
+path can now be exercised for real.
+
+**Found 2026-07-31, same day, and resolved the same day:** the `v0.1.1` tag, GitHub release
+and Docker Hub images from earlier that day turned out not to be a clean product of the
+pipeline — the tag pointed at the `develop` commit from just before PR #46's fix, with
+`VERSION` still reading `0.1.0`. Ben cut a real release, **v0.1.2**, through the fixed
+pipeline by hand rather than scripting a fix for the v0.1.1 mess. Verified against the
+running system, not just the workflow's own "success" status:
+
+- PR #47 (`chore(release): v0.1.2`, branch `release/v0.1.2`) merged into `develop` at
+  2026-07-31T07:04.
+- `develop`'s `VERSION` is `0.1.2` and `CHANGELOG.md` exists with a `v0.1.2` entry —
+  the drift that broke `v0.1.1` is gone.
+- The `Tag and release` workflow ran to completion (21m34s) for the first time ever under
+  its current, post-split form.
+- Tag `v0.1.2` points at the PR #47 merge commit, and that commit's `VERSION` file reads
+  `0.1.2` — unlike `v0.1.1`, tag and content agree.
+- All three images (`teem/tops`, `teem/tops-backup`, `teem/tops-installer`) are on Docker
+  Hub at `v0.1.2`, multi-arch (amd64 + arm64).
+- `teem/tops:latest`'s digest is byte-identical to `teem/tops:v0.1.2` — `latest` now points
+  at a real, tagged, released build, not the orphaned `v0.1.1`.
+
+**N-5 is done.** `v0.1.1` is left as-is — a known-messy artifact superseded by `v0.1.2`,
+not worth spending more effort unwinding. What's genuinely still unverified is narrower
+than N-5's original scope and doesn't block the milestone: the failing-tests gate, the
+tag-already-exists no-op, and the `TOPS_IMAGE_TAG` rollback path have none of them been
+exercised for real yet (see the acceptance criteria above). Revisit opportunistically —
+none of the three is likely to bite before a design partner is in the door.
+
+---
+
+### N-7 · Verify AWS onboarding end to end
+
+*Promoted from X-9 on 2026-07-31, when the 5-partner-by-2026-08-31 target made it
+critical-path rather than something to get to eventually.*
+
+**Problem:** nobody has connected a real AWS account and run a scan through the documented
+path (`install.sh`'s messaging step, CloudFormation quick-create, SNS/SQS account linking).
+N-3 documented that path and D-3 chose to keep it as-is rather than simplify it, but neither
+closed the loop with a real account and real spend. This is the one item in the milestone's
+own "done when" that has not been demonstrated at all, on any account.
+
+**Acceptance criteria**
+- [ ] Given a real AWS account, when I follow the documented onboarding path, then the
+      CloudFormation stack deploys and SNS confirms the subscription
+- [ ] Given the account is linked, when I run a scan, then it completes and returns findings
+      from real resources
+- [ ] Given the setup guide's cost description, when I check the actual AWS bill, then it
+      matches what was documented
+- [ ] Given something goes wrong, when I hit it, then either the troubleshooting section
+      already covers it, or it gets added
+
+**Depends on:** N-5 closing first — verifying onboarding against a build that isn't
+confirmed clean is verifying the wrong thing.
+
+---
+
+### N-9 · Generate real database passwords at install time
+
+*Added 2026-07-31. Security, not optional — treat with the same weight as N-6 (SNS
+verification). Critical-path alongside N-7, both before the first design partner installs.*
+
+**Problem:** `docker-compose.yml` has three password variables with hardcoded, insecure
+fallbacks — `MYSQL_ROOT_PASSWORD:-mysql` (`docker-compose.yml:7,19,139,179`),
+`MYSQL_PASSWORD`/`DB_PASSWORD:-teemops_dev_password` (`:10,62,109`), and
+`TOPS_BACKUP_PASSWORD:-tops_backup_dev_password` (`:141,181`). `.env.docker.example` ships
+the exact same values as the *example*, so anyone who follows the setup docs without
+manually overriding three specific variables gets a database with a publicly known root
+password — publicly, because this repo is Apache-2.0 and these values are readable by
+anyone. MySQL's port (`3306`) is bound to the host by default (`:11-12`), so "publicly
+known password" and "reachable outside the container network" are both true at once,
+which is the actual exposure. `install.sh` already solves exactly this shape of problem for
+`APP_KEY` — generate once, at install time, never ship a real value in the repo — this is
+the same pattern applied to three more variables.
+
+**Shape of the work**
+| Piece | Detail |
+| --- | --- |
+| `.env.docker.example` | Blank `MYSQL_ROOT_PASSWORD`, `DB_PASSWORD`/`MYSQL_PASSWORD`, and `TOPS_BACKUP_PASSWORD` — same treatment `APP_KEY=` already gets — with a comment explaining they're generated at install time. |
+| `install.sh` (`write_env()`) | Generate all three, only if unset, the same way `APP_KEY` is generated (`openssl rand -base64 …`) — mirrors lines 165-170 exactly. |
+| `docker/scripts/prepare-build.sh` | The contributor/build-from-source path needs the identical block — it already generates `APP_KEY` (lines 11-25), so this is additive to existing machinery, not new. |
+| `docker-compose.yml` | Remove the `:-mysql` / `:-teemops_dev_password` / `:-tops_backup_dev_password` fallbacks. A missing password should fail loudly, not silently start with a known one. |
+| Usernames | Unchanged (`teem`, `tops_backup`) — usernames aren't secrets, only the passwords need generating. |
+
+**Acceptance criteria**
+- [ ] Given a fresh `install.sh` run, when `.env` is created, then `MYSQL_ROOT_PASSWORD`, `DB_PASSWORD`/`MYSQL_PASSWORD` and `TOPS_BACKUP_PASSWORD` are each freshly generated, not the values in `.env.docker.example`
+- [ ] Given `install.sh` is re-run against an existing `.env`, when it completes, then none of the three passwords changed — they must stay stable forever, for the same reason `APP_KEY` does (see technical notes)
+- [ ] Given `install-build.sh` / `prepare-build.sh`, when it runs, then the same three passwords are generated the same way
+- [ ] Given any of the three password variables is unset, when `docker compose up` runs, then the affected container fails to start rather than falling back to a known default
+- [ ] Given `.env.docker.example`, when anyone reads it, then no real password value appears anywhere in the repo
+
+**Technical notes**
+- `MYSQL_ROOT_PASSWORD` and `MYSQL_PASSWORD` are consumed exactly once, by the official
+  `mysql:8.0` image's own init, only against an empty datadir. Generate before the first
+  `docker compose up`, and never regenerate against a datadir that already has data — the
+  stored credential doesn't move with `.env`, so drifting the two apart locks you out
+  exactly like rotating `APP_KEY` would.
+- `TOPS_BACKUP_PASSWORD` is the one exception: `docker/backup/entrypoint.sh:98-99` runs
+  `CREATE USER IF NOT EXISTS` *and* `ALTER USER ... IDENTIFIED BY` on every container start,
+  so that one actually is safe to rotate later. It doesn't need to be today — generate it
+  once alongside the other two for consistency.
+- **Scope, decided 2026-07-31:** passwords only. MySQL's port stays published to the host by
+  default — some self-hosters want direct DB access — so this closes the "known credential"
+  half of the exposure, not the "reachable at all" half. Firewalling or un-publishing the
+  port is a separate, later hardening item if it's ever raised.
+- **Existing installs aren't retroactively fixed.** Every install through v0.1.2 already has
+  the known default written into its `.env`, and `install.sh` never overwrites an existing
+  `.env`. Low blast radius today — these are Ben's own test installs, not a design partner's
+  — but worth a line in `docker-compose.README.md` about rotating manually if anyone kept
+  one of the early installs running.
+
+---
+
+### N-8 · Base image for the app container
+
+*Added 2026-07-31, unblocked the same day — N-5's clean release (v0.1.2) shipped, so it's
+safe to change what the app image builds from without that being in flight at the same time
+as verifying the pipeline itself. Still sequenced behind N-7.*
+
+**Problem:** `docker/app/Dockerfile:8-23` installs `nginx`, `supervisor` and four `-dev`
+libraries via `apt-get`, then compiles `bcmath`, `opcache`, `pdo_mysql` and `zip` via
+`docker-php-ext-install` — on **every** build of the app image, for **both** `linux/amd64`
+and `linux/arm64`. None of that changes release to release; only the app code and configs
+below it (lines 25-52) do. The arm64 leg runs under QEMU emulation in CI, where compiling
+PHP extensions is markedly slower than native — `tag-release.yml` already budgets 45
+minutes for the multi-arch build specifically because of this. It costs the same thing
+twice: slower CI on every release, and a slower first build for every contributor and
+self-hoster who builds from source (`install-build.sh`).
+
+**Shape of the work**
+- New image, same Docker Hub org: **`teem/tops-base`**. Contains `docker/app/Dockerfile`'s
+  current lines 6-23 (the `FROM php:8.3-fpm-bookworm`, the `apt-get install`, the
+  `docker-php-ext-install`) and nothing else.
+- `docker/app/Dockerfile` changes its `FROM` to a pinned `teem/tops-base` tag and drops the
+  `apt-get`/`docker-php-ext-install` block entirely. Everything from `COPY docker/app/nginx.conf`
+  onward (configs, `entrypoint.sh`, the app code, the vendor/build-artifact checks) is
+  unchanged.
+- `teem/tops-base` still needs to be multi-arch — the app depends on both — but it only
+  needs building when its own inputs change (a PHP version bump, a new system package, a
+  new extension), which is rare. That's the entire point.
+- Version pinning, not `latest`: the app Dockerfile references an explicit
+  `teem/tops-base:<tag>`, so a base rebuild never silently changes what the next app build
+  produces. Bumping it is a one-line, reviewable diff.
+- Given how rarely this changes, a manual `workflow_dispatch` (or even a documented
+  `docker buildx build --push` run by hand, per D-3's reasoning for `install.sh`) is
+  probably the right amount of automation — resist building change-detection for
+  something that moves a few times a year.
+
+**Acceptance criteria**
+- [ ] Given `docker/app/Dockerfile`, when it builds, then it starts `FROM teem/tops-base:<tag>`
+      and contains no `apt-get` or `docker-php-ext-install` step
+- [ ] Given `teem/tops-base`, when it's built, then it's published for `linux/amd64` and
+      `linux/arm64`
+- [ ] Given a base-image change is needed, when someone makes it, then a documented process
+      publishes a new `teem/tops-base` tag and the app Dockerfile's pin is bumped in the
+      same PR
+- [ ] Given a release with an unchanged base tag, when `tag-release.yml` builds the app
+      image, then it no longer compiles PHP extensions — measure the before/after time and
+      record it here once landed
+- [ ] Given a contributor running `install-build.sh` for the first time, when the app image
+      builds, then it pulls `teem/tops-base` rather than compiling extensions locally
+
+**Technical notes**
+- `docker/backup/Dockerfile` and `docker/installer/Dockerfile` are out of scope — neither
+  compiles anything (`percona/percona-xtrabackup` and AWS's SAM build image are already
+  prebuilt), so there's no equivalent win there.
+- `docker-compose.build.yml` needs no change: it still builds `docker/app/Dockerfile` from
+  the working tree, which will just pull `teem/tops-base` as its first layer instead of
+  `php:8.3-fpm-bookworm`.
 
 ---
 
@@ -675,8 +927,8 @@ Blocking nothing today, but each one shapes the plan:
    `Copyright 2026 TeemOps`. If there is no incorporated company, copyright vests
    personally and the line should name the individual instead. One-line fix either way,
    but worth getting right before the repo is public.
-3. **How many design partners, and by when?** Sizes the Now bucket and sets a real
-   deadline.
+3. ~~**How many design partners, and by when?**~~ ✅ Resolved 2026-07-31 — **5 by
+   2026-08-31.** See the milestone target above.
 4. ~~**Does the SNS gap need closing before you hand the code to an external party?**~~
    ✅ **Answered by events 2026-07-30** — the repo is public, so the code is already in
    arm's-length hands. Promoted to **N-6**.
@@ -687,6 +939,38 @@ Blocking nothing today, but each one shapes the plan:
 
 ## Changelog
 
+- **2026-07-31** — **N-9 added, critical-path.** `docker-compose.yml` defaults
+  `MYSQL_ROOT_PASSWORD` to `mysql` and `DB_PASSWORD` to `teemops_dev_password`, both
+  published in `.env.docker.example` in what is now a public repo, with MySQL's port bound
+  to the host by default — a database reachable outside the container network with a
+  publicly known root password unless someone manually overrides three specific variables.
+  Fix mirrors the `APP_KEY` pattern `install.sh` already has: generate once, at install
+  time, never ship a real value. Scoped to passwords only, not un-publishing the port
+  (Ben's call) — that stays a separate future hardening item.
+- **2026-07-31** — **N-5 closed.** v0.1.2 went through the fixed release pipeline cleanly:
+  PR #47 merged, `develop`'s `VERSION` and `CHANGELOG.md` landed correctly, `Tag and
+  release` ran to completion for the first time, and all three images are on Docker Hub for
+  both architectures with `latest` matching `v0.1.2` exactly. Verified against the running
+  system (git, GitHub releases, Docker Hub API), not just workflow status. **N-7 is now the
+  only item in Now** — the last thing between the code and a design partner. N-8 is
+  unblocked and queued behind it.
+- **2026-07-31** — Product owner review against current state (git, GitHub Actions, Docker
+  Hub — not just this document). Set the milestone target: **5 design partners by
+  2026-08-31**, resolving the open question. N-5's two "still needed" items turned out to
+  be done — Docker Hub secrets are configured and images are live — but the review also
+  found the `v0.1.1` tag/release/images are leftovers from a pre-fix run: `develop`'s
+  `VERSION` and `CHANGELOG.md` were never actually updated, so N-5 stays open until a
+  release goes through the fixed pipeline cleanly. Ben is handling that directly. X-9
+  promoted to **N-7** — with a four-week deadline, "verify AWS onboarding end to end" is
+  critical-path, not queued. **N-8** added the same session: `docker/app/Dockerfile`
+  recompiles nginx, supervisor and four PHP extensions from source on every build, for both
+  architectures — a rarely-changing `teem/tops-base` image gets that out of the release
+  path. Ships after the first clean N-5 release, not blocking it. **D-10** recorded: user
+  documentation lives in a new top-level `user-docs/` directory (not `docs/`, which stays
+  contributor-facing), one site for technical and non-technical readers, deployed to
+  `docs.teemops.com` via Cloudflare Pages — matching the domain actually wired into the
+  live app rather than the stale `teem.nz` in the unbuilt marketing mockups. Tracked as an
+  ongoing Later item, built in parallel with feature work.
 - **2026-07-30** — `APP_KEY` leaked in a tracked infra env file. Response recorded as D-9:
   rather than build the `APP_KEY` rotation command that the leak seemed to demand, the
   encryption that made rotation dangerous was removed. `iam_role_arn` is now plaintext,

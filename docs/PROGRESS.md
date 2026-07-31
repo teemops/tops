@@ -270,7 +270,9 @@ most of it blocks the first external contributor or self-hoster.
   commit, so the guarantee behind D-7 depends on reviewer diligence.
 - `README.md:31-36` still reads as hosted SaaS — it lists a Firebase project and an AWS
   account as hard prerequisites and points at `app/README.md` rather than the Docker path.
-- No published container images; Compose builds from source only.
+- ~~No published container images; Compose builds from source only.~~ **Resolved
+  2026-07-31** — `teem/tops`, `teem/tops-backup` and `teem/tops-installer` are published on
+  Docker Hub, multi-arch (amd64+arm64), as of the v0.1.2 release (roadmap N-5).
 - `~/.aws` is mounted read-only into the app and worker containers
   (`docker-compose.yml:82,124`), assuming host AWS credentials exist.
 
