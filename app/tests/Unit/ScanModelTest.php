@@ -242,182 +242,52 @@ class ScanModelTest extends TestCase
     }
 
     /**
-     * Test checkAndMarkRegionBasedScanComplete does nothing for non-running scan
+     * Settling is what completes a region-based scan now. A scan already in a terminal
+     * state must not be settled again — that would re-run findings evaluation and could
+     * overwrite an accurate result with a fallback one.
      */
-    public function test_check_and_mark_complete_does_nothing_for_non_running_scan(): void
+    public function test_settling_does_nothing_for_a_scan_already_terminal(): void
+    {
+        $scan = Scan::factory()->create([
+            'scan_types' => ['ec2'],
+            'status' => 'cancelled',
+        ]);
+
+        $this->assertFalse($scan->settleRegionScan(true, 'stale sweep'));
+
+        $scan->refresh();
+        $this->assertEquals('cancelled', $scan->status);
+    }
+
+    /**
+     * A scan whose orchestrator died before flipping it to 'running' still has region
+     * jobs reporting in, so 'pending' has to be settleable or nothing ever completes it.
+     */
+    public function test_a_pending_scan_can_still_be_settled(): void
     {
         $scan = Scan::factory()->pending()->create([
             'scan_types' => ['ec2'],
-            'expected_regions_count' => 5,
         ]);
 
-        // Add some scan details
-        \App\Models\ScanDetail::factory()->ec2('us-east-1')->create(['scan_id' => $scan->id]);
-        \App\Models\ScanDetail::factory()->ec2('us-west-2')->create(['scan_id' => $scan->id]);
-
-        $scan->checkAndMarkRegionBasedScanComplete();
+        $this->assertTrue($scan->settleRegionScan(true, 'orphaned batch'));
 
         $scan->refresh();
-        $this->assertEquals('pending', $scan->status);
+        $this->assertEquals('completed', $scan->status);
+        $this->assertTrue($scan->is_partial);
     }
 
-    /**
-     * Test checkAndMarkRegionBasedScanComplete does nothing for non-region-based scan types
-     */
-    public function test_check_and_mark_complete_does_nothing_for_non_region_based_types(): void
+    public function test_settling_records_completion_time(): void
     {
-        $scan = Scan::factory()->running()->create([
-            'scan_types' => ['iam'], // IAM is not region-based
-            'expected_regions_count' => 5,
-        ]);
-
-        $scan->checkAndMarkRegionBasedScanComplete();
-
-        $scan->refresh();
-        $this->assertEquals('running', $scan->status);
-    }
-
-    /**
-     * Test checkAndMarkRegionBasedScanComplete marks scan as completed when all regions done
-     */
-    public function test_check_and_mark_complete_marks_scan_completed_when_all_regions_done(): void
-    {
-        $organization = \App\Models\Organization::factory()->create();
-        $awsAccount = \App\Models\AwsAccount::factory()->completed()->create([
-            'organization_id' => $organization->id,
-        ]);
-        $scan = Scan::factory()->running()->create([
-            'organization_id' => $organization->id,
-            'aws_account_id' => $awsAccount->id,
+        $scan = Scan::factory()->create([
             'scan_types' => ['ec2'],
-            'expected_regions_count' => 3,
+            'status' => 'running',
+            'started_at' => now()->subMinutes(5),
         ]);
 
-        // Add scan details for all expected regions
-        \App\Models\ScanDetail::factory()->ec2('us-east-1')->create(['scan_id' => $scan->id]);
-        \App\Models\ScanDetail::factory()->ec2('us-west-2')->create(['scan_id' => $scan->id]);
-        \App\Models\ScanDetail::factory()->ec2('eu-west-1')->create(['scan_id' => $scan->id]);
-
-        $scan->checkAndMarkRegionBasedScanComplete();
+        $scan->settleRegionScan(false);
 
         $scan->refresh();
         $this->assertEquals('completed', $scan->status);
         $this->assertNotNull($scan->completed_at);
-    }
-
-    /**
-     * The completion line reports wall time for the whole scan — the headline number
-     * the parallel-scan work (PERF-1) is measured against.
-     */
-    public function test_completion_log_reports_total_scan_wall_time(): void
-    {
-        $organization = \App\Models\Organization::factory()->create();
-        $awsAccount = \App\Models\AwsAccount::factory()->completed()->create([
-            'organization_id' => $organization->id,
-        ]);
-        $scan = Scan::factory()->running()->create([
-            'organization_id' => $organization->id,
-            'aws_account_id' => $awsAccount->id,
-            'scan_types' => ['ec2'],
-            'expected_regions_count' => 1,
-            'started_at' => now()->subSeconds(90),
-        ]);
-
-        \App\Models\ScanDetail::factory()->ec2('us-east-1')->create(['scan_id' => $scan->id]);
-
-        $context = null;
-        \Illuminate\Support\Facades\Event::listen(
-            \Illuminate\Log\Events\MessageLogged::class,
-            function ($event) use (&$context) {
-                if ($event->message === 'Region-based scan marked as completed') {
-                    $context = $event->context;
-                }
-            }
-        );
-
-        $scan->checkAndMarkRegionBasedScanComplete();
-
-        $this->assertNotNull($context, 'The scan did not log a completion line');
-        $this->assertArrayHasKey('total_ms', $context);
-        $this->assertGreaterThanOrEqual(
-            90_000,
-            $context['total_ms'],
-            'total_ms must measure from started_at, not from when the check ran'
-        );
-    }
-
-    /**
-     * Test checkAndMarkRegionBasedScanComplete does not mark complete when not enough regions
-     */
-    public function test_check_and_mark_complete_does_not_mark_complete_when_not_enough_regions(): void
-    {
-        $scan = Scan::factory()->running()->create([
-            'scan_types' => ['ec2'],
-            'expected_regions_count' => 5,
-        ]);
-
-        // Add scan details for only 2 regions (less than expected 5)
-        \App\Models\ScanDetail::factory()->ec2('us-east-1')->create(['scan_id' => $scan->id]);
-        \App\Models\ScanDetail::factory()->ec2('us-west-2')->create(['scan_id' => $scan->id]);
-
-        $scan->checkAndMarkRegionBasedScanComplete();
-
-        $scan->refresh();
-        $this->assertEquals('running', $scan->status);
-        $this->assertNull($scan->completed_at);
-    }
-
-    /**
-     * Test checkAndMarkRegionBasedScanComplete updates AWS account last_scan_at
-     */
-    public function test_check_and_mark_complete_updates_aws_account_last_scan_at(): void
-    {
-        $organization = \App\Models\Organization::factory()->create();
-        $awsAccount = \App\Models\AwsAccount::factory()->completed()->create([
-            'organization_id' => $organization->id,
-            'last_scan_at' => null,
-        ]);
-        $scan = Scan::factory()->running()->create([
-            'organization_id' => $organization->id,
-            'aws_account_id' => $awsAccount->id,
-            'scan_types' => ['ec2'],
-            'expected_regions_count' => 1,
-        ]);
-
-        \App\Models\ScanDetail::factory()->ec2('us-east-1')->create(['scan_id' => $scan->id]);
-
-        $this->assertNull($awsAccount->last_scan_at);
-
-        $scan->checkAndMarkRegionBasedScanComplete();
-
-        $awsAccount->refresh();
-        $this->assertNotNull($awsAccount->last_scan_at);
-    }
-
-    /**
-     * Test checkAndMarkRegionBasedScanComplete counts unique regions correctly
-     */
-    public function test_check_and_mark_complete_counts_unique_regions(): void
-    {
-        $organization = \App\Models\Organization::factory()->create();
-        $awsAccount = \App\Models\AwsAccount::factory()->completed()->create([
-            'organization_id' => $organization->id,
-        ]);
-        $scan = Scan::factory()->running()->create([
-            'organization_id' => $organization->id,
-            'aws_account_id' => $awsAccount->id,
-            'scan_types' => ['ec2'],
-            'expected_regions_count' => 2,
-        ]);
-
-        // Add multiple scan details for the same region (should count as 1)
-        \App\Models\ScanDetail::factory()->ec2('us-east-1')->create(['scan_id' => $scan->id]);
-        \App\Models\ScanDetail::factory()->ec2('us-east-1')->create(['scan_id' => $scan->id]);
-        \App\Models\ScanDetail::factory()->ec2('us-west-2')->create(['scan_id' => $scan->id]);
-
-        $scan->checkAndMarkRegionBasedScanComplete();
-
-        $scan->refresh();
-        $this->assertEquals('completed', $scan->status);
     }
 }

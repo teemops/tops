@@ -131,26 +131,28 @@ class MarkStaleRegionScansCompleteTest extends TestCase
     }
 
     /**
-     * ...but not whether they are completed. Scan::checkAndMarkRegionBasedScanComplete()
-     * applies its own fixed 60-minute timeout, so lowering --minutes below that
-     * selects a scan the model then declines to finish.
+     * ...and now also whether they are settled. The model used to apply its own fixed
+     * 60-minute timeout on top, so lowering --minutes selected a scan the model then
+     * declined to finish. That second, hidden threshold is gone with the counter (#65):
+     * the option means what it says.
      */
-    public function test_lowering_minutes_does_not_override_the_models_own_timeout(): void
+    public function test_lowering_minutes_now_settles_the_scan_it_selects(): void
     {
         $scan = $this->staleRegionScan(minutesAgo: 20);
 
         $this->artisan('scans:mark-stale-region-complete', ['--minutes' => 10])
-            ->expectsOutputToContain('Processed scan')
+            ->expectsOutputToContain('Settled scan')
             ->assertSuccessful();
 
-        $this->assertEquals('running', $scan->fresh()->status);
+        $this->assertEquals('completed', $scan->fresh()->status);
     }
 
     /**
-     * Once every expected region has reported in, the scan completes regardless
-     * of how long it has been running.
+     * Everything this sweep settles is partial, whatever has reported in. It only runs
+     * when the batch callback did not, so work is unaccounted for by definition — and a
+     * fallback path on a security scanner must never be able to say "all clear".
      */
-    public function test_a_scan_with_all_regions_reported_completes_immediately(): void
+    public function test_anything_the_sweep_settles_is_marked_partial(): void
     {
         $scan = $this->staleRegionScan(minutesAgo: 20);
         ScanDetail::factory()->ec2('eu-west-1')->create(['scan_id' => $scan->id]);
@@ -158,20 +160,25 @@ class MarkStaleRegionScansCompleteTest extends TestCase
         $this->artisan('scans:mark-stale-region-complete', ['--minutes' => 10])
             ->assertSuccessful();
 
-        $this->assertEquals('completed', $scan->fresh()->status);
+        $scan->refresh();
+        $this->assertEquals('completed', $scan->status);
+        $this->assertTrue($scan->is_partial, 'a swept scan is never a clean bill of health');
+        $this->assertStringContainsString('partial', $scan->error_message);
     }
 
     /**
-     * The command hands each scan to the model, which only completes region-based
-     * ones — an IAM-only scan is picked up but deliberately left running.
+     * A scan with no region-based services is completed inline by the orchestrator, so
+     * one still running is a different fault. It is now filtered out of the selection
+     * rather than listed and then skipped — the command should not report scans it has
+     * no intention of touching.
      */
-    public function test_a_stale_non_region_scan_is_listed_but_not_completed(): void
+    public function test_a_stale_non_region_scan_is_not_selected(): void
     {
         $scan = $this->staleRegionScan();
         $scan->update(['scan_types' => ['iam']]);
 
         $this->artisan('scans:mark-stale-region-complete')
-            ->expectsOutputToContain('Found 1 scan(s)')
+            ->expectsOutputToContain('No scans found')
             ->assertSuccessful();
 
         $this->assertEquals('running', $scan->fresh()->status);

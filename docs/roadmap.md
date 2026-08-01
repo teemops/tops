@@ -479,17 +479,23 @@ independent and already dispatched one per (service, region) — roughly 153 of 
 scan — and then executed strictly one at a time. That single fact reframes the whole series:
 most of it is deployment and bookkeeping, not rearchitecting.
 
-Two of these are **correctness bugs wearing a performance label**, and they gate more than
-they look like they do:
+Two of these were **correctness bugs wearing a performance label**, and both are now fixed —
+they gated everything else:
 
-- **PERF-2 ([#65](https://github.com/teemops/tops/issues/65))** — `expected_regions_count`
-  completes scans prematurely under concurrency. This is what makes `is_partial` read `false`
-  when regions silently failed, and it is why `resource_gone` is deferred out of D-11.
-  **Fix this before running more workers, not after.**
-- **PERF-3 ([#66](https://github.com/teemops/tops/issues/66))** — the stale-scan sweep's
-  completion write is unguarded.
+- ~~**PERF-2 ([#65](https://github.com/teemops/tops/issues/65))**~~ — ✅ **Done 2026-08-02.**
+  Region dispatch became a single `Bus::batch()`, so the batch size is fixed atomically and the
+  window in which a finishing job could complete a whole scan cannot exist. Completion moved to
+  the batch's `finally()` callback. **`checkAndMarkRegionBasedScanComplete()` was deleted rather
+  than deprecated** — it retained the branch that marked a barely-started scan `completed,
+  is_partial=false`, and a "reported clean when nobody looked" path has no business surviving on
+  a security scanner. Verified with multiple workers locally.
+- ~~**PERF-3 ([#66](https://github.com/teemops/tops/issues/66))**~~ — ✅ **Done 2026-08-02.**
+  `settleRegionScan()` claims a scan with a conditional `UPDATE`, so exactly one of the batch
+  callback and the stale sweep wins. The sweep now marks everything it settles **partial**,
+  unconditionally: it only runs when the normal path did not, so a fallback can never say "all
+  clear".
 
-Then the cheap wins: PERF-6 (#69, run more than one worker — the actual headline),
+**PERF-6 (#69, run more than one worker) is now unblocked and is the actual headline.** Then the other cheap wins:
 PERF-11 (#74, index `scan_details`), PERF-12 (#75, bulk-insert), PERF-13 (#76, memoize AWS
 clients), PERF-14 (#77), PERF-15 (#78), PERF-18 (#94). Remaining: PERF-4 (#67),
 PERF-5 (#68), PERF-7 (#70), PERF-8 (#71), PERF-9 (#72), PERF-10 (#73), PERF-16 (#79),

@@ -22,58 +22,70 @@ class PartialScanTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function scanWithRegionsOutstanding(int $expected, int $delivered, int $minutesAgo): Scan
+    private function runningRegionScan(int $minutesAgo = 5): Scan
     {
         $organization = Organization::factory()->create();
         $awsAccount = AwsAccount::factory()->create(['organization_id' => $organization->id]);
 
-        $scan = Scan::factory()->create([
+        return Scan::factory()->create([
             'organization_id' => $organization->id,
             'aws_account_id' => $awsAccount->id,
             'status' => 'running',
             'scan_types' => ['ec2'],
             'rulesets' => ['basic'],
             'started_at' => now()->subMinutes($minutesAgo),
-            'expected_regions_count' => $expected,
         ]);
-
-        foreach (range(1, $delivered) as $i) {
-            ScanDetail::create([
-                'scan_id' => $scan->id,
-                'service' => 'ec2',
-                'api_method' => 'describeInstances',
-                'raw_data' => ['Reservations' => []],
-                'region' => "us-test-{$i}",
-            ]);
-        }
-
-        return $scan;
     }
 
-    public function test_a_timed_out_scan_is_completed_and_flagged_partial(): void
+    public function test_a_scan_settled_with_failures_is_completed_and_flagged_partial(): void
     {
-        $scan = $this->scanWithRegionsOutstanding(expected: 10, delivered: 3, minutesAgo: 90);
+        $scan = $this->runningRegionScan(minutesAgo: 90);
 
-        $scan->checkAndMarkRegionBasedScanComplete();
+        $scan->settleRegionScan(true, '7 of 10 region jobs failed; results are partial.');
         $scan->refresh();
 
         $this->assertSame('completed', $scan->status);
         $this->assertTrue($scan->is_partial);
-        $this->assertSame(3, $scan->processed_regions_count);
-        $this->assertStringContainsString('partial results', $scan->error_message);
+        $this->assertStringContainsString('partial', $scan->error_message);
     }
 
-    public function test_a_scan_that_reached_every_region_is_not_flagged_partial(): void
+    public function test_a_scan_whose_regions_all_succeeded_is_not_flagged_partial(): void
     {
-        $scan = $this->scanWithRegionsOutstanding(expected: 3, delivered: 3, minutesAgo: 5);
+        $scan = $this->runningRegionScan();
 
-        $scan->checkAndMarkRegionBasedScanComplete();
+        $scan->settleRegionScan(false);
         $scan->refresh();
 
         $this->assertSame('completed', $scan->status);
         $this->assertFalse($scan->is_partial);
-        $this->assertSame(3, $scan->processed_regions_count);
         $this->assertNull($scan->error_message);
+    }
+
+    /**
+     * The guard that makes the batch callback and the stale sweep safe to both exist:
+     * exactly one of them settles a given scan (#66).
+     */
+    public function test_only_the_first_caller_settles_a_scan(): void
+    {
+        $scan = $this->runningRegionScan();
+
+        $this->assertTrue($scan->settleRegionScan(false));
+
+        // A late sweep must not overwrite a clean result with a partial one.
+        $this->assertFalse($scan->settleRegionScan(true, 'stale sweep'));
+
+        $scan->refresh();
+        $this->assertFalse($scan->is_partial);
+        $this->assertNull($scan->error_message);
+    }
+
+    public function test_settling_records_the_scan_against_its_aws_account(): void
+    {
+        $scan = $this->runningRegionScan();
+
+        $scan->settleRegionScan(false);
+
+        $this->assertNotNull($scan->awsAccount->fresh()->last_scan_at);
     }
 
     /**

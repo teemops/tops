@@ -23,6 +23,7 @@ class Scan extends Model
         'completed_at',
         'error_message',
         'expected_regions_count',
+        'batch_id',
         'processed_regions_count',
         'is_partial',
     ];
@@ -76,126 +77,72 @@ class Scan extends Model
     }
 
     /**
-     * Check if all region-based scans (EC2, RDS) are complete and mark scan as completed if so
+     * Settle a region-based scan, exactly once.
+     *
+     * The write is a guarded UPDATE rather than a read-then-write: whichever of the batch
+     * callback and the stale-scan sweep gets here first claims the scan, and the other is
+     * told it lost and does nothing. Without the guard both could complete the same scan
+     * and evaluate its findings twice (#66).
+     *
+     * $partial is what consumers act on. A scan that missed regions must never read as a
+     * clean bill of health — that is the whole point of the flag, and the reason the
+     * previous counter-based completion was a security bug rather than an accounting one.
+     *
+     * @return bool Whether this caller was the one that completed the scan.
      */
-    public function checkAndMarkRegionBasedScanComplete(): void
+    public function settleRegionScan(bool $partial, ?string $reason = null): bool
     {
-        // Get region-based services in this scan
-        $regionBasedServices = ScanTypesService::getRegionBased();
-        $scanRegionServices = array_filter($this->scan_types ?? [], fn($type) => ScanTypesService::isRegionBased($type));
-        
-        // Only check if scan includes region-based services and hasn't already
-        // reached a terminal state. 'pending' must be eligible too: a scan whose
-        // orchestrator job died before flipping it to 'running' still has region
-        // jobs reporting in, and if we ignored it here nothing would ever
-        // complete it (the stale-scan sweep uses this same method).
-        if (empty($scanRegionServices) || !in_array($this->status, ['pending', 'running'], true)) {
-            return;
-        }
-
-        // Count distinct (region, service) pairs - one per region job that completed
-        $processedRegionJobs = $this->details()
-            ->whereIn('service', $regionBasedServices)
-            ->whereNotNull('region')
-            ->select('region', 'service')
-            ->distinct()
-            ->get()
-            ->count();
-
-        $expectedRegionJobs = $this->expected_regions_count ?? null;
-
-        $shouldComplete = false;
-        $staleMinutes = 60; // Mark running scan as completed after this many minutes (partial/timeout)
-
-        if ($expectedRegionJobs !== null) {
-            $shouldComplete = $processedRegionJobs >= $expectedRegionJobs;
-        }
-
-        // Timeout: if scan has been running too long, mark completed (partial) so it doesn't stay "Running" forever
-        if (!$shouldComplete && $this->started_at && $this->started_at->diffInMinutes(now()) >= $staleMinutes) {
-            \Illuminate\Support\Facades\Log::warning('Region-based scan timed out, marking completed with partial results', [
-                'scan_id' => $this->id,
-                'processed_region_jobs' => $processedRegionJobs,
-                'expected_region_jobs' => $expectedRegionJobs,
-            ]);
-            $shouldComplete = true;
-        }
-
-        if (!$shouldComplete && $expectedRegionJobs === null && $this->started_at) {
-            // Fallback: no expected count stored (legacy), use 10 min + at least 5 region jobs
-            $shouldComplete = $this->started_at->diffInMinutes(now()) > 10 && $processedRegionJobs >= 5;
-        }
-
-        if ($shouldComplete) {
-            $timedOut = $expectedRegionJobs !== null
-                && $processedRegionJobs < $expectedRegionJobs
-                && $this->started_at
-                && $this->started_at->diffInMinutes(now()) >= $staleMinutes;
-
-            // Evaluate findings for non-region-based scan types present in this scan
-            $nonRegionTypes = array_values(
-                array_intersect($this->scan_types ?? [], ScanTypesService::getNonRegionBased())
-            );
-            
-            if (!empty($nonRegionTypes)) {
-                try {
-                    $conditionEvaluator = new \App\Services\RulesEngine\ConditionEvaluator();
-                    $findingsEngine = new \App\Services\RulesEngine\FindingsEngine($conditionEvaluator);
-                    $findingsEngine->evaluateScan($this, $this->rulesets ?? ['basic']);
-                    
-                    \Illuminate\Support\Facades\Log::info('Findings evaluation completed for non-region-based types', [
-                        'scan_id' => $this->id,
-                        'types' => $nonRegionTypes,
-                    ]);
-                } catch (\Exception $e) {
-                    \Illuminate\Support\Facades\Log::error('Findings evaluation failed for non-region-based types', [
-                        'scan_id' => $this->id,
-                        'error' => $e->getMessage(),
-                    ]);
-                }
-            }
-
-            $this->update([
+        $claimed = static::query()
+            ->whereKey($this->id)
+            ->whereIn('status', ['pending', 'running'])
+            ->update([
                 'status' => 'completed',
                 'completed_at' => now(),
-                // is_partial is what consumers act on; the message stays for humans
-                // reading the scan. Compliance scoring must never treat a scan that
-                // missed regions as a clean bill of health.
-                'is_partial' => $timedOut,
-                'processed_regions_count' => $processedRegionJobs,
-                'error_message' => $timedOut
-                    ? "Scan timed out (partial results). {$processedRegionJobs}/{$expectedRegionJobs} region jobs completed."
-                    : null,
+                'is_partial' => $partial,
+                'error_message' => $reason,
             ]);
 
-            if ($this->awsAccount) {
-                $this->awsAccount->update(['last_scan_at' => now()]);
-            }
+        if ($claimed === 0) {
+            \Illuminate\Support\Facades\Log::info('Scan already settled by another writer', [
+                'scan_id' => $this->id,
+            ]);
 
-            \Illuminate\Support\Facades\Log::info('Region-based scan marked as completed', [
-                'scan_id' => $this->id,
-                'processed_region_jobs' => $processedRegionJobs,
-                'expected_region_jobs' => $expectedRegionJobs,
-                'timed_out' => $timedOut,
-                // Wall time for the whole scan — the headline number for the
-                // parallel-scan baseline (PERF-1, #64). Compare against the sum of
-                // 'Region scan completed' total_ms to see how much of it was serial.
-                'total_ms' => $this->started_at
-                    ? (int) $this->started_at->diffInMilliseconds(now())
-                    : null,
-            ]);
-        } else {
-            // Without this, a scan that never reaches its expected count is silently
-            // stuck with no indication of why. If processed is plateauing below
-            // expected, expected_regions_count is likely inflated (e.g. the
-            // orchestrator job ran more than once).
-            \Illuminate\Support\Facades\Log::debug('Region-based scan not complete yet', [
-                'scan_id' => $this->id,
-                'status' => $this->status,
-                'processed_region_jobs' => $processedRegionJobs,
-                'expected_region_jobs' => $expectedRegionJobs,
-                'started_at' => $this->started_at,
-            ]);
+            return false;
         }
+
+        $this->refresh();
+
+        // Region jobs evaluate their own service's findings as they go; anything not
+        // region-based was collected inline by the orchestrator and still needs a pass.
+        $nonRegionTypes = array_values(
+            array_intersect($this->scan_types ?? [], ScanTypesService::getNonRegionBased())
+        );
+
+        if (!empty($nonRegionTypes)) {
+            try {
+                $findingsEngine = new \App\Services\RulesEngine\FindingsEngine(
+                    new \App\Services\RulesEngine\ConditionEvaluator()
+                );
+                $findingsEngine->evaluateScan($this, $this->rulesets ?? ['basic']);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::error('Findings evaluation failed while settling scan', [
+                    'scan_id' => $this->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        $this->awsAccount?->update(['last_scan_at' => now()]);
+
+        \Illuminate\Support\Facades\Log::info('Region-based scan settled', [
+            'scan_id' => $this->id,
+            'is_partial' => $partial,
+            'reason' => $reason,
+            'total_ms' => $this->started_at
+                ? (int) $this->started_at->diffInMilliseconds(now())
+                : null,
+        ]);
+
+        return true;
     }
 }

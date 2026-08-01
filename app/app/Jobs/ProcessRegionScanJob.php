@@ -7,6 +7,7 @@ use App\Services\AwsSecurityScanner;
 use App\Services\RulesEngine\RulesEngine;
 use App\Services\RulesEngine\FindingsEngine;
 use App\Services\RulesEngine\ConditionEvaluator;
+use Illuminate\Bus\Batchable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\InteractsWithQueue;
@@ -15,7 +16,7 @@ use Illuminate\Support\Facades\Log;
 
 class ProcessRegionScanJob implements ShouldQueue
 {
-    use Queueable, InteractsWithQueue, SerializesModels;
+    use Batchable, Queueable, InteractsWithQueue, SerializesModels;
 
     /**
      * The number of times the job may be attempted.
@@ -44,6 +45,16 @@ class ProcessRegionScanJob implements ShouldQueue
     public function handle(): void
     {
         $jobStartedAt = microtime(true);
+
+        // A cancelled batch stops dispatching its remaining jobs; this covers the ones
+        // already dequeued.
+        if ($this->batch()?->cancelled()) {
+            Log::info('Batch cancelled, skipping region processing', [
+                'scan_id' => $this->scan->id,
+                'region' => $this->region,
+            ]);
+            return;
+        }
 
         // Reload scan to ensure we have latest data
         $this->scan->refresh();
@@ -152,11 +163,13 @@ class ProcessRegionScanJob implements ShouldQueue
 
             $findingsMs = $this->elapsedMs($findingsStartedAt);
 
-            // Check if all regions are complete and mark scan as completed if so
-            $completionCheckStartedAt = microtime(true);
-            $this->scan->refresh();
-            $this->scan->checkAndMarkRegionBasedScanComplete();
-            $completionCheckMs = $this->elapsedMs($completionCheckStartedAt);
+            // Completion is no longer decided here. A region job used to count the
+            // (region, service) pairs recorded so far and compare them against a counter
+            // the orchestrator was still incrementing, which meant the first job to
+            // finish during that window could mark the whole scan complete and not
+            // partial — a clean bill of health for regions nobody had looked at. The
+            // batch's finally() callback now settles it exactly once. See #65.
+            $completionCheckMs = 0;
 
             // Logged after the completion check, not before it, so total_ms covers the
             // whole job. findings_ms and completion_check_ms are the two that grow with
