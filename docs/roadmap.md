@@ -365,6 +365,12 @@ install → add AWS account → scan, on a real account, on v0.3.1, reaching Ins
 work, and that work is now the active one — see
 [Workstream: Scans, Findings & Insights](#workstream-scans-findings--insights) below.
 
+**And it refilled again on 2026-08-02, from a different direction.** **N-11** came out of
+writing an architecture diagram for CISOs rather than out of running the product: explaining
+the AWS integration to a sceptical reader is its own review technique, and it found a
+`Principal: "*"` on the one inbound path. Sequenced ahead of the workstream items on the
+grounds that it is cheap in phase 1 and the repo is public.
+
 **What that means, stated carefully.** The milestone's "done when" has two halves, and only
 one is closed. The *code* half — a documented path that takes someone from nothing to
 findings — is demonstrated. The other half is "**a design partner** … **without a call**",
@@ -403,6 +409,7 @@ fixes are what made that run succeed, which is the sequencing argument justifyin
 
 | # | Feature | Why it's here | Size |
 | --- | --- | --- | :---: |
+| **N-11** | **Lock down the account-linking SNS topic** | 🔴 **Security, open.** `teemops-sns` accepts `sns:Publish` from any AWS principal on the internet — the one inbound path into a TOPS install, and the first thing a reviewer probes. Two phases: consumer-side validation ([#100](https://github.com/teemops/tops/issues/100)), then an install-scoped filter secret ([#101](https://github.com/teemops/tops/issues/101)). Research, options and acceptance criteria in [the feature doc](features/sns-topic-publish-authorization.md). | S + M |
 | ~~**N-1**~~ | ~~Fix the clean-checkout build~~ | ✅ **Done** 2026-07-29 — `@vitejs/plugin-vue` on `^6`, `npm ci` clean, frontend CI job added. | — |
 | ~~**N-2**~~ | ~~Choose and add a licence~~ | ✅ **Done** 2026-07-29 — Apache-2.0, trademark held separately, DCO for contributions. See D-7. | — |
 | ~~**N-6**~~ | ~~SNS signature verification~~ | ✅ **Done** 2026-07-30 — real signature verification via AWS's validator package, plus a topic allowlist that fails closed. Promoted from X-2 that morning when going public expired its deferral. | — |
@@ -593,6 +600,45 @@ documentation sprint; no page written for a feature that doesn't exist yet.
 ## NOW
 
 The path to putting TOPS in a design partner's hands. Sequenced — do them in order.
+
+### N-11 · Lock down the account-linking SNS topic
+
+*Security. Added 2026-08-02, found while producing the AWS integration architecture diagram
+for CISO/CTO audiences — the diagram describes SNS as "the one inbound path into TOPS",
+which invites exactly this question.*
+
+The parent account's `teemops-sns` topic carries an `allow-all-aws-users` statement granting
+`sns:Publish` to `Principal: AWS: "*"`. The narrowing condition beside it is commented out,
+and could never have worked: `sns:Publish` supports no message-content condition keys, and
+CloudFormation's custom-resource publish carries no message attributes to match on.
+
+**Why it is not a five-alarm fire, stated honestly.** The exposure is publish-only — the
+sibling statement is scoped by `AWS:SourceOwner`, so nobody can subscribe, delete the topic
+or rewrite its policy. Damage still requires guessing `external_id`, a CSPRNG v4 UUID. The
+credible risks are denial-of-onboarding, data pollution, and unauthenticated cost — not
+exfiltration. **Why it is still N-11.** It is a `Principal: "*"` in a public repo on the one
+inbound path, and the number of reviewers who will read that statement and stop reading is
+not zero.
+
+**Two phases.** Phase 1 is consumer-side validation with no AWS changes — the message already
+carries the child account twice, in `StackId` and `TopsRoleArn`, and neither is checked
+against the other. Phase 2 is an install-scoped filter secret: a GUID minted once at install,
+threaded through the parent stack, both child templates and the quick-create URL, and matched
+in the subscription's `MessageBody` filter policy. It is a speed bump rather than an
+authentication boundary — the value is shared with every account admin onboarded — but it
+removes internet-wide unauthenticated access without putting AWS credentials back into the
+web tier or capping the product at SNS's 200-principal quota.
+
+Full research, the four options considered and why three were rejected, the open issues on
+the proposed design, and acceptance criteria for both phases:
+**[docs/features/sns-topic-publish-authorization.md](features/sns-topic-publish-authorization.md)**.
+
+- [ ] Phase 1 — consumer-side validation ships with tests — [#100](https://github.com/teemops/tops/issues/100)
+- [ ] Phase 2 — install-scoped filter secret, verified end to end against a real AWS account — [#101](https://github.com/teemops/tops/issues/101)
+- [ ] Payload filtering confirmed to work against a real CloudFormation message before it is relied on
+- [ ] The architecture diagram's "unlimited child accounts" claim still holds after the change
+
+---
 
 ### ~~N-1 · Fix the clean-checkout build~~ ✅ Done 2026-07-29
 
