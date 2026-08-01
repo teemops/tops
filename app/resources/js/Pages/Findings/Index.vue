@@ -392,10 +392,17 @@ const goToFindingType = (findingType: string) => {
                                     </button>
                                 </div>
                             </div>
-                            <!-- Expanded remediation -->
+                            <!-- Expanded remediation.
+                                 The finding's own one-line remediation comes first and shows on
+                                 its own: only critical/high rules carry step-by-step guidance, so
+                                 gating the whole block on that guidance hid perfectly good text
+                                 for the 46 medium/low rules that have nothing else. -->
                             <div v-if="expandedId === finding.id" class="mt-4 rounded-md bg-gray-50 dark:bg-gray-900/50 p-4 text-sm">
+                                <p v-if="finding.remediation" class="font-medium text-gray-900 dark:text-white">
+                                    {{ finding.remediation }}
+                                </p>
                                 <template v-if="getRecommendation(finding)">
-                                    <p class="font-medium text-gray-900 dark:text-white">{{ getRecommendation(finding)!.recommendation }}</p>
+                                    <p :class="['font-medium text-gray-900 dark:text-white', finding.remediation ? 'mt-3' : '']">{{ getRecommendation(finding)!.recommendation }}</p>
                                     <p class="mt-1 text-gray-600 dark:text-gray-300">{{ getRecommendation(finding)!.description }}</p>
                                     <p class="mt-2 text-gray-500 dark:text-gray-400"><strong>Impact:</strong> {{ getRecommendation(finding)!.impact }}</p>
                                     <ul class="mt-2 list-disc pl-5 space-y-1 text-gray-600 dark:text-gray-300">
@@ -410,7 +417,9 @@ const goToFindingType = (findingType: string) => {
                                         </ul>
                                     </div>
                                 </template>
-                                <p v-else class="text-gray-500 dark:text-gray-400">No remediation steps for this finding type.</p>
+                                <p v-if="!finding.remediation && !getRecommendation(finding)" class="text-gray-500 dark:text-gray-400">
+                                    No remediation steps for this finding type.
+                                </p>
                             </div>
                         </li>
                     </ul>
