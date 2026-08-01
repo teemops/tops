@@ -164,9 +164,13 @@ job, which is the argument for doing the IA before the writing.
 
 ### Two gaps this inventory exposed
 
-1. **There is no `SECURITY.md`.** A public repo with a `security` label, three open security
-   issues and a CISO-facing architecture page has nowhere to report a vulnerability. That is
-   a repo-hygiene fix, not a docs-site fix, and it should not wait for the site.
+1. ~~**There is no `SECURITY.md`.**~~ **Written 2026-08-02.** A public repo with a `security`
+   label, three open security issues and a CISO-facing architecture page had nowhere to
+   report a vulnerability, and `README.md` said "open an issue" — precisely the wrong advice.
+   Now at the repository root, with the README pointing to it. **Two follow-ups it depends
+   on:** GitHub private vulnerability reporting must be enabled (it is currently off), and
+   `security@teemops.com` must be created and routed. Until both are done the policy names
+   channels that do not answer.
 2. **`docs/quick-start.md` is dead.** It describes a Nuxt 3 + Serverless + Prisma monorepo —
    the pre-pivot stack. It is linked from `docs/README.md` and would mislead anyone who found
    it. Delete it rather than port it.
