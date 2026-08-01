@@ -56,6 +56,8 @@ class ProcessAuditScanJob implements ShouldQueue
      */
     public function handle(): void
     {
+        $jobStartedAt = microtime(true);
+
         $this->scan->refresh();
 
         if ($this->scan->status === 'cancelled') {
@@ -88,7 +90,10 @@ class ProcessAuditScanJob implements ShouldQueue
             $this->scan->update(['expected_regions_count' => 0]);
 
             $scanner = new AwsSecurityScanner($roleArn, $externalId);
+
+            $assumeRoleStartedAt = microtime(true);
             $credentials = $scanner->assumeRole();
+            $assumeRoleMs = $this->elapsedMs($assumeRoleStartedAt);
 
             $rulesEngine = new RulesEngine();
 
@@ -99,12 +104,23 @@ class ProcessAuditScanJob implements ShouldQueue
             // their region jobs instead of completing prematurely with no results.
             $dispatchedRegionServices = [];
 
+            // Per-service timings for the parallel-scan baseline (PERF-1, #64).
+            // global_scan_ms against dispatch_ms is the measurement that decides
+            // whether moving iam/s3 out of this job (#71) is worth doing: every
+            // region dispatch queues behind the global services running inline here.
+            $globalScanMs = [];
+            $dispatchMs = [];
+
             foreach ($scanTypes as $scanType) {
+                $serviceStartedAt = microtime(true);
+
                 if (ScanTypesService::isRegionBased($scanType)) {
                     $dispatchedRegionServices[] = $scanType;
                     $this->dispatchRegionScansForService($scanner, $credentials, $scanType);
+                    $dispatchMs[$scanType] = $this->elapsedMs($serviceStartedAt);
                 } else {
                     $this->runGlobalScanForService($rulesEngine, $scanType, $credentials);
+                    $globalScanMs[$scanType] = $this->elapsedMs($serviceStartedAt);
                 }
             }
 
@@ -115,6 +131,10 @@ class ProcessAuditScanJob implements ShouldQueue
                 'region_based_services' => $dispatchedRegionServices,
                 'has_region_based' => $hasRegionBasedScan,
                 'scan_types' => $scanTypes,
+                'assume_role_ms' => $assumeRoleMs,
+                'global_scan_ms' => $globalScanMs,
+                'dispatch_ms' => $dispatchMs,
+                'orchestration_ms' => $this->elapsedMs($jobStartedAt),
             ]);
 
             if (!$hasRegionBasedScan) {
@@ -163,6 +183,14 @@ class ProcessAuditScanJob implements ShouldQueue
             'completed_at' => now(),
             'error_message' => 'Job failed after ' . $this->tries . ' attempts: ' . $exception->getMessage(),
         ]);
+    }
+
+    /**
+     * Milliseconds since a microtime(true) mark, for the phase timings above.
+     */
+    private function elapsedMs(float $startedAt): int
+    {
+        return (int) round((microtime(true) - $startedAt) * 1000);
     }
 
     private function validateAndGetAwsAccount(): \App\Models\AwsAccount
@@ -314,9 +342,14 @@ class ProcessAuditScanJob implements ShouldQueue
         $conditionEvaluator = new ConditionEvaluator();
         $findingsEngine = new FindingsEngine($conditionEvaluator);
 
+        $startedAt = microtime(true);
+
         try {
             $findingsEngine->evaluateScan($this->scan, $this->scan->rulesets ?? [self::RULESET_BASIC]);
-            Log::info('Findings evaluation completed', ['scan_id' => $this->scan->id]);
+            Log::info('Findings evaluation completed', [
+                'scan_id' => $this->scan->id,
+                'findings_ms' => $this->elapsedMs($startedAt),
+            ]);
         } catch (\Throwable $e) {
             Log::error('Findings evaluation failed', [
                 'scan_id' => $this->scan->id,
@@ -353,6 +386,12 @@ class ProcessAuditScanJob implements ShouldQueue
                 'scan_id' => $this->scan->id,
                 'status' => $this->scan->status,
                 'completed_at' => $this->scan->completed_at,
+                // Wall time for the whole scan. This is the global-services-only path;
+                // region-based scans report their total from
+                // Scan::checkAndMarkRegionBasedScanComplete() instead.
+                'total_ms' => $this->scan->started_at
+                    ? (int) $this->scan->started_at->diffInMilliseconds(now())
+                    : null,
             ]);
         } catch (\Throwable $e) {
             Log::error('Failed to mark scan as completed', [

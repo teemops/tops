@@ -211,6 +211,45 @@ never shows up, the `sqs-audit-region` connection itself is broken.
 
 ---
 
+## Measuring where a scan's time goes
+
+Every region job reports its phase timings on one line when it finishes, and the scan
+reports its wall time when it completes. This is how the parallel-scan baseline is taken
+(see `docs/features/parallel-region-scans.md`).
+
+The per-job line — one per (service, region), so ~153 for a full scan:
+
+```bash
+docker compose logs worker | grep 'Region scan completed'
+```
+
+Each carries `assume_role_ms`, `collection_ms`, `findings_ms`, `completion_check_ms` and
+`total_ms`. The two that matter are `findings_ms` and `completion_check_ms`: both re-read
+every `scan_detail` collected so far, so they grow as the scan progresses. If they climb
+steadily from the first job to the last, that is the quadratic cost.
+
+Total wall time for the scan:
+
+```bash
+docker compose logs worker | grep 'Region-based scan marked as completed'
+```
+
+Sum the per-job `total_ms` and compare against the scan's `total_ms`. With one worker the
+two are close — that is the serial execution. The gap is what concurrency can recover.
+
+To sum a phase across every region job:
+
+```bash
+docker compose logs worker | grep -o '"findings_ms":[0-9]*' | cut -d: -f2 | paste -sd+ | bc
+```
+
+The orchestrator logs its own breakdown on `All scan types processed`, with
+`assume_role_ms`, per-service `global_scan_ms` and `dispatch_ms`. Compare `global_scan_ms`
+against `dispatch_ms`: global services (`iam`, `s3`) run inline before region jobs are
+dispatched, so time spent there is time every region job waits.
+
+---
+
 ## Testing account-linking without a full CloudFormation cycle
 
 Launching a real child-account CloudFormation stack takes 10-15 minutes to fail/roll back if

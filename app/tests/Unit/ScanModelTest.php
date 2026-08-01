@@ -306,6 +306,47 @@ class ScanModelTest extends TestCase
     }
 
     /**
+     * The completion line reports wall time for the whole scan — the headline number
+     * the parallel-scan work (PERF-1) is measured against.
+     */
+    public function test_completion_log_reports_total_scan_wall_time(): void
+    {
+        $organization = \App\Models\Organization::factory()->create();
+        $awsAccount = \App\Models\AwsAccount::factory()->completed()->create([
+            'organization_id' => $organization->id,
+        ]);
+        $scan = Scan::factory()->running()->create([
+            'organization_id' => $organization->id,
+            'aws_account_id' => $awsAccount->id,
+            'scan_types' => ['ec2'],
+            'expected_regions_count' => 1,
+            'started_at' => now()->subSeconds(90),
+        ]);
+
+        \App\Models\ScanDetail::factory()->ec2('us-east-1')->create(['scan_id' => $scan->id]);
+
+        $context = null;
+        \Illuminate\Support\Facades\Event::listen(
+            \Illuminate\Log\Events\MessageLogged::class,
+            function ($event) use (&$context) {
+                if ($event->message === 'Region-based scan marked as completed') {
+                    $context = $event->context;
+                }
+            }
+        );
+
+        $scan->checkAndMarkRegionBasedScanComplete();
+
+        $this->assertNotNull($context, 'The scan did not log a completion line');
+        $this->assertArrayHasKey('total_ms', $context);
+        $this->assertGreaterThanOrEqual(
+            90_000,
+            $context['total_ms'],
+            'total_ms must measure from started_at, not from when the check ran'
+        );
+    }
+
+    /**
      * Test checkAndMarkRegionBasedScanComplete does not mark complete when not enough regions
      */
     public function test_check_and_mark_complete_does_not_mark_complete_when_not_enough_regions(): void
