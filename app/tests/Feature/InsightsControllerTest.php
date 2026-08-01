@@ -88,6 +88,105 @@ class InsightsControllerTest extends TestCase
         return [$user, $organization, $scan];
     }
 
+    /**
+     * Findings carry their own organization and account since D-1, which is what lets the
+     * breakdown read them without going through the scan.
+     */
+    private function finding(Organization $organization, Scan $scan, array $attributes = []): ScanResult
+    {
+        return ScanResult::factory()->create(array_merge([
+            'scan_id' => $scan->id,
+            'organization_id' => $organization->id,
+            'aws_account_id' => $scan->aws_account_id,
+            'status' => 'open',
+        ], $attributes));
+    }
+
+    public function test_insights_break_findings_down_by_service_with_severities(): void
+    {
+        [$user, $organization, $scan] = $this->orgWithScan();
+
+        $this->finding($organization, $scan, ['service' => 'ec2', 'severity' => 'high']);
+        $this->finding($organization, $scan, ['service' => 'ec2', 'severity' => 'medium']);
+        $this->finding($organization, $scan, ['service' => 's3', 'severity' => 'low']);
+
+        $response = $this->actingAs($user)
+            ->getJson("/api/organizations/{$organization->org_id}/insights?period=30d");
+
+        $response->assertOk()
+            ->assertJsonPath('breakdown.byService.0.key', 'ec2')
+            ->assertJsonPath('breakdown.byService.0.total', 2)
+            ->assertJsonPath('breakdown.byService.0.severities.high', 1)
+            ->assertJsonPath('breakdown.byService.0.severities.medium', 1)
+            ->assertJsonPath('breakdown.byService.1.key', 's3');
+    }
+
+    public function test_insights_also_break_findings_down_by_finding_type(): void
+    {
+        [$user, $organization, $scan] = $this->orgWithScan();
+
+        $this->finding($organization, $scan, ['finding_type' => 'cis-5.1', 'severity' => 'high']);
+        $this->finding($organization, $scan, ['finding_type' => 'cis-5.1', 'severity' => 'high']);
+        $this->finding($organization, $scan, ['finding_type' => 'cis-3.9', 'severity' => 'medium']);
+
+        $this->actingAs($user)
+            ->getJson("/api/organizations/{$organization->org_id}/insights?period=30d")
+            ->assertOk()
+            ->assertJsonPath('breakdown.byFindingType.0.key', 'cis-5.1')
+            ->assertJsonPath('breakdown.byFindingType.0.total', 2);
+    }
+
+    /**
+     * The one deliberate inconsistency on this page, and the reason it is deliberate: the
+     * breakdown is current state, so it has to read the same number as Scan detail and
+     * Findings. Everything else here is scoped to the selected period.
+     */
+    public function test_the_breakdown_is_current_state_and_ignores_the_period(): void
+    {
+        [$user, $organization, $scan] = $this->orgWithScan();
+
+        // Older than every selectable period.
+        $this->finding($organization, $scan, [
+            'service' => 'ec2',
+            'created_at' => now()->subDays(400),
+        ]);
+
+        foreach (['30d', '90d', '365d'] as $period) {
+            $this->actingAs($user)
+                ->getJson("/api/organizations/{$organization->org_id}/insights?period={$period}")
+                ->assertOk()
+                ->assertJsonPath('breakdown.byService.0.key', 'ec2')
+                ->assertJsonPath('breakdown.byService.0.total', 1);
+        }
+    }
+
+    public function test_an_organization_with_no_findings_gets_an_empty_breakdown(): void
+    {
+        [$user, $organization] = $this->orgWithScan();
+
+        $response = $this->actingAs($user)
+            ->getJson("/api/organizations/{$organization->org_id}/insights?period=30d");
+
+        $response->assertOk()
+            ->assertJsonPath('breakdown.byService', [])
+            ->assertJsonPath('breakdown.summary.total', 0);
+    }
+
+    public function test_the_breakdown_excludes_other_organizations(): void
+    {
+        [$user, $organization, $scan] = $this->orgWithScan();
+        [, $otherOrganization, $otherScan] = $this->orgWithScan();
+
+        $this->finding($otherOrganization, $otherScan, ['service' => 'ec2']);
+        $this->finding($organization, $scan, ['service' => 's3']);
+
+        $response = $this->actingAs($user)
+            ->getJson("/api/organizations/{$organization->org_id}/insights?period=30d");
+
+        $response->assertOk()->assertJsonPath('breakdown.byService.0.key', 's3');
+        $this->assertCount(1, $response->json('breakdown.byService'));
+    }
+
     public function test_trend_uses_daily_buckets_for_thirty_days(): void
     {
         [$user, $organization] = $this->orgWithScan();

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Scan;
 use App\Models\ScanResult;
 use App\Services\ComplianceScoreService;
+use App\Services\FindingsBreakdownService;
 use App\Services\OrganizationPermission;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -15,7 +16,8 @@ class InsightsController extends Controller
 {
     public function __construct(
         protected OrganizationPermission $permission,
-        protected ComplianceScoreService $compliance
+        protected ComplianceScoreService $compliance,
+        protected FindingsBreakdownService $breakdown
     ) {
     }
 
@@ -156,6 +158,15 @@ class InsightsController extends Controller
             ],
             'trend' => $trend,
             'topServices' => $topServices,
+            // Deliberately *not* windowed by $period, unlike everything above it. The
+            // breakdown is current state, so it reads the same here as on Scan detail and
+            // Findings — windowing it would mean the same service showing two different
+            // numbers depending on which page you opened, which is the problem this whole
+            // workstream exists to remove. The UI labels it "across all scans".
+            //
+            // Same service Scan detail uses, keyed on the organization instead of one
+            // account. See docs/features/insights-by-service.md.
+            'breakdown' => $this->breakdown->for($organization->id),
             'keyInsights' => $keyInsights,
         ]);
     }
