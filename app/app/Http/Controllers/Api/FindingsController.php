@@ -108,6 +108,19 @@ class FindingsController extends Controller
             $baseQuery->where('scan_results.status', $request->input('status'));
         }
 
+        // A resolved finding is not an open problem, so it does not count toward the
+        // totals or the score. This matters more than it used to: before durable findings
+        // nothing resolved itself, so "resolved" was a rare manual act. Now a scan closes
+        // what it finds fixed, and if these counts included those, fixing something and
+        // rescanning would leave the numbers exactly where they were.
+        //
+        // Ignored findings still count. Ignoring is a decision not to act on a real
+        // problem, not evidence that it went away, and excluding them would let the score
+        // be improved by dismissing things.
+        if (!$request->filled('status')) {
+            $baseQuery->where('scan_results.status', '!=', 'resolved');
+        }
+
         $bySeverity = [
             'critical' => (clone $baseQuery)->where('scan_results.severity', 'critical')->count(),
             'high' => (clone $baseQuery)->where('scan_results.severity', 'high')->count(),
@@ -207,6 +220,11 @@ class FindingsController extends Controller
         $result->update([
             'status' => $validated['status'],
             'resolved_at' => $validated['status'] === 'resolved' ? now() : null,
+            // Distinguishes a person's decision from a scan closing something it found
+            // fixed, so the UI can say which happened.
+            'resolution_reason' => $validated['status'] === 'resolved'
+                ? \App\Models\ScanResult::REASON_MANUAL
+                : null,
         ]);
 
         return response()->json([
