@@ -1,6 +1,8 @@
 # Durable Findings - User Story
 
-**Roadmap:** D-1 · **Status:** draft, awaiting sign-off · **Raised:** 2026-08-01
+**Roadmap:** D-1 (recorded as **D-11** in [`roadmap.md`](../roadmap.md) — see the naming-collision
+note there) · **Issue:** [#81](https://github.com/teemops/tops/issues/81) ·
+**Status:** ✅ **Shipped 2026-08-01** in PR #95, less `resource_gone` · **Raised:** 2026-08-01
 
 > **This is the gate.** No code until this is agreed. All four open points were settled
 > with Ben on 2026-08-01; the reasoning for each is in place below. What remains open is

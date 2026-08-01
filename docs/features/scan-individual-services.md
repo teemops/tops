@@ -1,6 +1,16 @@
 # Scan Individual Services - User Story
 
 **Roadmap:** F-2 · **Issue:** [#84](https://github.com/teemops/tops/issues/84) · **Agreed:** 2026-08-01
+· **Status:** ✅ **Shipped 2026-08-01** in `89a1ea1`; issue closed
+
+> **Verified 2026-08-01.** All ten acceptance criteria below are met and covered by tests:
+> `ScansControllerTest` (34 passed, 156 assertions) and `ScanProfilesServiceTest` (5 passed,
+> 32 assertions). The last criterion is satisfied by durable findings
+> ([#81](https://github.com/teemops/tops/issues/81)), which shipped the same day.
+>
+> **One wireframe redline is not implemented:** redline ② on plate F-2, "collapse the long
+> tail" — the modal renders all 11 services of a profile with no `+ 7 more` affordance. It is
+> cosmetic today and grows worse with every ruleset added. Not tracked as an issue yet.
 
 ## User Story
 
@@ -22,26 +32,26 @@ Nothing about the existing flow changes for someone who does not expand anything
 
 ## User Acceptance Criteria
 
-- [ ] Given the New Scan modal, when I open it, then each available benchmark is listed and
+- [x] Given the New Scan modal, when I open it, then each available benchmark is listed and
       can be expanded to show its services
-- [ ] Given I tick a benchmark without expanding it, when I start the scan, then the scan runs
+- [x] Given I tick a benchmark without expanding it, when I start the scan, then the scan runs
       exactly as it does today — same services, same rulesets
-- [ ] Given I expand a benchmark and tick two of its services, when I start the scan, then
+- [x] Given I expand a benchmark and tick two of its services, when I start the scan, then
       only those two services are collected and only that benchmark's rules are evaluated
-- [ ] Given I have selected services, when I look at the modal before submitting, then it tells
+- [x] Given I have selected services, when I look at the modal before submitting, then it tells
       me how many services and rules will run
-- [ ] Given I select no benchmark and no service, when I try to start, then I see a validation
+- [x] Given I select no benchmark and no service, when I try to start, then I see a validation
       error and no scan is created
-- [ ] Given a benchmark whose ruleset is empty, such as PCI, when the modal renders, then it
+- [x] Given a benchmark whose ruleset is empty, such as PCI, when the modal renders, then it
       is not offered at all
-- [ ] Given I submit a service that is not in the registry, when the request is validated
+- [x] Given I submit a service that is not in the registry, when the request is validated
       server-side, then it is rejected with a validation error
-- [ ] Given I submit a service that exists but has no rules in the chosen benchmark, when the
+- [x] Given I submit a service that exists but has no rules in the chosen benchmark, when the
       request is validated, then it is rejected rather than running a scan that cannot produce
       a finding
-- [ ] Given a scan request for another organization's AWS account, when it is submitted, then
+- [x] Given a scan request for another organization's AWS account, when it is submitted, then
       it is rejected — the account must belong to the caller's organization
-- [ ] Given a scan of one service, when a later scan runs, then findings for other services
+- [x] Given a scan of one service, when a later scan runs, then findings for other services
       are untouched (see [durable findings](./durable-findings.md))
 
 ## Technical Notes
