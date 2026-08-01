@@ -183,6 +183,55 @@ class FindingsControllerTest extends TestCase
     /**
      * A clean organization scores 100.
      */
+    /**
+     * D-1: fixing something has to move the numbers, or the scan tells you nothing.
+     */
+    public function test_resolved_findings_do_not_count_toward_the_totals_or_the_score(): void
+    {
+        $user = User::factory()->create();
+        $organization = Organization::factory()->create(['user_id' => $user->id]);
+        $awsAccount = AwsAccount::factory()->completed()->create(['organization_id' => $organization->id]);
+        $scan = Scan::factory()->create([
+            'organization_id' => $organization->id,
+            'aws_account_id' => $awsAccount->id,
+            'status' => 'completed',
+        ]);
+
+        ScanResult::factory()->create(['scan_id' => $scan->id, 'severity' => 'critical', 'status' => 'open']);
+        ScanResult::factory()->create(['scan_id' => $scan->id, 'severity' => 'critical', 'status' => 'resolved']);
+
+        $response = $this->actingAs($user)
+            ->getJson("/api/organizations/{$organization->org_id}/findings");
+
+        $response->assertOk()
+            ->assertJsonPath('summary.bySeverity.critical', 1)
+            ->assertJsonPath('summary.total', 1);
+    }
+
+    /**
+     * Ignoring is a decision not to act, not evidence the problem went away — so it must
+     * not be a way to improve the score.
+     */
+    public function test_ignored_findings_still_count_toward_the_totals(): void
+    {
+        $user = User::factory()->create();
+        $organization = Organization::factory()->create(['user_id' => $user->id]);
+        $awsAccount = AwsAccount::factory()->completed()->create(['organization_id' => $organization->id]);
+        $scan = Scan::factory()->create([
+            'organization_id' => $organization->id,
+            'aws_account_id' => $awsAccount->id,
+            'status' => 'completed',
+        ]);
+
+        ScanResult::factory()->create(['scan_id' => $scan->id, 'severity' => 'high', 'status' => 'open']);
+        ScanResult::factory()->create(['scan_id' => $scan->id, 'severity' => 'high', 'status' => 'ignored']);
+
+        $this->actingAs($user)
+            ->getJson("/api/organizations/{$organization->org_id}/findings")
+            ->assertOk()
+            ->assertJsonPath('summary.bySeverity.high', 2);
+    }
+
     public function test_the_security_score_is_perfect_with_no_findings(): void
     {
         $response = $this->actingAs($this->user)->getJson($this->findingsUrl());

@@ -6,6 +6,12 @@
 > with Ben on 2026-08-01; the reasoning for each is in place below. What remains open is
 > named in "Still to settle during design".
 
+> **Scope cut, 2026-08-01, after [#92](https://github.com/teemops/tops/pull/92) landed.**
+> `resource_gone` is **deferred to a follow-up** and is not built here. Everything else
+> ships. The reasoning is in "Why `resource_gone` waits" below; the short version is that
+> its safety guard rests on `is_partial`, and #92's design demonstrates `is_partial` reads
+> `false` when regions silently failed to report.
+
 ## User Story
 
 As a solo engineer scanning my AWS account repeatedly, I want each finding to be one
@@ -51,9 +57,9 @@ of every scan ever run.
       shows the newer content
 - [ ] Given a finding, when a later scan examines that resource and the rule now passes, then
       the finding is **resolved with reason `fixed`**, timestamped, and the scan recorded
-- [ ] Given a finding, when a later scan **successfully enumerates that service in that
+- [ ] ~~Given a finding, when a later scan **successfully enumerates that service in that
       resource's region** and the resource is absent, then the finding is **resolved with
-      reason `resource_gone`**, timestamped, and the scan recorded
+      reason `resource_gone`**~~ — **deferred, see "Why `resource_gone` waits"**
 - [ ] Given a finding, when a later scan does not enumerate that service in that region at
       all, then the finding is unchanged — not resolved, not touched, still in the list
 - [ ] Given a resolved finding, when I look at it, then I can tell **which** of the two
@@ -116,7 +122,7 @@ when the condition fails. So:
 | Test against this scan's `scan_details` | Outcome |
 | --- | --- |
 | A detail exists for the same service + `api_method` + `resource_id`, and no finding was raised | `fixed` |
-| Details exist for that service + `api_method` **in that region**, but none for this `resource_id` | `resource_gone` |
+| Details exist for that service + `api_method` **in that region**, but none for this `resource_id` | `resource_gone` — **deferred** |
 | No details for that service + `api_method` in that region | untouched |
 
 **The middle row is the dangerous one and needs a guard.** Concluding "gone" from an empty
@@ -180,6 +186,50 @@ Deliberately excluded, so v1 stays shippable:
   decided against on 2026-08-01. Revisit only if a design partner asks for trends, and treat
   it as a new data model rather than an addition to this one
 - **Auto-closing on absence** — explicitly rejected above; it would be broken by F-2
+
+## Why `resource_gone` waits
+
+**Decided 2026-08-01, after reading [#92](https://github.com/teemops/tops/pull/92)'s design
+for parallel region scans.** The two auto-resolve reasons rest on different kinds of
+evidence, and only one of them is safe on today's scan accounting:
+
+| | Evidence | Safe now? |
+| --- | --- | --- |
+| `fixed` | **Positive** — a `scan_detail` exists for *that resource*, and no finding was raised | **Yes.** Nothing can fabricate a detail row for a resource that was not examined |
+| `resource_gone` | **Inference from absence** | **No** — see below |
+
+#92 documents two ways a scan reports more coverage than it achieved, and both were
+verified against the code rather than taken on the document's word:
+
+1. **The completion counter races.** `expected_regions_count` accumulates *during*
+   orchestration, so a region job finishing inside that window compares `1 >= 0` and writes
+   `status = completed, is_partial = false` with a fraction of the region-service pairs
+   scanned. Masked today only by single-worker timing.
+2. **A half-collected region reports as done.** `ProcessRegionScanJob::hasAlreadyCollected()`
+   returns true when *any* detail row exists for a (service, region), so a job that throttles
+   part-way through retries, sees rows, skips collection, and reports the region complete.
+
+Guard 1 in the technical notes — never conclude gone from a partial scan — is therefore
+resting on a flag that reads `false` in exactly the cases it needs to catch. Requiring
+positive `scan_detail` evidence survives the first bug, because a region that never ran
+leaves no details at all. It does **not** survive the second: a half-collected region has
+details, so its uncollected resources are indistinguishable from deleted ones.
+
+Shipping it anyway would auto-resolve findings for resources nobody looked at — the single
+failure this design set out to prevent.
+
+**What ships instead:** durable identity, the upsert, status preservation, and `fixed`.
+That is the whole headline outcome — counts stop doubling, fixed problems leave the list,
+and `ignored` survives a rescan. Ghost findings from deleted resources stay open, which is
+the conservative behaviour Ben originally specified anyway, and `last_seen_at` makes them
+identifiable in the meantime.
+
+**What unblocks it:** trustworthy per-(service, region) collection accounting — T10 in #92's
+design. Add `resource_gone` then, against the criteria already written above.
+
+**One thing this work gives #92 back:** the unique index on the finding identity makes
+#92's finding 2b — concurrent region jobs double-inserting the same finding, with no unique
+constraint to stop them — impossible at the database level.
 
 ## Still to settle during design
 

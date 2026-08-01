@@ -367,16 +367,28 @@ class FindingsEngineTest extends TestCase
     }
 
     /**
-     * Test that evaluateScan prevents duplicate findings
+     * Re-evaluating the same problem updates the one finding rather than adding another.
+     *
+     * Under durable findings the content comes from the scan that just looked — so the
+     * stale title is expected to be replaced, not preserved. That is the model: the most
+     * recent scan to examine a resource is authoritative for its content.
      */
-    public function test_evaluate_scan_prevents_duplicate_findings(): void
+    public function test_evaluate_scan_updates_the_existing_finding_rather_than_duplicating_it(): void
     {
-        // Create a scan
         $scan = Scan::factory()->create();
 
-        // Create an existing finding
-        ScanResult::create([
+        $existing = ScanResult::create([
             'scan_id' => $scan->id,
+            'organization_id' => $scan->organization_id,
+            'aws_account_id' => $scan->aws_account_id,
+            'identity_hash' => ScanResult::identityHash(
+                $scan->organization_id,
+                $scan->aws_account_id,
+                'iam',
+                'user',
+                'test-user-dup',
+                'tops-iam-001',
+            ),
             'severity' => 'high',
             'service' => 'iam',
             'resource_type' => 'user',
@@ -386,10 +398,11 @@ class FindingsEngineTest extends TestCase
             'description' => 'Existing description',
             'remediation' => 'Existing remediation',
             'status' => 'open',
+            'first_seen_at' => now()->subDay(),
+            'last_seen_at' => now()->subDay(),
         ]);
 
-        // Create scan details
-        $scanDetail = ScanDetail::create([
+        ScanDetail::create([
             'scan_id' => $scan->id,
             'service' => 'iam',
             'resource_type' => 'user',
@@ -398,7 +411,6 @@ class FindingsEngineTest extends TestCase
             'raw_data' => ['MFADevices' => []],
         ]);
 
-        // Mock rules file
         $mockRules = [
             'rules' => [
                 [
@@ -413,32 +425,22 @@ class FindingsEngineTest extends TestCase
             ],
         ];
 
-        File::shouldReceive('exists')
-            ->once()
-            ->andReturn(true);
+        File::shouldReceive('exists')->once()->andReturn(true);
+        File::shouldReceive('get')->once()->andReturn(json_encode($mockRules));
 
-        File::shouldReceive('get')
-            ->once()
-            ->andReturn(json_encode($mockRules));
-
-        // Mock ConditionEvaluator to return true
         $mockEvaluator = Mockery::mock(ConditionEvaluator::class);
-        $mockEvaluator->shouldReceive('evaluate')
-            ->once()
-            ->andReturn(true);
+        $mockEvaluator->shouldReceive('evaluate')->once()->andReturn(true);
 
-        // Create FindingsEngine with mocked evaluator
-        $engine = new FindingsEngine($mockEvaluator);
+        (new FindingsEngine($mockEvaluator))->evaluateScan($scan, ['basic']);
 
-        // Execute
-        $engine->evaluateScan($scan, ['basic']);
+        $findings = ScanResult::where('finding_type', 'tops-iam-001')->get();
+        $this->assertCount(1, $findings, 'The problem is one finding, however many scans see it.');
 
-        // Assert only one finding exists (no duplicate created)
-        $findings = ScanResult::where('scan_id', $scan->id)
-            ->where('finding_type', 'tops-iam-001')
-            ->get();
-        $this->assertCount(1, $findings);
-        $this->assertEquals('Existing Finding', $findings->first()->title);
+        $finding = $findings->first();
+        $this->assertSame($existing->id, $finding->id, 'The record persists rather than being replaced.');
+        $this->assertNotSame('Existing Finding', $finding->title, 'Content comes from the scan that just looked.');
+        $this->assertSame('open', $finding->status);
+        $this->assertSame($scan->id, $finding->last_seen_scan_id);
     }
 
     /**

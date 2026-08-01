@@ -66,9 +66,91 @@ class FindingsEngine
             return "{$detail->service}:{$detail->api_method}";
         });
 
-        // Evaluate each rule
+        // Evaluate each rule, remembering which findings this scan raised so the
+        // reconciliation pass can tell "still failing" from "examined and now fine".
+        $this->raisedThisScan = [];
+
         foreach ($allRules as $rule) {
             $this->evaluateRule($scan, $rule, $scanDetails, $detailsByServiceMethod);
+        }
+
+        $this->resolveFixedFindings($scan, $allRules, $detailsByServiceMethod);
+    }
+
+    /**
+     * Identity hashes raised by the scan currently being evaluated.
+     *
+     * @var array<string, true>
+     */
+    private array $raisedThisScan = [];
+
+    /**
+     * Close findings whose resource this scan examined and did not flag.
+     *
+     * The whole safety of this rests on one distinction: a finding is only resolved when
+     * there is **positive evidence** the scan looked at that exact resource under that
+     * exact rule — a scan_detail for the same service, api_method and resource_id — and
+     * raised nothing. Absence of a detail means the resource was not examined (a
+     * service-scoped scan, a failed region, a denied permission), and the finding is left
+     * strictly alone.
+     *
+     * That is why "the resource was deleted" is not handled here. It can only be inferred
+     * from an absent resource inside a successful enumeration, and a half-collected region
+     * currently reports as complete — so the inference would close findings nobody looked
+     * at. Deferred until per-(service, region) accounting is trustworthy.
+     *
+     * @param array<int, array<string, mixed>> $rules
+     * @param Collection<string, Collection<int, ScanDetail>> $detailsByServiceMethod
+     */
+    private function resolveFixedFindings(Scan $scan, array $rules, Collection $detailsByServiceMethod): void
+    {
+        // Which (service, api_method, resource_id) triples this scan actually examined.
+        $examined = [];
+        foreach ($rules as $rule) {
+            $service = $rule['service'] ?? null;
+            $method = $rule['method'] ?? null;
+            $findingType = $rule['rule'] ?? null;
+
+            if ($service === null || $method === null || $findingType === null) {
+                continue;
+            }
+
+            foreach ($detailsByServiceMethod->get("{$service}:{$method}", collect()) as $detail) {
+                $resourceId = $detail->resource_id ?? 'unknown';
+                $examined[] = ScanResult::identityHash(
+                    $scan->organization_id,
+                    $scan->aws_account_id,
+                    $service,
+                    $detail->resource_type ?? 'unknown',
+                    $resourceId,
+                    $findingType,
+                );
+            }
+        }
+
+        $examined = array_values(array_unique($examined));
+        if ($examined === []) {
+            return;
+        }
+
+        // Examined, and this scan raised nothing for it — the problem is fixed.
+        $fixed = array_values(array_diff($examined, array_keys($this->raisedThisScan)));
+        if ($fixed === []) {
+            return;
+        }
+
+        foreach (array_chunk($fixed, 500) as $chunk) {
+            ScanResult::query()
+                ->where('organization_id', $scan->organization_id)
+                ->whereIn('identity_hash', $chunk)
+                ->where('status', '!=', 'resolved')
+                ->update([
+                    'status' => 'resolved',
+                    'resolved_at' => now(),
+                    'resolution_reason' => ScanResult::REASON_FIXED,
+                    'last_seen_at' => now(),
+                    'last_seen_scan_id' => $scan->id,
+                ]);
         }
     }
 
@@ -142,29 +224,61 @@ class FindingsEngine
         $title = $this->buildTitle($rule, $detail);
         $description = $this->buildDescription($rule, $detail);
         
-        // Check if finding already exists (avoid duplicates)
-        $existing = ScanResult::where('scan_id', $scan->id)
-            ->where('service', $rule['service'])
-            ->where('resource_type', $resourceType)
-            ->where('resource_id', $resourceId)
-            ->where('finding_type', $rule['rule'] ?? 'unknown')
+        $findingType = $rule['rule'] ?? 'unknown';
+        $identity = ScanResult::identityHash(
+            $scan->organization_id,
+            $scan->aws_account_id,
+            $rule['service'],
+            $resourceType,
+            $resourceId,
+            $findingType,
+        );
+
+        // Remember it was raised, so the reconciliation pass does not read this scan's
+        // silence about other resources as "fixed".
+        $this->raisedThisScan[$identity] = true;
+
+        $existing = ScanResult::where('organization_id', $scan->organization_id)
+            ->where('identity_hash', $identity)
             ->first();
-        
-        if ($existing) {
-            return; // Finding already exists
-        }
-        
-        ScanResult::create([
-            'scan_id' => $scan->id,
+
+        // Content always comes from the scan that just looked. Status does not: it is the
+        // user's, and a scan may only contradict it with evidence.
+        $content = [
             'severity' => $rule['severity'] ?? 'medium',
-            'service' => $rule['service'],
-            'resource_type' => $resourceType,
-            'resource_id' => $resourceId,
-            'finding_type' => $rule['rule'] ?? 'unknown',
             'title' => $title,
             'description' => $description,
             'remediation' => $this->buildRemediation($rule, $detail),
+            'last_seen_at' => now(),
+            'last_seen_scan_id' => $scan->id,
+        ];
+
+        if ($existing) {
+            // A finding someone marked resolved that is still failing gets reopened —
+            // the claim was contradicted, and saying so is the point of scanning again.
+            // "Ignored" is a standing instruction rather than a claim, so it stands.
+            if ($existing->status === 'resolved') {
+                $content['status'] = 'open';
+                $content['resolved_at'] = null;
+                $content['resolution_reason'] = null;
+            }
+
+            $existing->update($content);
+
+            return;
+        }
+
+        ScanResult::create($content + [
+            'scan_id' => $scan->id,
+            'organization_id' => $scan->organization_id,
+            'aws_account_id' => $scan->aws_account_id,
+            'identity_hash' => $identity,
+            'service' => $rule['service'],
+            'resource_type' => $resourceType,
+            'resource_id' => $resourceId,
+            'finding_type' => $findingType,
             'status' => 'open',
+            'first_seen_at' => now(),
         ]);
     }
 
