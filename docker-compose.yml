@@ -114,6 +114,13 @@ services:
       DB_USERNAME: ${MYSQL_USER:-teem}
       DB_PASSWORD: ${MYSQL_PASSWORD:?missing from .env; install.sh and docker/scripts/prepare-build.sh generate it}
       LOG_CHANNEL: ${LOG_CHANNEL:-stderr}
+      # How many region-scan workers run in parallel. A full scan fans out to roughly
+      # 153 region jobs, so this is the number that decides how long a scan takes.
+      # Each process holds the AWS SDK (~60-120 MB) and one MySQL connection, so 5 costs
+      # about 0.6-0.8 GB. Raise it only with the memory and the AWS API rate limits to
+      # match — five concurrent workers against one account already raises throttling
+      # risk noticeably.
+      TOPS_WORKER_PROCESSES: ${TOPS_WORKER_PROCESSES:-5}
       # See the note on the app service: these queue-connection vars must come
       # from env_file layering, not `environment:`, or generated/teemops.env's
       # sqs-* values get overridden and jobs are dispatched to the wrong queue.

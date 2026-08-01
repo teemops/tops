@@ -495,7 +495,15 @@ they gated everything else:
   unconditionally: it only runs when the normal path did not, so a fallback can never say "all
   clear".
 
-**PERF-6 (#69, run more than one worker) is now unblocked and is the actual headline.** Then the other cheap wins:
+~~**PERF-6 (#69, run more than one worker)**~~ — ✅ **Done 2026-08-02.** The worker container
+now runs two supervisord pools instead of one process: the orchestrator (`default`,
+`teemops_audit`) and region jobs (`teemops_audit_region`), the latter sized by
+`TOPS_WORKER_PROCESSES`, **default 5**. Split deliberately, so a long orchestrator job cannot
+block the ~153 region jobs queued behind it. The no-SQS path gets the same concurrency —
+it previously ran a single bare `queue:work`. Safe because the database driver uses
+`SELECT … FOR UPDATE SKIP LOCKED` on MySQL 8 and completion is settled by the batch from
+PERF-2, not by workers racing a counter. Costs ~0.6–0.8 GB at the default, which is now a
+documented minimum-spec note. Then the other cheap wins:
 PERF-11 (#74, index `scan_details`), PERF-12 (#75, bulk-insert), PERF-13 (#76, memoize AWS
 clients), PERF-14 (#77), PERF-15 (#78), PERF-18 (#94). Remaining: PERF-4 (#67),
 PERF-5 (#68), PERF-7 (#70), PERF-8 (#71), PERF-9 (#72), PERF-10 (#73), PERF-16 (#79),

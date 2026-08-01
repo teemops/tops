@@ -107,13 +107,32 @@ php artisan queue:work sqs-audit-region --queue=teemops_audit_region
 - **Local dev without SQS:** Set in `.env`:
   - `SCAN_QUEUE_CONNECTION=database`
   - `SCAN_REGION_QUEUE_CONNECTION=database`
-  Then run **one** worker that processes both main and region jobs:
+  Then run a worker that processes both main and region jobs:
   ```bash
   php artisan queue:work database --queue=default,teemops_audit_region
   ```
   (Terminal 3 can use that command instead of plain `queue:work`.)
+
+  **One worker will be slow.** A full scan fans out to roughly 153 region jobs — nine
+  regional services across ~17 regions — and a single worker runs them one at a time.
+  Run several to see realistic timings:
+  ```bash
+  for i in 1 2 3 4 5; do
+    php artisan queue:work database --queue=default,teemops_audit_region --stop-when-empty &
+  done; wait
+  ```
+  This is safe: the database queue driver uses `SELECT … FOR UPDATE SKIP LOCKED` on
+  MySQL 8, so workers never take the same job, and scan completion is settled by a job
+  batch rather than by workers racing a counter.
 - **Production / SQS:** Set `SCAN_QUEUE_CONNECTION=sqs-audit` and `SCAN_REGION_QUEUE_CONNECTION=sqs-audit-region` (or leave unset). Create SQS queues `teemops_audit` and `teemops_audit_region`, set AWS credentials, and run both workers (Terminal 7). If the push to SQS fails, creating a scan returns 503.
 - **Why “no status update” on region worker:** If you see “Scan with region-based service - waiting for region scans to complete” but the region worker never processes jobs, either (1) region jobs are going to SQS but the region worker is not running or is pointing at the wrong queue, or (2) use database for both (above) so one worker handles everything.
+- **Worker concurrency in Docker:** the worker container runs two supervisord pools — one
+  for the orchestrator (`default`, `teemops_audit`) and one for region jobs
+  (`teemops_audit_region`), sized by `TOPS_WORKER_PROCESSES` (default **5**). They are split
+  so a long orchestrator job cannot block region jobs behind it. Each process holds the AWS
+  SDK (~60–120 MB) and one MySQL connection, so 5 costs roughly 0.6–0.8 GB — **worth
+  treating as a minimum-spec note for self-hosters.** Raising it also raises AWS API
+  throttling risk against a single account.
 - **Scan stuck in “Running”:** If an EC2/S3 (region-based) scan stays “Running”, ensure the region worker is processing jobs (see above). To fix already-stuck scans, run: `php artisan scans:mark-stale-region-complete` (marks scans that have been running 60+ minutes as completed with partial results). Use `--dry-run` to list scans that would be updated.
 
 Visit: http://localhost:8000
