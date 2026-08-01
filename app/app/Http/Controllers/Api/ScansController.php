@@ -8,6 +8,7 @@ use App\Models\AwsAccount;
 use App\Models\Organization;
 use App\Models\Scan;
 use App\Models\ScanResult;
+use App\Services\FindingsBreakdownService;
 use App\Services\OrganizationPermission;
 use App\Services\ScanProfilesService;
 use App\Services\ScanTypesService;
@@ -18,8 +19,10 @@ class ScansController extends Controller
 {
     protected OrganizationPermission $permission;
 
-    public function __construct(OrganizationPermission $permission)
-    {
+    public function __construct(
+        OrganizationPermission $permission,
+        protected FindingsBreakdownService $breakdown
+    ) {
         $this->permission = $permission;
     }
 
@@ -219,11 +222,25 @@ class ScansController extends Controller
             ->where('organization_id', $organization->id)
             ->firstOrFail();
 
+        // Findings are current state, so a breakdown only makes sense under the scan that
+        // produced that state. Under an older scan's date the same numbers would be wrong
+        // and plausible at once, which is worse than showing nothing. See D-11.
+        $latest = $this->latestCompletedScanFor($scan);
+        $isLatest = $latest !== null && $latest->id === $scan->id;
+
         return response()->json([
             'id' => $scan->id,
             'awsAccountId' => $scan->aws_account_id,
             'awsAccountName' => $scan->awsAccount->name ?? 'Unknown',
             'status' => $scan->status,
+            // What actually ran. Both are stored and neither was returned before, so the
+            // page could not say whether it was looking at a benchmark or a few services.
+            'scanTypes' => $scan->scan_types ?? [],
+            'rulesets' => $scan->rulesets ?? [],
+            // Resolved here rather than shipping the whole label map for the client to
+            // navigate: rulesetLabels() returns a ['label' => ..., 'description' => ...]
+            // per ruleset, and every consumer that only wants the name has to know that.
+            'rulesetLabels' => $this->rulesetLabelsFor($scan->rulesets ?? []),
             // A scan can be 'completed' yet have missed regions. Surfacing that lets the
             // UI say so instead of presenting partial results as a full picture.
             'isPartial' => (bool) $scan->is_partial,
@@ -232,7 +249,49 @@ class ScansController extends Controller
             'startedAt' => $scan->started_at?->toISOString(),
             'completedAt' => $scan->completed_at?->toISOString(),
             'errorMessage' => $scan->error_message ?? null,
+            'isLatestForAccount' => $isLatest,
+            'latestScanId' => $latest?->id,
+            'breakdown' => $isLatest
+                ? $this->breakdown->for($organization->id, $scan->aws_account_id)
+                : null,
         ]);
+    }
+
+    /**
+     * Human labels for the rulesets a scan ran, in the order it ran them.
+     *
+     * Falls back to the raw ruleset name rather than dropping it — a scan of a ruleset
+     * that has since been renamed should still say what it ran.
+     *
+     * @param  array<int, string>  $rulesets
+     * @return array<int, string>
+     */
+    private function rulesetLabelsFor(array $rulesets): array
+    {
+        $labels = ScanProfilesService::rulesetLabels();
+
+        return array_values(array_map(
+            fn (string $ruleset) => $labels[$ruleset]['label'] ?? $ruleset,
+            $rulesets
+        ));
+    }
+
+    /**
+     * The most recently completed scan of the same account, within the same organization.
+     *
+     * Ordered by completed_at rather than created_at: a scan that started earlier can
+     * finish later, and it is the finish that decides which one produced current state.
+     */
+    private function latestCompletedScanFor(Scan $scan): ?Scan
+    {
+        return Scan::query()
+            ->where('organization_id', $scan->organization_id)
+            ->where('aws_account_id', $scan->aws_account_id)
+            ->where('status', 'completed')
+            ->whereNotNull('completed_at')
+            ->orderByDesc('completed_at')
+            ->orderByDesc('id')
+            ->first();
     }
 
     /**

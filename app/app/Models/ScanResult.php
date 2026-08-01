@@ -57,6 +57,20 @@ class ScanResult extends Model
     public const SEVERITY_ORDER = ['critical', 'high', 'medium', 'low'];
 
     /**
+     * How much each severity counts when findings are weighed against each other.
+     *
+     * Lives here because more than one thing needs it — the security score and the
+     * "fix these first" ranking. Two weightings would let two numbers in the same
+     * product disagree about which of two problems is worse.
+     */
+    public const SEVERITY_WEIGHTS = [
+        'critical' => 10,
+        'high' => 5,
+        'medium' => 2,
+        'low' => 1,
+    ];
+
+    /**
      * The scan that first raised this finding.
      *
      * Note this is no longer "the scan this finding belongs to" — a finding outlives the

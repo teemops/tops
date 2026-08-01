@@ -415,17 +415,22 @@ detail becomes a link into Findings, filtered. The per-finding list comes **off*
 | ~~**#64**~~ | ~~PERF-1 · Instrument scan phases~~ | ✅ **Done** 2026-08-01 — phase timing instrumented so the ~10 minutes is attributed rather than guessed. Baseline captured. PR #96. | S |
 | ~~**#85**~~ | ~~F-3 · Filter Findings by service~~ | ✅ **Done** 2026-08-02, verified on the reference install — service pills with server-computed facet counts, ordered by size, long tail behind `+ N more`. The facet deliberately does not constrain itself, so selecting one pill leaves the rest navigable, and counts follow list semantics so a pill reading N returns N rows. | S |
 | ~~**#83**~~ | ~~F-7 · Findings does not read its filters from the URL~~ | ✅ **Done** 2026-08-02 — shipped inside F-3, which could not meet its "and the URL reflects it" criterion without it. Filters now read from and write back to the URL, so a filtered view can be bookmarked or sent to a colleague. | XS |
+| ~~**#86**~~ | ~~S-1 · Scan detail summarises and dispatches~~ | ✅ **Done** 2026-08-02, verified on the reference install — Scan detail now summarises and dispatches: run facts, severity totals, "fix these first" ranked by severity, and a drillable breakdown whose every row links into Findings filtered. The per-finding list, its remediation and its severity filter are **deleted**, which is what pays for the feature. Built as a shared service and component so Insights is a re-key, not a rewrite. | M |
 | ~~**#82**~~ | ~~F-1 · Findings drops the remediation it already has~~ | ✅ **Done** 2026-08-02 — the one-line remediation now renders on its own rather than being gated behind `tips.json` step-by-step guidance, which only critical/high rules carry. Fixed the empty state for **46 of 74 rules**. Landed *before* S-1 deliberately: S-1 makes Findings the only page showing remediation at all. | XS |
 
 #### Open — UI, in dependency order
 
-**#86 is next and is now unblocked** — #81, #83 and #85 have all landed, and #82 was cleared
-ahead of it for the reason that made it P0: S-1 removes the per-finding list from Scan detail,
-so Findings becomes the only page rendering remediation at all.
+**The P0/P1 run is complete.** #81, #82, #83, #85 and #86 have all landed; what remains is P2
+and below. **#88 (F-5, Insights by service) is the cheapest next thing** — S-1 built the
+breakdown as a shared service and component precisely so Insights is a re-key rather than a
+rewrite, and there is already a test proving the organization-wide path works.
 
 | # | Item | Depends on | Size | Priority |
 | --- | --- | --- | :---: | :---: |
-| **#86** | S-1 · Scan detail summarises and dispatches — **next**, story drafted | ✅ all met | M | P1 |
+| **#88** | F-5 · Insights by service — **next**; reuses S-1's component and service | ✅ all met | S | P2 |
+| **#91** | B-2 · Security score pinned at 0 and cannot improve | — | XS–S | P2 · bug |
+| **#87** | F-4 · Filter Findings by compliance benchmark — the one genuine data-model change left; nothing records a finding's benchmark | #81 | M | P2 |
+| **#89** | F-6 · Insights by benchmark | #87, #88 | XS | P3 |
 | **#87** | F-4 · Filter Findings by compliance benchmark — the one genuine data-model change left; nothing records a finding's benchmark | #81 | M | P2 |
 | **#88** | F-5 · Insights by service with severity breakdown | #86, #81 | S | P2 |
 | **#91** | B-2 · Security score pinned at 0 and cannot improve | — | XS–S | P2 · bug |
@@ -1327,6 +1332,23 @@ Blocking nothing today, but each one shapes the plan:
 
 ## Changelog
 
+- **2026-08-02** — **S-1 landed, and the P0/P1 run of this workstream is complete.** Scan
+  detail summarises and dispatches: run facts, severity totals, "fix these first" ranked by
+  severity weight rather than raw count, and a drillable breakdown whose every row links into
+  Findings already filtered. **The per-finding list, its remediation and its severity filter
+  are deleted** — that duplication was the whole problem, and removing it is what pays for the
+  feature. An older scan now renders deliberately blank apart from its run facts and a link to
+  the latest, which follows directly from D-11: a current-state number under a July date would
+  be wrong *and* plausible. The cost, accepted knowingly, is that "what did scan X find?" is no
+  longer answerable for anything but the latest scan. Built as `FindingsBreakdownService` plus a
+  shared `FindingsBreakdown` component, both keyed on an organization with an *optional*
+  account, so F-5 is a re-key rather than a rewrite — there is a test covering that path
+  already. The severity weighting moved to `ScanResult::SEVERITY_WEIGHTS` so the security score
+  and the ranking cannot drift apart. **One bug found in review by Ben, not by the tests:** the
+  scan group rendered `[object Object]`, because `rulesetLabels()` returns a label/description
+  pair per ruleset and the whole map was shipped to the client typed as flat strings. Labels are
+  now resolved server-side. That is the second time the missing frontend test runner has cost
+  something — **worth deciding on Vitest rather than continuing to rely on manual checks.**
 - **2026-08-02** — **F-3, F-7 and F-1 landed; the Findings page is now the destination S-1
   needs.** F-3 ([#85](https://github.com/teemops/tops/issues/85)) gained server-computed service
   facets — one grouped query against the indexed `scan_results.service`, with the rule that

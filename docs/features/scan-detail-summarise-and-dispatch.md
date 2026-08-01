@@ -1,7 +1,18 @@
 # Scan Detail — Summarise and Dispatch - User Story
 
 **Roadmap:** S-1 · **Issue:** [#86](https://github.com/teemops/tops/issues/86) ·
-**Milestone:** Findings & Scans v2 · **Status:** draft, awaiting sign-off · **Raised:** 2026-08-02
+**Milestone:** Findings & Scans v2 · **Status:** ✅ **Shipped 2026-08-02** · **Raised:** 2026-08-02
+
+> **Verified 2026-08-02** by Ben on the reference install. One bug found and fixed in review:
+> the scan group rendered `[object Object]` because `ScanProfilesService::rulesetLabels()`
+> returns a `['label' => ..., 'description' => ...]` per ruleset and the whole map was being
+> shipped to the client typed as flat strings. Labels are now resolved server-side, so the
+> page receives only the labels for the rulesets this scan actually ran.
+>
+> **Known gap, deliberate:** "Fix these first" entries do not link into Findings. A theme
+> spanning several rules cannot be expressed as a filter while Findings is single-select on
+> `finding_type`, and making only the single-rule entries clickable would be worse than making
+> none of them clickable. Needs multi-select or F-4's data model first.
 
 **Depends on** (all landed): D-1 durable findings ([#81](https://github.com/teemops/tops/issues/81)) ·
 F-7 URL filters ([#83](https://github.com/teemops/tops/issues/83)) ·
@@ -45,39 +56,39 @@ remediation, no severity filter. That deletion is what pays for the feature.
 
 **Run facts**
 
-- [ ] Given any scan, when I open it, then I see its scan group, when it ran, its status and
+- [x] Given any scan, when I open it, then I see its scan group, when it ran, its status and
       its account
-- [ ] Given a scan that ran a whole benchmark, when I read the scan group, then it names the
+- [x] Given a scan that ran a whole benchmark, when I read the scan group, then it names the
       benchmark; given a scan narrowed to services, then it says how many services ran
-- [ ] Given a partial scan, when I view it, then I am told the counts are a floor rather than
+- [x] Given a partial scan, when I view it, then I am told the counts are a floor rather than
       a total, because a service unscanned in a region is not a service with nothing wrong
 
 **The latest scan**
 
-- [ ] Given the most recent completed scan for an account, when I open it, then I see severity
+- [x] Given the most recent completed scan for an account, when I open it, then I see severity
       totals and the breakdown
-- [ ] Given the breakdown, when I read its heading, then it says these are findings open now
+- [x] Given the breakdown, when I read its heading, then it says these are findings open now
       rather than what this scan personally saw
-- [ ] Given "Fix these first", when it ranks entries, then a higher-severity group outranks a
+- [x] Given "Fix these first", when it ranks entries, then a higher-severity group outranks a
       larger but less severe one
-- [ ] Given a service row, when I click it, then I land on Findings filtered to that service
-- [ ] Given a finding-type row, when I click it, then I land on Findings filtered to that type
+- [x] Given a service row, when I click it, then I land on Findings filtered to that service
+- [x] Given a finding-type row, when I click it, then I land on Findings filtered to that type
 
 **Older scans**
 
-- [ ] Given a scan that is not the latest completed one for its account, when I open it, then
+- [x] Given a scan that is not the latest completed one for its account, when I open it, then
       I see the run facts, a note that it has been superseded, and a link to the latest scan
-- [ ] Given that same older scan, when I look for totals or a breakdown, then there are none
+- [x] Given that same older scan, when I look for totals or a breakdown, then there are none
 
 **Removal**
 
-- [ ] Given any scan, when I open it, then there is no per-finding list, no remediation text
+- [x] Given any scan, when I open it, then there is no per-finding list, no remediation text
       and no severity filter on the page
 
 **Authorization and isolation**
 
-- [ ] Given a scan belonging to another organization, when I request it, then it is not found
-- [ ] Given the breakdown and totals, when they are computed, then they include only findings
+- [x] Given a scan belonging to another organization, when I request it, then it is not found
+- [x] Given the breakdown and totals, when they are computed, then they include only findings
       from the caller's organization
 
 ## Technical Notes
