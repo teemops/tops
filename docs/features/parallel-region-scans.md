@@ -53,9 +53,10 @@ For contrast, the legacy EC2 supervisor configs ran `numprocs=8`
 The Docker deployment lost that and nobody noticed, because nothing is functionally
 broken — it is just serial.
 
-153 jobs × ~4s each ≈ 612s. That is the 10 minutes.
+153 jobs × ~4s each ≈ 612s. That is the 10 minutes — and the measured baseline
+below puts the fan-out at 590s, so this is close to right.
 
-### The second bottleneck: findings evaluation is quadratic
+### A suspected second bottleneck: findings evaluation re-runs per job
 
 `ProcessRegionScanJob` calls `FindingsEngine::evaluateScan()` on **every** region job
 ([ProcessRegionScanJob.php:120](../../app/app/Jobs/ProcessRegionScanJob.php#L120)). That
@@ -70,6 +71,10 @@ in the ruleset across the whole collection. Region job #150 re-does the work of 
 1–149. Across 153 jobs this is O(N²) in detail rows for a result that only needs
 computing once. `createFinding()` also issues an individual `SELECT` per candidate row to
 dedupe ([FindingsEngine.php:146](../../app/app/Services/RulesEngine/FindingsEngine.php#L146)).
+
+This was the working hypothesis for where the time went. **The measurement below does not
+bear it out** — it is kept here because the structure is real and does matter at scale, but
+it is not the cause of the ten minutes.
 
 `checkAndMarkRegionBasedScanComplete()` adds a `DISTINCT (region, service)` scan over all
 the scan's detail rows, also once per job, with no supporting index (`scan_details` has
