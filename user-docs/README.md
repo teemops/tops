@@ -26,6 +26,24 @@ tables, that is a signal about the page, not about the tooling.
 **Install instructions live in `README.md`, not here.** Linking beats copying; two canonical
 copies drift. Pages reference it rather than restating commands.
 
+**No links to pages that do not exist yet.** The IA maps 34 pages; only some are written. A
+page may link forward only once the target is real — otherwise the site ships dead links,
+which cost more trust than a missing cross-reference. Until a target exists, link the
+repository file it will be based on, or leave the link out. Check before committing:
+
+```bash
+python3 - <<'EOF'
+import pathlib, re
+bad = []
+for md in pathlib.Path("user-docs").rglob("*.md"):
+    text = re.sub(r"```.*?```", "", md.read_text(), flags=re.S)
+    for m in re.finditer(r"\]\((?!https?:|#)([^)#]+)(#[^)]*)?\)", text):
+        if not (md.parent / m.group(1)).resolve().exists():
+            bad.append(f"{md}: -> {m.group(1)}")
+print("\n".join(bad) or "all relative links resolve")
+EOF
+```
+
 **Do not document what does not exist.** Verified against `docs/PROGRESS.md`. Firebase
 sign-in is built but off by default, MFA is gated, and report export, scheduled scans and
 multi-cloud are not started — none get a page.
@@ -69,7 +87,25 @@ python3 -c "import xml.etree.ElementTree as ET,sys; [ET.parse(f) for f in sys.ar
 
 ### Writing a new page
 
-Pick one of the three archetypes in the IA document — **task**, **explainer**, or
-**reference** — and follow its shape. Depth increases down the page: the first screen serves
-a non-technical reader, the last third serves someone debugging. That is what lets one site
-serve both without splitting into audience tracks.
+Copy the matching archetype and replace it. The guidance is inline, as comments that do not
+render:
+
+| Archetype | Use for | Template |
+| --- | --- | --- |
+| **Task** | Someone doing a thing right now | [`task.md`](../design/docs-site/archetypes/task.md) |
+| **Explainer** | Someone deciding whether to trust something | [`explainer.md`](../design/docs-site/archetypes/explainer.md) |
+| **Reference** | Someone who arrived from search and wants to leave | [`reference.md`](../design/docs-site/archetypes/reference.md) |
+
+Seven rules, in full in the
+[IA document](../design/docs-site/information-architecture.md#house-voice):
+
+1. **Depth increases down the page** — first screen for a non-technical reader, last third
+   for someone debugging. This is what lets one site serve three audiences.
+2. **Write from the reader's side of the screen** — they manage accounts and findings, not
+   rows and rule evaluations.
+3. **Symptom before cause** — troubleshooting is reached by searching an error message.
+4. **Show real output**, not paraphrased output.
+5. **Never claim more than the code does.** The child IAM role is not read-only, so no page
+   says it is. Every explainer carries a *What we do not claim* section.
+6. **Link, do not restate.** Two canonical copies drift, and the stale one gets followed.
+7. **No page for a feature that does not exist** — check `docs/PROGRESS.md`, not the roadmap.

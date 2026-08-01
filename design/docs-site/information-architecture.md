@@ -199,6 +199,68 @@ read/write permissions split.
 **3. Reference** — glossary, commands, rules, release notes. Scannable, tabular, no
 narrative. Assumed to be arrived at from search or a link, never read top to bottom.
 
+Copyable skeletons, with the guidance inline as comments that do not render:
+[`archetypes/task.md`](archetypes/task.md) ·
+[`archetypes/explainer.md`](archetypes/explainer.md) ·
+[`archetypes/reference.md`](archetypes/reference.md).
+
+## House voice
+
+D-10's decision to structure by task rather than by audience only works if every page is
+written the same way. Pages will be written by whoever ships the feature, months apart, so
+the rules have to be few enough to remember and specific enough to check.
+
+**Depth increases down the page.** The first screen serves someone non-technical; the last
+third serves someone debugging. This is the mechanism that lets one site serve three
+audiences without splitting into tracks — if a page cannot be arranged this way, it is
+probably two pages.
+
+**Write from the reader's side of the screen.** They manage *accounts* and *findings*, not
+`aws_accounts` rows and rule evaluations. Name things the way the UI names them. Internal
+vocabulary belongs in `docs/`, not here.
+
+**Symptom before cause.** Troubleshooting entries are reached by searching an error message,
+so lead with the literal text the reader has in front of them — then the cause, then the fix.
+A section organised by subsystem is unfindable by the person who needs it.
+
+**Show real output.** Readers compare their screen to the page character by character.
+Paraphrased output silently breaks that.
+
+**Never claim more than the code does.** The child IAM role is not read-only, so no page says
+it is. A reader who catches one overstatement stops trusting the rest of the site, and
+reviewers are exactly the audience that checks. Every explainer carries a *What we do not
+claim* section for this reason.
+
+**Link, do not restate.** Install commands live in `README.md`; the site links to them. Two
+canonical copies drift, and the stale one is the one someone follows.
+
+**No page for a feature that does not exist.** Verified against `docs/PROGRESS.md`, not
+against the roadmap — the roadmap describes intent, `PROGRESS.md` describes the code.
+
+## Writing order
+
+Priority in the inventory says what matters; this says what unblocks what. Roughly dependency
+order, not importance order.
+
+1. **`SECURITY.md`** — repo hygiene, blocked by nothing, and the one gap with an active
+   reason to exist today.
+2. **The two evaluator pages** — already written. *How TOPS connects to AWS* is done; *What
+   the IAM role can do* is a straight extraction from it and the child template.
+3. **Reading a finding**, then **Resolving a finding.** In that order: resolution is
+   meaningless to someone who cannot yet interpret severity and evidence. These two are what
+   a design partner hits within minutes of a first scan, and nothing currently describes them.
+4. **Deploy the site.** Cloudflare Pages, `docs.teemops.com`. Do it once there are four real
+   pages rather than before — a live site with one page invites filler.
+5. **Trim `README.md`'s setup section** to link inward. Only after an install page exists to
+   link *to*; doing it earlier points at nothing.
+6. **Delete `docs/quick-start.md`.**
+7. **Everything else, as the feature that needs it ships.** No documentation sprint.
+
+The one ordering trap: **Configuration reference** looks cheap because the values already
+exist in `.env.docker.example` and the compose file. It is not — it is a second copy of
+something the code states, and it goes stale silently. Write it late, and only after deciding
+whether it can be generated.
+
 ## Sample test: the architecture page as a real Markdown page
 
 Built and measured, not theorised. `user-docs/start-here/how-tops-connects-to-aws.md` plus

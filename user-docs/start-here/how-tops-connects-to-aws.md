@@ -159,9 +159,9 @@ publish the link — the scanner keeps working, the operational features stop.
 
 ## Related
 
-- [What the IAM role can do](../aws-accounts/what-the-iam-role-can-do.md) — the same permissions, policy by policy
-- [The security model](../security/the-security-model.md) — trust boundaries in full
-- [Install](../start-here/install.md) — when you are ready to run it
+- [Installing TOPS](https://github.com/teemops/tops#install) — the commands, kept in one place in the repository
+- [The child-account CloudFormation template](https://github.com/teemops/tops/blob/develop/templates/iam.role.child.account.cfn.yaml) — every policy this page summarises, in full
+- [Licence and trademark](https://github.com/teemops/tops/blob/develop/LICENSE) — Apache-2.0, with the name held separately
 
 *Source of truth for this page: `templates/iam.role.child.account.cfn.yaml`,
 `infra/cloud-stack/`, and `docker-compose.yml` in the TOPS repository.*
