@@ -75,8 +75,51 @@ dedupe ([FindingsEngine.php:146](../../app/app/Services/RulesEngine/FindingsEngi
 the scan's detail rows, also once per job, with no supporting index (`scan_details` has
 no index covering `region`).
 
-**Caveat:** this breakdown is read off the code, not measured. T1 below exists to confirm
-the split before we spend effort on the wrong half.
+### Measured baseline (2026-08-01)
+
+T1 has since measured a real scan — 11 services, 17 regions, 153 region jobs, one worker.
+**Total 735s (12m15s).** It confirms the diagnosis above in outline and corrects it in one
+important respect.
+
+| Phase | Time | Share |
+| --- | --- | --- |
+| Orchestrator (`ProcessAuditScanJob`) | 142s | 19% |
+| Region fan-out (153 jobs) | 590s | 80% |
+
+Only ~8s of the orchestrator's 142s is dispatching. `iam` takes **74s** and `s3` **60s**,
+both inline, and `sns`/`sqs` cannot dispatch until they finish — 134s in which no region
+job can start. This is T8, and it is larger than estimated.
+
+Within the fan-out, one service dominates:
+
+| service | jobs | mean | total |
+| --- | --- | --- | --- |
+| **ec2** | 17 | **15.24s** | **259s** |
+| rds | 17 | 3.41s | 58s |
+| sqs | 17 | 2.94s | 50s |
+| others (6) | 100 | ~2.2s | 223s |
+
+ec2 is 7x slower per region than anything else and is 35% of the whole scan, *including in
+regions holding nothing*. Cause: `describeVpcs` declares nine per-VPC actions and every
+region has a default VPC, so ec2 makes ~12 sequential API calls per region regardless.
+Tracked separately as T18.
+
+**The quadratic findings claim is not supported at this scale.** Per-job time was expected
+to climb steadily as `scan_details` grew. It does not:
+
+```
+first 15 jobs mean: 2.33s
+last  15 jobs mean: 3.00s
+growth factor     : 1.3x
+```
+
+The scan produced only **523 detail rows and 79 findings** — re-evaluating 523 rows 153
+times costs milliseconds. The O(N²) structure is real and still worth removing for
+simplicity, but it is not where the time goes, and T7 drops from P0 to P2 accordingly.
+
+**Caveat:** one account, one shape — a default VPC per region and little else. An estate
+20–50x larger would shift weight toward collection and make the quadratic cost real. The
+T7 demotion is a call on this estate, not a general one.
 
 ---
 
@@ -223,8 +266,8 @@ P1 = the speed-up itself; P2 = worthwhile after; P3 = optional.
 | T4 | Unique finding key + `insertOrIgnore` in `createFinding()` | Do existing installs already hold duplicates? Determines dedupe migration shape | **Demoted from P0 by Q2.** With evaluation running once in the batch callback there is no concurrent `createFinding`, so this is defence-in-depth (retried callback, sweep fallback) rather than a concurrency blocker. Needs a stored hash column — the columns exceed InnoDB's 3072-byte index limit. Schema and data migrations stay separate | P1 | S |
 | T5 | AWS SDK adaptive retry on `createClient` | None | None. Cheap, but a genuine prerequisite — concurrency raises throttling odds | P0 | XS |
 | T6 | Configurable worker concurrency: `numprocs`, separate region pool, fix the no-SQS `exec queue:work` path | None | **Depends on T2, T3, T5, T7.** Region pool defaults to 5 (Q3); audit pool stays small. ~60–120 MB + 1 MySQL connection per worker | P1 | XS |
-| T7 | Remove findings evaluation from region jobs; run it once in the batch `finally()` (Q2 resolved) | None | Depends on T2. **Blocks T6** — until this lands, region jobs still evaluate concurrently and T4 becomes a hard prerequisite instead | P0 | S |
-| T8 | Move `iam` / `s3` out of the orchestrator into their own jobs | Does this change `is_partial` semantics for global services? | Depends on T2 — completion accounting must cover them | P1 | S |
+| T7 | Remove findings evaluation from region jobs; run it once in the batch `finally()` | None | **Demoted P0 → P2 by the measured baseline** — growth is 1.3x, not quadratic, at this account size. Still worth doing for simplicity. If it slips past T6, T4 returns to being a hard prerequisite | P2 | S |
+| T8 | Move `iam` / `s3` out of the orchestrator into their own jobs | Does this change `is_partial` semantics for global services? | Depends on T2. **Measured at 134s of dead time (19% of the scan), and it does not dilute under T6** — highest-value item after T6 | P0 | S |
 | T9 | Cache `determineBucketRegion()` per bucket in `S3Scanner` | None | None. Currently 10 API calls per bucket instead of 5 | P1 | XS |
 | T10 | Per-(service, region) work record replacing `hasAlreadyCollected()` | New table vs. columns on an existing one? | **Not absorbed by T2.** A batch tracks counts, not which (service, region) failed, and does nothing about a half-collected region being recorded as done | P1 | S |
 | T11 | Index `scan_details (scan_id, service, region)` | None | **Still wanted after T2.** The `DISTINCT` count goes away, but `hasAlreadyCollected()` queries exactly these three columns on every region job | P1 | XS |
@@ -234,6 +277,7 @@ P1 = the speed-up itself; P2 = worthwhile after; P3 = optional.
 | T15 | Remove dead `$scan->region` in `RulesEngine::getScanner()` | None | None — `scans` has no `region` column; works by accident | P3 | XS |
 | T16 | Revisit region-pruning defaults | Is there a signal safer than the Tagging API that could make it default-on? | Deliberately off today for good reasons. Only worth it if T6+T7 fall short | P3 | S |
 | T17 | Batch the dispatch loop (SQS `SendMessageBatch`) | None | Irrelevant on the `database` driver, which is what installs actually use | P3 | XS |
+| T18 | ec2 makes ~12 sequential API calls per region even when empty (`describeVpcs` declares 9 per-VPC actions, every region has a default VPC) | Are all nine actions actually read by rules? | None. **259s — 35% of the scan.** Diluted by T6, so not on the critical path | P1 | S |
 
 ### Decisions needed before work starts
 
@@ -242,7 +286,7 @@ P1 = the speed-up itself; P2 = worthwhile after; P3 = optional.
 | ~~Q1~~ | ~~`Bus::batch()` or plan-then-dispatch?~~ **Resolved 2026-08-01: `Bus::batch()`** | T2, T3 |
 | ~~Q2~~ | ~~Must findings appear incrementally during a running scan?~~ **Resolved 2026-08-01: no** | T4, T7 |
 | ~~Q3~~ | ~~Default worker count?~~ **Resolved 2026-08-01: 5** (region pool) | T6 |
-| Q4 | Do we commit to T8–T10 up front, or stop after T6 if T1 says we are fast enough? | Scope |
+| ~~Q4~~ | ~~Commit to T8–T10 up front, or stop after T6?~~ **Answered by the baseline: T8 is not optional** — it is 55% of the post-T6 scan. T9/T10 remain discretionary | T8 |
 
 Q1 is the one to answer first — it is the largest structural fork and four tasks hang off it.
 
@@ -260,16 +304,25 @@ Q1 is the one to answer first — it is the largest structural fork and four tas
 
 ## 6. Expected outcome
 
-Unmeasured estimates, to be replaced by T1's numbers:
+Projected from T1's measured 735s baseline.
 
-| Change | Expected effect |
-| --- | --- |
-| T2–T5 | No speed change. Unblocks T6; fixes latent silent-false-clean and duplicate-finding defects |
-| T6 (5 workers) | Remaining fan-out time ÷ ~5 |
-| T7–T9 | Removes the growing per-job cost and the orchestrator's inline S3 stall |
+| Scenario | Fan-out | Orchestrator | Total |
+| --- | --- | --- | --- |
+| Today | 590s | 142s | **735s** (12m15s) |
+| + T6 (5 workers) | 118s | 142s | **~260s** (4m20s) |
+| + T6 + T8 (globals as jobs) | 118s | ~9s | **~127s** (2m) |
+| + T18 (ec2 per-region cost) | ~75s | ~9s | **~85s** (1m25s) |
 
-Plausible combined landing point is **1–2 minutes** for a full 11-service scan. That
-number should not be committed to before T1.
+**~12 minutes to ~2 minutes** from T6 and T8 alone — a 5.8x improvement from one config
+change and one job restructure.
+
+The ordering matters more than it looks. T8 does *not* dilute under concurrency the way
+region jobs do: it is a single serial job, so after T6 its 142s would be **55% of the
+remaining scan**. That makes it the highest-value item after T6 itself, and it moves ahead
+of the work that was originally sequenced before it.
+
+T2–T5 change no timings. They exist so T6 can be switched on without producing
+silent false-clean scans.
 
 ---
 
