@@ -1,0 +1,222 @@
+/* Low-fidelity wireframe styling for the teemops.com redraw.
+   Greyscale on purpose — this is structure and message, not visual design.
+   Self-contained: no CDN, no fonts, no network. Opens offline from the filesystem. */
+
+:root {
+  --ink: #1a1a1a;
+  --mid: #6b6b6b;
+  --faint: #9a9a9a;
+  --line: #c2c2c2;
+  --fill: #f1f1f1;
+  --fill-2: #e4e4e4;
+  --paper: #fff;
+  --note: #0b57d0;
+  --note-bg: #eef3fd;
+  --note-line: #b9cdf3;
+  --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 56px 0 80px;
+  background: #d9d9d9;
+  color: var(--ink);
+  font: 400 15px/1.55 var(--sans);
+}
+
+/* ---------- wireframe chrome (not part of the design) ---------- */
+
+.wf-bar {
+  position: fixed; inset: 0 0 auto 0; z-index: 100;
+  display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
+  padding: 8px 14px;
+  background: var(--ink); color: #fff;
+  font: 500 12px/1 var(--mono);
+}
+.wf-bar strong { font-weight: 700; margin-right: 10px; letter-spacing: .04em; }
+.wf-bar a {
+  color: #fff; text-decoration: none; opacity: .62;
+  padding: 5px 9px; border-radius: 4px;
+}
+.wf-bar a:hover { opacity: 1; background: #ffffff1f; }
+.wf-bar a[aria-current="page"] { opacity: 1; background: #ffffff2e; }
+.wf-bar button {
+  margin-left: auto; cursor: pointer;
+  padding: 5px 10px; border: 1px solid #ffffff4d; border-radius: 4px;
+  background: none; color: #fff; font: 500 12px/1 var(--mono);
+}
+.wf-bar button:hover { background: #ffffff1f; }
+
+.page {
+  max-width: 1080px; margin: 0 auto; padding: 0 16px;
+}
+
+/* Each section gets a labelled frame so reviewers can cite "§5" */
+.sec {
+  position: relative;
+  margin: 26px 0;
+  padding: 40px 34px 34px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+}
+.sec > .tag {
+  position: absolute; top: 0; left: 0;
+  padding: 4px 10px;
+  background: var(--ink); color: #fff;
+  font: 600 10px/1.4 var(--mono); letter-spacing: .08em; text-transform: uppercase;
+}
+.sec.tight { padding-top: 34px; }
+
+/* ---------- generic low-fi primitives ---------- */
+
+h1, h2, h3, h4 { margin: 0 0 12px; line-height: 1.2; font-weight: 700; }
+h1 { font-size: 34px; }
+h2 { font-size: 25px; }
+h3 { font-size: 17px; }
+h4 { font-size: 14px; text-transform: uppercase; letter-spacing: .06em; color: var(--mid); }
+p { margin: 0 0 12px; }
+p.lede { font-size: 17px; color: var(--mid); }
+.center { text-align: center; }
+.muted { color: var(--mid); }
+.small { font-size: 13px; }
+.tiny { font-size: 11.5px; }
+
+.row { display: flex; gap: 18px; flex-wrap: wrap; }
+.row > * { flex: 1 1 220px; min-width: 0; }
+.split { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; align-items: center; }
+.cols-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+.cols-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; }
+@media (max-width: 860px) {
+  .split, .cols-3, .cols-2 { grid-template-columns: 1fr; }
+  .sec { padding: 38px 18px 24px; }
+  h1 { font-size: 27px; }
+}
+
+.box {
+  padding: 16px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+}
+.box.fill { background: var(--fill); }
+.box.dash { border-style: dashed; }
+
+/* placeholder for imagery we don't have yet */
+.ph {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 150px; padding: 16px; text-align: center;
+  border: 1px dashed var(--faint);
+  color: var(--faint);
+  font: 500 12px/1.5 var(--mono);
+  background:
+    linear-gradient(to top right, transparent calc(50% - .5px), var(--faint) 50%, transparent calc(50% + .5px)),
+    linear-gradient(to bottom right, transparent calc(50% - .5px), var(--faint) 50%, transparent calc(50% + .5px)),
+    var(--fill);
+}
+.ph span { padding: 4px 8px; background: var(--fill); }
+
+.btn {
+  display: inline-block; padding: 11px 20px;
+  border: 1.5px solid var(--ink); background: var(--ink); color: #fff;
+  font: 600 14px/1 var(--sans); text-decoration: none;
+}
+.btn.ghost { background: none; color: var(--ink); }
+.btn.sm { padding: 7px 12px; font-size: 12.5px; }
+
+/* the install command — the primary conversion element on the site */
+.cmd {
+  display: flex; align-items: center; gap: 10px;
+  padding: 13px 14px;
+  border: 1.5px solid var(--ink); background: var(--fill);
+  font: 500 13px/1.3 var(--mono);
+  overflow: hidden;
+}
+.cmd code { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cmd .copy {
+  flex: none; padding: 4px 9px;
+  border: 1px solid var(--ink); background: var(--paper);
+  font: 600 11px/1.3 var(--mono);
+}
+@media (max-width: 860px) { .cmd code { white-space: normal; } }
+
+/* app-UI chrome mimic, used in hero + product panels */
+.app {
+  border: 1px solid var(--ink); background: var(--paper);
+}
+.app > .bar {
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px 10px; border-bottom: 1px solid var(--line); background: var(--fill);
+  font: 600 11px/1 var(--mono); color: var(--mid);
+}
+.app > .bar i { width: 9px; height: 9px; border: 1px solid var(--faint); border-radius: 50%; }
+.app > .bar em { margin-left: auto; font-style: normal; }
+.app > .body { padding: 12px; }
+
+.chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+.chip {
+  padding: 4px 9px; border: 1px solid var(--line); background: var(--fill);
+  font: 500 11px/1.3 var(--mono); color: var(--mid); white-space: nowrap;
+}
+.chip.on { border-color: var(--ink); color: var(--ink); background: var(--paper); }
+
+/* a findings row — severity is a weight, never a colour, in a wireframe */
+.finding {
+  display: flex; gap: 10px;
+  padding: 10px 0; border-top: 1px solid var(--line);
+}
+.finding:first-child { border-top: 0; }
+.finding .sev {
+  flex: none; width: 62px;
+  font: 700 10px/1.6 var(--mono); letter-spacing: .04em;
+  border-left: 4px solid var(--ink); padding-left: 7px;
+}
+.finding .sev.s2 { border-left-color: var(--mid); }
+.finding .sev.s3 { border-left-color: var(--line); }
+.finding .meta { flex: 1; min-width: 0; }
+.finding .title { font-weight: 600; font-size: 13.5px; }
+.finding .fix { font-size: 12.5px; color: var(--mid); }
+.finding .tags { margin-top: 4px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.status { font: 600 11px/1.4 var(--mono); }
+
+/* simple bar chart for the insights blocks */
+.bars { margin: 0; padding: 0; list-style: none; font: 500 12px/1 var(--mono); }
+.bars li { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+.bars .k { width: 74px; flex: none; color: var(--mid); }
+.bars .b { height: 12px; background: var(--fill-2); border: 1px solid var(--line); }
+.bars .n { color: var(--mid); }
+
+table.wf { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+table.wf th, table.wf td { padding: 9px 10px; border-bottom: 1px solid var(--line); text-align: left; }
+table.wf th { font: 600 11px/1.4 var(--mono); text-transform: uppercase; letter-spacing: .05em; color: var(--mid); }
+table.wf td.c, table.wf th.c { text-align: center; }
+
+ul.ticks { margin: 0; padding: 0; list-style: none; }
+ul.ticks li { padding: 4px 0 4px 22px; position: relative; font-size: 13.5px; }
+ul.ticks li::before { content: "✓"; position: absolute; left: 0; color: var(--mid); }
+ul.ticks li.no::before { content: "✗"; }
+
+/* ---------- annotations (reviewer notes, toggleable) ---------- */
+
+.note {
+  margin: 14px 0 0;
+  padding: 11px 13px;
+  border-left: 3px solid var(--note);
+  background: var(--note-bg);
+  color: #17335f;
+  font-size: 13px;
+}
+.note b { color: var(--note); font: 700 10.5px/1.6 var(--mono); letter-spacing: .07em; text-transform: uppercase; display: block; }
+.note a { color: var(--note); }
+.note code { font: 500 12px/1.4 var(--mono); background: #ffffffb3; padding: 1px 4px; }
+body.no-notes .note { display: none; }
+
+.gone {
+  margin: 14px 0 0; padding: 11px 13px;
+  border: 1px dashed var(--faint); background: repeating-linear-gradient(
+    135deg, transparent 0 8px, #00000008 8px 16px);
+  color: var(--mid); font-size: 13px;
+}
+.gone b { display: block; font: 700 10.5px/1.6 var(--mono); letter-spacing: .07em; text-transform: uppercase; }
+body.no-notes .gone { display: none; }

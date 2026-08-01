@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wireframe — teemops.com features</title>
+<link rel="stylesheet" href="wireframe.css">
+</head>
+<body>
+
+<nav class="wf-bar">
+  <strong>WIREFRAME</strong>
+  <a href="index.html">Homepage</a>
+  <a href="features.html" aria-current="page">Features</a>
+  <a href="pricing.html">Pricing (deleted)</a>
+  <button type="button" id="toggle">Hide notes</button>
+</nav>
+
+<div class="page">
+
+  <!-- ================= 1. HERO ================= -->
+  <section class="sec tight">
+    <span class="tag">§1 · Hero + jump nav</span>
+    <h1>Everything TOPS does</h1>
+    <p class="lede">74 checks across 11 AWS services. Self-hosted. Apache-2.0.</p>
+    <hr style="border:0;border-top:1px solid var(--line);margin:18px 0 10px">
+    <p class="small muted" style="margin:0">
+      Findings &nbsp;·&nbsp; Scanning &nbsp;·&nbsp; Filtering &nbsp;·&nbsp; Remediation &nbsp;·&nbsp;
+      Insights &nbsp;·&nbsp; Teams
+    </p>
+    <div class="note">
+      <b>Note 1 — this page is scanned, not read</b>
+      The reader has decided we're interesting and is now checking whether we do the one specific
+      thing they need. Optimise for someone using ⌘F. Sticky jump nav under the main nav on
+      <code>lg+</code>; drop it below <code>md</code> rather than stacking two sticky bars.
+    </div>
+    <div class="note">
+      <b>Note 2 — reorganised, not edited</b>
+      The current page (<code>../pages/features.md</code>, 333 lines) is a generic CSPM feature list:
+      scanning, compliance, multi-account, alerts, remediation, reporting, integrations. Three of
+      those sections describe things that don't exist or are now wrong. This is organised around what
+      we actually ship.
+    </div>
+  </section>
+
+  <!-- ================= 2. DURABLE FINDINGS ================= -->
+  <section class="sec">
+    <span class="tag">§2 · Durable findings</span>
+    <h2>Findings that persist</h2>
+    <p class="lede">One record per resource and rule — not one row per scan.</p>
+
+    <div class="app" style="margin-top:18px">
+      <div class="body">
+        <div class="finding">
+          <div class="sev">CRIT</div>
+          <div class="meta">
+            <div class="title">S3 bucket allows public read</div>
+            <div class="fix" style="font-family:var(--mono);font-size:12px">arn:aws:s3:::acme-assets</div>
+            <div class="fix">First seen 12 Jun · Last seen 2 Aug · <strong>51 days open</strong></div>
+            <div class="tags">
+              <span class="chip">cis-2.1.5</span><span class="chip">S3</span>
+              <span class="status">Status: ● Open</span>
+            </div>
+            <hr style="border:0;border-top:1px solid var(--line);margin:10px 0">
+            <div class="fix"><strong>Fix:</strong> Enable Block Public Access on the bucket.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <ul class="ticks" style="margin-top:16px">
+      <li>Mark resolved or ignored — it stays that way through the next scan</li>
+      <li>First-seen and last-seen on every finding</li>
+      <li>Reappears automatically if the misconfiguration comes back</li>
+    </ul>
+
+    <div class="note">
+      <b>Note 3 — the anatomy figure</b>
+      Ships #81 and #90. Every element on this card is a separate capability, labelled once; the
+      sections below refer back to it rather than re-explaining.
+    </div>
+    <div class="note">
+      <b>Note 4 — "51 days open" is the number that sells this</b>
+      It is only computable because a finding is a durable record (#81). A per-scan row cannot
+      produce it.
+    </div>
+  </section>
+
+  <!-- ================= 3. SCANNING ================= -->
+  <section class="sec">
+    <span class="tag">§3 · Scanning</span>
+    <h2>Scan what you need, when you need it</h2>
+    <div class="cols-2" style="margin-top:18px">
+      <div class="box fill">
+        <h3>Whole benchmark</h3>
+        <p class="small" style="margin:0">CIS AWS Foundations, or the general "basic" profile.</p>
+      </div>
+      <div class="box fill">
+        <h3>One service</h3>
+        <p class="small" style="margin:0">Changed one S3 policy? Scan S3 and get an answer in a
+          fraction of the time.</p>
+      </div>
+    </div>
+    <p style="margin-top:14px">Regions run in parallel. A ten-region account isn't ten times the wait.</p>
+
+    <h4 style="margin-top:26px">Coverage</h4>
+    <table class="wf">
+      <tr><th>Service</th><th class="c">Checks</th><th>Service</th><th class="c">Checks</th></tr>
+      <tr><td>S3</td><td class="c">n</td><td>IAM</td><td class="c">n</td></tr>
+      <tr><td>EC2</td><td class="c">n</td><td>RDS</td><td class="c">n</td></tr>
+      <tr><td>CloudTrail</td><td class="c">n</td><td>KMS</td><td class="c">n</td></tr>
+      <tr><td>Lambda</td><td class="c">n</td><td>DynamoDB</td><td class="c">n</td></tr>
+      <tr><td>ELBv2</td><td class="c">n</td><td>SNS</td><td class="c">n</td></tr>
+      <tr><td>SQS</td><td class="c">n</td><td class="muted" colspan="2">11 services · 74 checks</td></tr>
+    </table>
+    <p class="small" style="margin-top:12px"><a href="#">See every check → docs</a></p>
+
+    <div class="note">
+      <b>Note 5 — the coverage table is the ⌘F target</b>
+      Highest-value block on the page for an evaluator. Per-service counts must be
+      <strong>generated</strong> from the rule JSON via <code>scan:validate-rules</code>, never typed.
+      A stale count here is exactly the small inaccuracy that loses a technical buyer.
+    </div>
+    <div class="note">
+      <b>Note 6 — link out, don't inline</b>
+      Full listing of all 74 checks belongs in the docs, not on this page.
+    </div>
+  </section>
+
+  <!-- ================= 4. FILTER AND SLICE ================= -->
+  <section class="sec">
+    <span class="tag">§4 · Filter and slice</span>
+    <h2>Cut 400 findings down to the 8 you're working on</h2>
+
+    <div class="app" style="margin-top:18px">
+      <div class="body">
+        <div class="chips" style="margin:0">
+          <span class="chip on">Account: prod ▾</span>
+          <span class="chip on">Service: S3 ▾</span>
+          <span class="chip on">Benchmark: CIS 2.x ▾</span>
+          <span class="chip on">Severity: Critical ▾</span>
+          <span class="chip on">Status: Open ▾</span>
+          <span class="chip" style="margin-left:auto">12 results</span>
+        </div>
+      </div>
+    </div>
+
+    <p style="font:500 13px/1.5 var(--mono);margin:14px 0 6px">
+      /findings?service=s3&amp;benchmark=cis&amp;status=open
+    </p>
+    <p class="muted">
+      ↑ every filter is in the URL — bookmark it, paste it in Slack, send it to the person who owns S3
+    </p>
+
+    <div class="note">
+      <b>Note 7 — render the URL as visible monospace, not a caption</b>
+      Ships #85, #87, #83. The URL <em>is</em> the section; it should not be styled as an aside.
+    </div>
+    <div class="note">
+      <b>Note 8 — one sentence on why benchmark filtering works</b>
+      Findings record which benchmark raised them (<code>a74a6c3</code>), so a compliance question has
+      a direct answer.
+    </div>
+  </section>
+
+  <!-- ================= 5. REMEDIATION ================= -->
+  <section class="sec">
+    <span class="tag">§5 · Remediation</span>
+    <h2>Every finding tells you how to fix it</h2>
+    <div class="cols-2" style="margin-top:18px">
+      <div class="box">
+        <h4>In the list</h4>
+        <div class="finding" style="padding-top:0">
+          <div class="sev s2">HIGH</div>
+          <div class="meta">
+            <div class="title">RDS instance is publicly accessible</div>
+            <div class="fix">Set PubliclyAccessible to false</div>
+          </div>
+        </div>
+        <p class="tiny muted" style="margin:0">One line. No click needed.</p>
+      </div>
+      <div class="box">
+        <h4>On the finding</h4>
+        <ol class="small" style="margin:0;padding-left:18px">
+          <li>Open the RDS console</li>
+          <li>Modify → Connectivity</li>
+          <li>Public access → No</li>
+          <li>Apply immediately</li>
+        </ol>
+        <p class="small" style="margin:10px 0 0"><a href="#">AWS docs →</a></p>
+      </div>
+    </div>
+    <p style="margin-top:14px">Step-by-step guidance on every critical and high finding.</p>
+
+    <div class="note">
+      <b>Note 9 — the split is the real product behaviour</b>
+      Ships #82. A one-liner everywhere, full steps on critical and high. Do <strong>not</strong>
+      imply step-by-step exists on all 74 checks — the README is precise about this and the site must
+      match it.
+    </div>
+  </section>
+
+  <!-- ================= 6. INSIGHTS ================= -->
+  <section class="sec">
+    <span class="tag">§6 · Insights</span>
+    <h2>Where the problems actually are</h2>
+    <div class="cols-2" style="margin-top:18px">
+      <div class="box fill">
+        <h3>By service</h3>
+        <p class="small" style="margin:0">With a severity breakdown per service, so "42 in S3" becomes
+          "12 critical in S3".</p>
+      </div>
+      <div class="box fill">
+        <h3>By benchmark</h3>
+        <p class="small" style="margin:0">Which controls are failing, and how badly.</p>
+      </div>
+    </div>
+    <p class="muted" style="margin-top:14px">
+      Also: findings trend over a period, severity distribution, remediation rate.
+    </p>
+    <div class="note">
+      <b>Note 10 — the "also" line is table stakes and gets one line</b>
+      Ships #88 and #89. Trend / distribution / remediation-rate already existed and must not get
+      equal billing with the two groupings.
+    </div>
+    <div class="note">
+      <b>Note 11 — no score, no grade, no single health number anywhere on this page</b>
+    </div>
+  </section>
+
+  <!-- ================= 7. TEAMS ================= -->
+  <section class="sec">
+    <span class="tag">§7 · Teams and isolation</span>
+    <h2>Built multi-tenant from the schema up</h2>
+    <p>Organisations · team roles · every query scoped by organisation.</p>
+    <p>Run one instance for several clients, or several teams, without one seeing another's findings.</p>
+    <div class="note">
+      <b>Note 12 — short, and aimed at agencies and MSPs</b>
+      A real segment for a self-hosted scanner. It is genuinely enforced rather than aspirational, so
+      we can state it flatly.
+    </div>
+  </section>
+
+  <!-- ================= 8. WHAT WE DON'T DO ================= -->
+  <section class="sec">
+    <span class="tag">§8 · What we don't do</span>
+    <h2>What TOPS doesn't do (yet)</h2>
+    <ul class="ticks">
+      <li class="no">Azure or GCP — AWS only</li>
+      <li class="no">Auto-remediation — we tell you the fix, you apply it</li>
+      <li class="no">Real-time alerting / webhooks — scans are on demand</li>
+      <li class="no">Agent-based runtime monitoring — this is config scanning</li>
+    </ul>
+    <p class="small" style="margin-top:12px">Roadmap → github.com/teemops/tops</p>
+    <div class="note">
+      <b>Note 13 — recommend keeping this section</b>
+      It disqualifies bad-fit visitors before they install and bounce, it is unusual enough to be
+      memorable, and on an open-source project it reads as confidence. It also lets us delete the
+      current page's "Real-time Alerts" and "Integrations (future)" sections honestly instead of
+      leaving them as vapour.
+    </div>
+    <div class="note">
+      <b>Note 14 — only an asset while it's accurate</b>
+      Verify every line against the roadmap before shipping.
+    </div>
+  </section>
+
+  <!-- ================= 9. CTA ================= -->
+  <section class="sec">
+    <span class="tag">§9 · CTA</span>
+    <div class="center">
+      <div class="cmd" style="max-width:620px;margin:0 auto 14px">
+        <code>$ bash &lt;(curl -fsSL https://raw.githubusercontent.com/teemops/tops/develop/install.sh)</code>
+        <span class="copy">⧉ Copy</span>
+      </div>
+      <p class="small"><a href="#">Read the script first →</a> &nbsp;&nbsp;&nbsp; ★ Star on GitHub</p>
+    </div>
+    <div class="note">
+      <b>Note 15 — no paid alternative offered, here or anywhere on this page</b>
+      Same block as <a href="index.html">homepage</a> §9. The only commercial mention on the site is
+      the footer line in homepage §10.
+    </div>
+  </section>
+
+  <!-- ================= DELETED ================= -->
+  <section class="sec">
+    <span class="tag">Removed from the current features page</span>
+    <div class="gone">
+      <b>Deleted</b>
+      <ul style="margin:6px 0 0;padding-left:18px">
+        <li>Three "Score" tiles (<code>../html/features.html:285, 303, 321</code>) — feature removed
+            in <code>a246323</code></li>
+        <li>"Real-time Alerts" section — does not exist; now one line in §8</li>
+        <li>"Integrations (future)" section — does not exist; now one line in §8</li>
+        <li>"Reporting &amp; Exports" as a headline section — demote to a line unless we can
+            screenshot it</li>
+        <li>All "Start Free Scan" CTAs</li>
+      </ul>
+    </div>
+  </section>
+
+</div>
+
+<script>
+  var b = document.body, t = document.getElementById('toggle');
+  t.addEventListener('click', function () {
+    var off = b.classList.toggle('no-notes');
+    t.textContent = off ? 'Show notes' : 'Hide notes';
+  });
+</script>
+
+</body>
+</html>
