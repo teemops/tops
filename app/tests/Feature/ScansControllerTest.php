@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\AwsAccount;
 use App\Models\Organization;
 use App\Models\Scan;
+use App\Models\ScanResult;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
@@ -567,6 +568,184 @@ class ScansControllerTest extends TestCase
     /**
      * Test cannot show scan from another user's organization
      */
+    /**
+     * Both are stored and neither was returned before, so the page could not say whether
+     * it was looking at a whole benchmark or a handful of services.
+     */
+    public function test_show_returns_what_the_scan_actually_ran(): void
+    {
+        $user = User::factory()->create();
+        $organization = Organization::factory()->create(['user_id' => $user->id]);
+        $awsAccount = AwsAccount::factory()->completed()->create([
+            'organization_id' => $organization->id,
+        ]);
+        $scan = Scan::factory()->completed()->create([
+            'organization_id' => $organization->id,
+            'aws_account_id' => $awsAccount->id,
+            'scan_types' => ['s3', 'ec2'],
+            'rulesets' => ['cis'],
+        ]);
+
+        $response = $this->actingAs($user)->getJson("/api/scans/{$scan->id}");
+
+        $response->assertStatus(200)
+            ->assertJsonPath('scanTypes', ['s3', 'ec2'])
+            ->assertJsonPath('rulesets', ['cis']);
+
+        // Flat strings, not the ['label' => ..., 'description' => ...] shape
+        // rulesetLabels() returns internally — the page renders these directly.
+        $labels = $response->json('rulesetLabels');
+        $this->assertIsArray($labels);
+        $this->assertCount(1, $labels);
+        $this->assertIsString($labels[0]);
+    }
+
+    /**
+     * A ruleset with no profile behind it still has to say what ran, rather than
+     * disappearing from the scan group.
+     */
+    public function test_an_unrecognised_ruleset_falls_back_to_its_own_name(): void
+    {
+        $user = User::factory()->create();
+        $organization = Organization::factory()->create(['user_id' => $user->id]);
+        $awsAccount = AwsAccount::factory()->completed()->create([
+            'organization_id' => $organization->id,
+        ]);
+        $scan = Scan::factory()->completed()->create([
+            'organization_id' => $organization->id,
+            'aws_account_id' => $awsAccount->id,
+            'rulesets' => ['retired-ruleset'],
+        ]);
+
+        $this->actingAs($user)->getJson("/api/scans/{$scan->id}")
+            ->assertStatus(200)
+            ->assertJsonPath('rulesetLabels', ['retired-ruleset']);
+    }
+
+    /**
+     * The breakdown is current state, so it belongs only under the scan that produced it.
+     */
+    public function test_the_latest_completed_scan_carries_the_breakdown(): void
+    {
+        $user = User::factory()->create();
+        $organization = Organization::factory()->create(['user_id' => $user->id]);
+        $awsAccount = AwsAccount::factory()->completed()->create([
+            'organization_id' => $organization->id,
+        ]);
+        $scan = Scan::factory()->completed()->create([
+            'organization_id' => $organization->id,
+            'aws_account_id' => $awsAccount->id,
+            'completed_at' => now(),
+        ]);
+
+        ScanResult::factory()->count(2)->create([
+            'scan_id' => $scan->id,
+            'organization_id' => $organization->id,
+            'aws_account_id' => $awsAccount->id,
+            'service' => 'ec2',
+            'severity' => 'high',
+            'status' => 'open',
+        ]);
+
+        $response = $this->actingAs($user)->getJson("/api/scans/{$scan->id}");
+
+        $response->assertStatus(200)
+            ->assertJsonPath('isLatestForAccount', true)
+            ->assertJsonPath('breakdown.summary.total', 2)
+            ->assertJsonPath('breakdown.byService.0.key', 'ec2')
+            ->assertJsonPath('breakdown.byService.0.total', 2);
+    }
+
+    /**
+     * Current-state numbers under a historical date would be wrong and plausible at the
+     * same time, which is worse than showing nothing. See D-11.
+     */
+    public function test_an_older_scan_has_no_breakdown_and_points_at_the_latest(): void
+    {
+        $user = User::factory()->create();
+        $organization = Organization::factory()->create(['user_id' => $user->id]);
+        $awsAccount = AwsAccount::factory()->completed()->create([
+            'organization_id' => $organization->id,
+        ]);
+
+        $older = Scan::factory()->completed()->create([
+            'organization_id' => $organization->id,
+            'aws_account_id' => $awsAccount->id,
+            'completed_at' => now()->subDay(),
+        ]);
+        $latest = Scan::factory()->completed()->create([
+            'organization_id' => $organization->id,
+            'aws_account_id' => $awsAccount->id,
+            'completed_at' => now(),
+        ]);
+
+        ScanResult::factory()->create([
+            'scan_id' => $latest->id,
+            'organization_id' => $organization->id,
+            'aws_account_id' => $awsAccount->id,
+            'status' => 'open',
+        ]);
+
+        $response = $this->actingAs($user)->getJson("/api/scans/{$older->id}");
+
+        $response->assertStatus(200)
+            ->assertJsonPath('isLatestForAccount', false)
+            ->assertJsonPath('breakdown', null)
+            ->assertJsonPath('latestScanId', $latest->id);
+    }
+
+    /**
+     * A scan still running has produced no state, so there is nothing to summarise under
+     * it — and the page polls this endpoint while it runs.
+     */
+    public function test_a_running_scan_has_no_breakdown(): void
+    {
+        $user = User::factory()->create();
+        $organization = Organization::factory()->create(['user_id' => $user->id]);
+        $awsAccount = AwsAccount::factory()->completed()->create([
+            'organization_id' => $organization->id,
+        ]);
+        $running = Scan::factory()->running()->create([
+            'organization_id' => $organization->id,
+            'aws_account_id' => $awsAccount->id,
+        ]);
+
+        $this->actingAs($user)->getJson("/api/scans/{$running->id}")
+            ->assertStatus(200)
+            ->assertJsonPath('isLatestForAccount', false)
+            ->assertJsonPath('breakdown', null);
+    }
+
+    /**
+     * Another organization's scan of the same account must not decide whose numbers show.
+     */
+    public function test_the_latest_scan_is_scoped_to_the_callers_organization(): void
+    {
+        $user = User::factory()->create();
+        $organization = Organization::factory()->create(['user_id' => $user->id]);
+        $awsAccount = AwsAccount::factory()->completed()->create([
+            'organization_id' => $organization->id,
+        ]);
+        $scan = Scan::factory()->completed()->create([
+            'organization_id' => $organization->id,
+            'aws_account_id' => $awsAccount->id,
+            'completed_at' => now()->subDay(),
+        ]);
+
+        // A later scan of the same account, belonging to someone else.
+        Scan::factory()->completed()->create([
+            'organization_id' => Organization::factory()->create([
+                'user_id' => User::factory()->create()->id,
+            ])->id,
+            'aws_account_id' => $awsAccount->id,
+            'completed_at' => now(),
+        ]);
+
+        $this->actingAs($user)->getJson("/api/scans/{$scan->id}")
+            ->assertStatus(200)
+            ->assertJsonPath('isLatestForAccount', true);
+    }
+
     public function test_cannot_show_scan_from_other_organization(): void
     {
         $user = User::factory()->create();

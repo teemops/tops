@@ -799,4 +799,86 @@ class FindingsEngineTest extends TestCase
             $withRemediation->firstWhere('rule', 'tops-kms-002')['remediation'] ?? null
         );
     }
+
+    /**
+     * F-4: a finding has to carry the benchmark that raised it, because nothing else
+     * records it — scan_results had no ruleset, and a scan can run several at once.
+     */
+    public function test_a_finding_records_the_ruleset_that_raised_it(): void
+    {
+        $scan = Scan::factory()->create();
+
+        ScanDetail::create([
+            'scan_id' => $scan->id,
+            'service' => 'iam',
+            'resource_type' => 'user',
+            'resource_id' => 'test-user-123',
+            'api_method' => 'listMFADevices',
+            'raw_data' => ['MFADevices' => []],
+        ]);
+
+        $rules = ['rules' => [[
+            'rule' => 'cis-1.2',
+            'name' => 'MFA',
+            'service' => 'iam',
+            'method' => 'listMFADevices',
+            'description' => 'MFA required',
+            'severity' => 'high',
+            'condition' => 'true',
+        ]]];
+
+        File::shouldReceive('exists')->with(\Mockery::pattern('/cis\.json$/'))->andReturn(true);
+        File::shouldReceive('get')->with(\Mockery::pattern('/cis\.json$/'))->andReturn(json_encode($rules));
+
+        $evaluator = Mockery::mock(ConditionEvaluator::class);
+        $evaluator->shouldReceive('evaluate')->andReturn(true);
+
+        (new FindingsEngine($evaluator))->evaluateScan($scan, ['cis']);
+
+        $finding = ScanResult::where('scan_id', $scan->id)->first();
+        $this->assertNotNull($finding);
+        $this->assertSame(['cis'], $finding->rulesets);
+    }
+
+    /**
+     * The multi-ruleset case the acceptance criteria call out: one finding carrying both
+     * benchmarks, not two findings for one problem on one resource. The latter would
+     * recreate exactly the duplication durable findings removed.
+     */
+    public function test_a_rule_in_two_rulesets_raises_one_finding_carrying_both(): void
+    {
+        $scan = Scan::factory()->create();
+
+        ScanDetail::create([
+            'scan_id' => $scan->id,
+            'service' => 'iam',
+            'resource_type' => 'user',
+            'resource_id' => 'shared-user',
+            'api_method' => 'listMFADevices',
+            'raw_data' => ['MFADevices' => []],
+        ]);
+
+        $shared = ['rules' => [[
+            'rule' => 'shared-rule-001',
+            'name' => 'Shared',
+            'service' => 'iam',
+            'method' => 'listMFADevices',
+            'description' => 'In two rulesets',
+            'severity' => 'high',
+            'condition' => 'true',
+        ]]];
+
+        File::shouldReceive('exists')->andReturn(true);
+        File::shouldReceive('get')->andReturn(json_encode($shared));
+
+        $evaluator = Mockery::mock(ConditionEvaluator::class);
+        $evaluator->shouldReceive('evaluate')->andReturn(true);
+
+        (new FindingsEngine($evaluator))->evaluateScan($scan, ['basic', 'cis']);
+
+        $findings = ScanResult::where('scan_id', $scan->id)->get();
+
+        $this->assertCount(1, $findings, 'one problem on one resource is one finding');
+        $this->assertSame(['basic', 'cis'], $findings->first()->rulesets);
+    }
 }

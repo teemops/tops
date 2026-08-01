@@ -10,6 +10,7 @@ use App\Services\ServiceRegistry;
 use App\Services\RulesEngine\RulesEngine;
 use App\Services\RulesEngine\FindingsEngine;
 use App\Services\RulesEngine\ConditionEvaluator;
+use Illuminate\Bus\Batch;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\InteractsWithQueue;
@@ -80,14 +81,11 @@ class ProcessAuditScanJob implements ShouldQueue
                 throw new \Exception('No scan types specified');
             }
 
-            // Region dispatch must be idempotent. expected_regions_count is compared
-            // against the number of DISTINCT (region, service) pairs recorded in
-            // scan_details, which is capped at regions x region-based-scan-types. If
-            // this job runs more than once for the same scan (SQS at-least-once
-            // redelivery, a retry, or a stale queued job being replayed) and we simply
-            // accumulated, the expected total would exceed what can ever be recorded
-            // and the scan could never complete. Reset per run so re-runs converge.
-            $this->scan->update(['expected_regions_count' => 0]);
+            // Re-running this job for the same scan (SQS is at-least-once, and this job
+            // retries) creates a fresh batch that supersedes the old one, so the previous
+            // batch id must not linger. The old expected/processed counters are no longer
+            // read by anything — their columns remain only until a cleanup migration.
+            $this->scan->update(['batch_id' => null]);
 
             $scanner = new AwsSecurityScanner($roleArn, $externalId);
 
@@ -111,12 +109,21 @@ class ProcessAuditScanJob implements ShouldQueue
             $globalScanMs = [];
             $dispatchMs = [];
 
+            // Every region job across every service, planned before any is dispatched.
+            // The batch is then created in one call, so its size is fixed atomically —
+            // there is no window during which a completing job can compare itself against
+            // a total still being accumulated. That window was #65.
+            $regionJobs = [];
+
             foreach ($scanTypes as $scanType) {
                 $serviceStartedAt = microtime(true);
 
                 if (ScanTypesService::isRegionBased($scanType)) {
                     $dispatchedRegionServices[] = $scanType;
-                    $this->dispatchRegionScansForService($scanner, $credentials, $scanType);
+                    $regionJobs = array_merge(
+                        $regionJobs,
+                        $this->planRegionScansForService($scanner, $credentials, $scanType)
+                    );
                     $dispatchMs[$scanType] = $this->elapsedMs($serviceStartedAt);
                 } else {
                     $this->runGlobalScanForService($rulesEngine, $scanType, $credentials);
@@ -130,6 +137,7 @@ class ProcessAuditScanJob implements ShouldQueue
                 'scan_id' => $this->scan->id,
                 'region_based_services' => $dispatchedRegionServices,
                 'has_region_based' => $hasRegionBasedScan,
+                'region_jobs_planned' => count($regionJobs),
                 'scan_types' => $scanTypes,
                 'assume_role_ms' => $assumeRoleMs,
                 'global_scan_ms' => $globalScanMs,
@@ -137,25 +145,22 @@ class ProcessAuditScanJob implements ShouldQueue
                 'orchestration_ms' => $this->elapsedMs($jobStartedAt),
             ]);
 
-            if (!$hasRegionBasedScan) {
+            if (empty($regionJobs)) {
+                // Either no region-based service was selected, or every region was pruned
+                // and none produced a job. Nothing will call back, so settle it here
+                // rather than leaving it for the stale sweep an hour later.
                 $this->evaluateFindings();
+
+                if ($hasRegionBasedScan) {
+                    Log::warning('No region jobs to run, completing scan now', [
+                        'scan_id' => $this->scan->id,
+                        'region_based_services' => $dispatchedRegionServices,
+                    ]);
+                }
+
                 $this->markScanCompleted($awsAccount);
             } else {
-                Log::info('Scan with region-based service - waiting for region scans to complete', [
-                    'scan_id' => $this->scan->id,
-                    'region_based_services' => $dispatchedRegionServices,
-                ]);
-
-                // If every region job failed to dispatch (or getAvailableRegions
-                // returned none), nothing will ever call back to complete this scan.
-                // Check now instead of waiting on the periodic stale-scan sweep.
-                $this->scan->refresh();
-                if (($this->scan->expected_regions_count ?? 0) === 0) {
-                    Log::warning('No region jobs were successfully dispatched, completing scan now', [
-                        'scan_id' => $this->scan->id,
-                    ]);
-                    $this->scan->checkAndMarkRegionBasedScanComplete();
-                }
+                $this->dispatchRegionBatch($regionJobs);
             }
 
             Log::info('Scan processing completed', [
@@ -206,24 +211,23 @@ class ProcessAuditScanJob implements ShouldQueue
     }
 
     /**
-     * Dispatch one ProcessRegionScanJob per available region for this scan type.
+     * Build — but do not dispatch — one ProcessRegionScanJob per region for this service.
      *
-     * expected_regions_count only counts jobs we actually confirmed were pushed to
-     * the queue — not the full region list up front. If any single region's push
-     * fails, it's logged and excluded from the expected total, so the scan can
-     * still reach completion instead of waiting forever for a job that was never
-     * delivered. Each region is dispatched explicitly (Bus::dispatch on a fully
-     * configured job instance) rather than via the PendingDispatch fluent/deferred
-     * dispatch, so a failure is caught right here, per region, instead of
-     * potentially aborting the rest of the loop silently.
+     * Planning is separated from dispatch so every service's jobs can go into a single
+     * batch. The old code dispatched per service and accumulated an expected total as it
+     * went, which meant that between the first dispatch and the last increment the scan
+     * held a total smaller than the work outstanding. Any region job finishing in that
+     * window saw "processed >= expected" and completed the whole scan, not partial — a
+     * clean result for regions nobody had scanned. A single worker hid it; a second
+     * worker would have fired it on the first scan. See #65.
+     *
+     * @return array<int, ProcessRegionScanJob>
      */
-    private function dispatchRegionScansForService(AwsSecurityScanner $scanner, array $credentials, string $scanType): void
+    private function planRegionScansForService(AwsSecurityScanner $scanner, array $credentials, string $scanType): array
     {
         $regions = $scanner->getAvailableRegions($credentials);
-        $regionConnection = config('queue.scan_region_connection', 'sqs-audit-region');
 
-        $dispatched = 0;
-        $failedRegions = [];
+        $jobs = [];
         $prunedRegions = [];
 
         foreach ($regions as $region) {
@@ -235,39 +239,72 @@ class ProcessAuditScanJob implements ShouldQueue
                 continue;
             }
 
-            try {
-                $job = new ProcessRegionScanJob($this->scan, $region, $scanType);
-                $job->onConnection($regionConnection);
-                if ($regionConnection === 'database') {
-                    $job->onQueue('teemops_audit_region');
-                }
-
-                Bus::dispatch($job);
-                $dispatched++;
-            } catch (\Throwable $e) {
-                $failedRegions[] = $region;
-                Log::error("Failed to dispatch region scan job", [
-                    'scan_id' => $this->scan->id,
-                    'service' => $scanType,
-                    'region' => $region,
-                    'connection' => $regionConnection,
-                    'error' => $e->getMessage(),
-                ]);
-            }
+            $jobs[] = new ProcessRegionScanJob($this->scan, $region, $scanType);
         }
 
-        $currentExpected = $this->scan->expected_regions_count ?? 0;
-        $this->scan->update([
-            'expected_regions_count' => $currentExpected + $dispatched,
-        ]);
-
-        Log::info("{$scanType} scan dispatched to regions", [
+        Log::info("{$scanType} region scans planned", [
             'scan_id' => $this->scan->id,
             'service' => $scanType,
             'regions_count' => count($regions),
-            'dispatched' => $dispatched,
-            'failed_regions' => $failedRegions,
+            'planned' => count($jobs),
             'pruned_regions' => $prunedRegions,
+        ]);
+
+        return $jobs;
+    }
+
+    /**
+     * Dispatch every planned region job as one batch.
+     *
+     * allowFailures() is not optional. A batch cancels itself on the first failed job by
+     * default, and a failed region has never failed a scan here — it is recorded and
+     * surfaces as is_partial. Without it, one unreachable region would cancel the other
+     * ~152 and the scan would report on a fraction of the account.
+     *
+     * The finally() callback is serialized to storage, so it cannot capture $this or any
+     * model. It closes over the scan id and re-reads.
+     *
+     * @param  array<int, ProcessRegionScanJob>  $jobs
+     */
+    private function dispatchRegionBatch(array $jobs): void
+    {
+        $scanId = $this->scan->id;
+        $connection = config('queue.scan_region_connection', 'sqs-audit-region');
+
+        $pending = Bus::batch($jobs)
+            ->name("scan:{$scanId}")
+            ->allowFailures()
+            ->finally(function (Batch $batch) use ($scanId) {
+                $scan = Scan::find($scanId);
+
+                if (!$scan) {
+                    return;
+                }
+
+                $failed = $batch->failedJobs;
+
+                $scan->settleRegionScan(
+                    $failed > 0,
+                    $failed > 0
+                        ? "{$failed} of {$batch->totalJobs} region jobs failed; results are partial."
+                        : null
+                );
+            })
+            ->onConnection($connection);
+
+        if ($connection === 'database') {
+            $pending->onQueue('teemops_audit_region');
+        }
+
+        $batch = $pending->dispatch();
+
+        $this->scan->update(['batch_id' => $batch->id]);
+
+        Log::info('Region scan batch dispatched', [
+            'scan_id' => $scanId,
+            'batch_id' => $batch->id,
+            'total_jobs' => $batch->totalJobs,
+            'connection' => $connection,
         ]);
     }
 

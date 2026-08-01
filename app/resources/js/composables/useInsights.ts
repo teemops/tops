@@ -1,5 +1,6 @@
 import { ref } from 'vue';
 import { useOrganizations } from './useOrganizations';
+import type { ScanBreakdown } from './useScans';
 
 const axios = (window as any).axios;
 
@@ -60,6 +61,11 @@ export interface InsightsResponse {
     };
     trend: InsightPoint[];
     topServices: TopService[];
+    /**
+     * Current state across all scans — the one part of this payload that is not scoped to
+     * the selected period, so a service reads the same number here as on Scan detail.
+     */
+    breakdown: ScanBreakdown;
     keyInsights: InsightItem[];
 }
 

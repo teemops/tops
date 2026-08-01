@@ -22,6 +22,7 @@ class ScanResult extends Model
         'resource_type',
         'resource_id',
         'finding_type',
+        'rulesets',
         'title',
         'description',
         'remediation',
@@ -37,6 +38,9 @@ class ScanResult extends Model
         'resolved_at' => 'datetime',
         'first_seen_at' => 'datetime',
         'last_seen_at' => 'datetime',
+        // Which benchmarks raised this finding. A list because one rule may belong to
+        // several rulesets; null on findings raised before F-4 shipped.
+        'rulesets' => 'array',
     ];
 
     /**
@@ -55,6 +59,21 @@ class ScanResult extends Model
      * Severity ordering used when listing findings, most severe first.
      */
     public const SEVERITY_ORDER = ['critical', 'high', 'medium', 'low'];
+
+    /**
+     * How much each severity counts when findings are weighed against each other.
+     *
+     * Used by the "fix these first" ranking, so eighteen mediums do not outrank eighteen
+     * highs. Lives here rather than in the caller so that anything else needing to rank
+     * findings picks up the same answer about which of two problems is worse — the
+     * security score removed in D-12 had its own copy, and that is how numbers drift.
+     */
+    public const SEVERITY_WEIGHTS = [
+        'critical' => 10,
+        'high' => 5,
+        'medium' => 2,
+        'low' => 1,
+    ];
 
     /**
      * The scan that first raised this finding.

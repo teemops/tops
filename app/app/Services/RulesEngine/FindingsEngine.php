@@ -44,12 +44,38 @@ class FindingsEngine
      */
     public function evaluateScan(Scan $scan, array $rulesets = ['basic']): void
     {
-        // Load all rules from specified rulesets
+        // Load the rules, keyed by rule id so a rule belonging to two rulesets is
+        // evaluated once carrying both rather than twice carrying one each. Which
+        // rulesets raised a finding is recorded on it (F-4), and it is a list because
+        // that question genuinely can have more than one answer.
         $allRules = [];
         foreach ($rulesets as $ruleset) {
             try {
-                $rules = $this->loadRules($ruleset);
-                $allRules = array_merge($allRules, $rules);
+                foreach ($this->loadRules($ruleset) as $rule) {
+                    $ruleId = $rule['rule'] ?? null;
+
+                    // Previously a rule with no id still evaluated and raised findings
+                    // typed 'unknown', which is indistinguishable from a real rule in the
+                    // UI. Skipping is better, but silently skipping is not — say so.
+                    if ($ruleId === null) {
+                        Log::warning('Skipping a rule with no id', [
+                            'scan_id' => $scan->id,
+                            'ruleset' => $ruleset,
+                            'service' => $rule['service'] ?? null,
+                        ]);
+
+                        continue;
+                    }
+
+                    if (isset($allRules[$ruleId])) {
+                        $allRules[$ruleId]['rulesets'][] = $ruleset;
+
+                        continue;
+                    }
+
+                    $rule['rulesets'] = [$ruleset];
+                    $allRules[$ruleId] = $rule;
+                }
             } catch (\Exception $e) {
                 Log::warning("Failed to load ruleset: {$ruleset}", [
                     'scan_id' => $scan->id,
@@ -57,6 +83,8 @@ class FindingsEngine
                 ]);
             }
         }
+
+        $allRules = array_values($allRules);
 
         // Get all scan details for this scan
         $scanDetails = ScanDetail::where('scan_id', $scan->id)->get();
@@ -249,6 +277,9 @@ class FindingsEngine
             'title' => $title,
             'description' => $description,
             'remediation' => $this->buildRemediation($rule, $detail),
+            // Content, not identity — so if a rule moves between rulesets in a later
+            // release, the next scan to examine the resource corrects the attribution.
+            'rulesets' => $rule['rulesets'] ?? null,
             'last_seen_at' => now(),
             'last_seen_scan_id' => $scan->id,
         ];

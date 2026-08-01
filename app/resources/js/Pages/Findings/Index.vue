@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import SidebarAppLayout from '@/Layouts/SidebarAppLayout.vue';
 import { useFindings, type Finding, type Recommendation } from '@/composables/useFindings';
@@ -7,15 +7,92 @@ import { useAwsAccounts } from '@/composables/useAwsAccounts';
 import { useOrganizations } from '@/composables/useOrganizations';
 import { useNotifications } from '@/composables/useNotifications';
 
-const { findings, summary, recommendationsMap, loading, error, fetchFindings, updateFindingStatus } = useFindings();
+const { findings, summary, serviceFacets, benchmarkFacets, recommendationsMap, loading, error, fetchFindings, updateFindingStatus } = useFindings();
 const { accounts, fetchAccounts } = useAwsAccounts();
 const { currentOrganization } = useOrganizations();
 const { showSuccess, showError } = useNotifications();
 
-const selectedAwsAccountId = ref<string>('');
-const selectedFindingType = ref<string>('');
-const selectedStatus = ref<string>('');
+const VALID_STATUSES = ['open', 'resolved', 'ignored'];
+
+/**
+ * Filters come from the URL so a drill-through or a shared link lands filtered.
+ *
+ * Read at setup rather than in onMounted: assigning to the refs afterwards would trip the
+ * filter watcher below and fetch the same list twice.
+ */
+const readFiltersFromUrl = () => {
+    const params = new URLSearchParams(window.location.search);
+    const status = params.get('status') ?? '';
+
+    return {
+        awsAccountId: params.get('aws_account_id') ?? '',
+        findingType: params.get('finding_type') ?? '',
+        service: params.get('service') ?? '',
+        ruleset: params.get('ruleset') ?? '',
+        // The only parameter with a known valid set, so the only one we can reject up
+        // front. An unrecognised service or type simply matches nothing, which the empty
+        // state already handles.
+        status: VALID_STATUSES.includes(status) ? status : '',
+    };
+};
+
+const initial = readFiltersFromUrl();
+
+const selectedAwsAccountId = ref<string>(initial.awsAccountId);
+const selectedFindingType = ref<string>(initial.findingType);
+const selectedService = ref<string>(initial.service);
+const selectedRuleset = ref<string>(initial.ruleset);
+const selectedStatus = ref<string>(initial.status);
 const expandedId = ref<string | null>(null);
+
+/** How many service pills to show before the tail collapses. */
+const SERVICE_PILL_LIMIT = 6;
+const showAllServices = ref(false);
+
+const visibleServiceFacets = computed(() =>
+    showAllServices.value ? serviceFacets.value : serviceFacets.value.slice(0, SERVICE_PILL_LIMIT)
+);
+
+const hiddenServiceCount = computed(() =>
+    Math.max(serviceFacets.value.length - SERVICE_PILL_LIMIT, 0)
+);
+
+/** The "All" pill — every service's findings under the other active filters. */
+const allServicesCount = computed(() =>
+    serviceFacets.value.reduce((sum, facet) => sum + facet.count, 0)
+);
+
+/** Clicking the active pill clears the filter rather than reapplying it. */
+const selectService = (service: string) => {
+    selectedService.value = selectedService.value === service ? '' : service;
+};
+
+/** Same toggle behaviour as the service pills — clicking the active one clears it. */
+const selectRuleset = (ruleset: string) => {
+    selectedRuleset.value = selectedRuleset.value === ruleset ? '' : ruleset;
+};
+
+/** The "All" benchmark pill. Findings with no benchmark are not counted under any. */
+const allBenchmarksCount = computed(() =>
+    benchmarkFacets.value.reduce((sum, facet) => sum + facet.count, 0)
+);
+
+/**
+ * Mirror the filters into the address bar so the view can be bookmarked or sent to a
+ * colleague. replaceState rather than pushState — the back button should leave Findings,
+ * not step back through every pill the user tried.
+ */
+const syncUrl = () => {
+    const params = new URLSearchParams();
+    if (selectedAwsAccountId.value) params.set('aws_account_id', selectedAwsAccountId.value);
+    if (selectedFindingType.value) params.set('finding_type', selectedFindingType.value);
+    if (selectedService.value) params.set('service', selectedService.value);
+    if (selectedRuleset.value) params.set('ruleset', selectedRuleset.value);
+    if (selectedStatus.value) params.set('status', selectedStatus.value);
+
+    const query = params.toString();
+    window.history.replaceState({}, '', query ? `${window.location.pathname}?${query}` : window.location.pathname);
+};
 
 // Options for the Type filter dropdown. Selecting a type filters the findings
 // list server-side, so it must NOT be derived from the (now-filtered) findings —
@@ -30,6 +107,8 @@ const loadData = async () => {
         await fetchFindings({
             awsAccountId: selectedAwsAccountId.value || undefined,
             findingType: selectedFindingType.value || undefined,
+            service: selectedService.value || undefined,
+            ruleset: selectedRuleset.value || undefined,
             status: selectedStatus.value || undefined,
             limit: 100,
             offset: 0,
@@ -40,11 +119,34 @@ const loadData = async () => {
 onMounted(() => loadData());
 
 watch(() => currentOrganization.value?.org_id, () => {
-    // Different org has a different set of finding types.
+    // Different org has a different set of finding types, and its own accounts and
+    // services — carrying a filter across would point at rows that are not there.
     allFindingTypes.value = [];
-    loadData();
+    selectedAwsAccountId.value = '';
+    selectedFindingType.value = '';
+    selectedService.value = '';
+    selectedRuleset.value = '';
+    selectedStatus.value = '';
+    showAllServices.value = false;
 });
-watch([selectedAwsAccountId, selectedFindingType, selectedStatus], () => loadData());
+
+// One loader for both the org and the filters. Watching the org here as well as above is
+// what keeps a switch to a fresh org reloading even when no filter was set — and keeps it
+// to a single fetch, since clearing the filters above would otherwise trigger a second.
+watch(
+    [
+        () => currentOrganization.value?.org_id,
+        selectedAwsAccountId,
+        selectedFindingType,
+        selectedService,
+        selectedRuleset,
+        selectedStatus,
+    ],
+    () => {
+        syncUrl();
+        loadData();
+    }
+);
 
 // Keep the Type dropdown's options as the union of all types seen, so it stays
 // stable while a type filter is active.
@@ -125,11 +227,7 @@ const goToFindingType = (findingType: string) => {
             <!-- Executive Summary -->
             <section v-if="summary" class="mb-8">
                 <h2 class="text-lg font-medium text-gray-900 dark:text-white mb-4">Executive Summary</h2>
-                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-                    <div class="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 shadow-sm">
-                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Security Score</dt>
-                        <dd class="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">{{ summary.securityScore }}</dd>
-                    </div>
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <div class="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 shadow-sm">
                         <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Findings</dt>
                         <dd class="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">{{ summary.total }}</dd>
@@ -186,6 +284,97 @@ const goToFindingType = (findingType: string) => {
                         <option value="ignored">Ignored</option>
                     </select>
                 </div>
+            </section>
+
+            <!-- Service pills. Counts are what you would get by clicking, given the other
+                 filters — so they stay meaningful while a service is already selected. -->
+            <section v-if="serviceFacets.length" class="mb-6" aria-label="Filter by service">
+                <h2 class="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                    Service
+                </h2>
+                <div class="flex flex-wrap items-center gap-2">
+                    <button
+                        type="button"
+                        :aria-pressed="selectedService === ''"
+                        :class="[
+                            'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm transition-colors',
+                            selectedService === ''
+                                ? 'border-gray-900 bg-gray-900 text-white dark:border-white dark:bg-white dark:text-gray-900'
+                                : 'border-gray-300 bg-white text-gray-600 hover:border-gray-400 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-gray-500',
+                        ]"
+                        @click="selectedService = ''"
+                    >
+                        All
+                        <span class="text-xs tabular-nums opacity-70">{{ allServicesCount }}</span>
+                    </button>
+
+                    <button
+                        v-for="facet in visibleServiceFacets"
+                        :key="facet.service"
+                        type="button"
+                        :aria-pressed="selectedService === facet.service"
+                        :class="[
+                            'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm uppercase transition-colors',
+                            selectedService === facet.service
+                                ? 'border-gray-900 bg-gray-900 text-white dark:border-white dark:bg-white dark:text-gray-900'
+                                : 'border-gray-300 bg-white text-gray-600 hover:border-gray-400 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-gray-500',
+                        ]"
+                        @click="selectService(facet.service)"
+                    >
+                        {{ facet.service }}
+                        <span class="text-xs tabular-nums opacity-70">{{ facet.count }}</span>
+                    </button>
+
+                    <button
+                        v-if="hiddenServiceCount > 0"
+                        type="button"
+                        class="rounded-full border border-dashed border-gray-300 px-3 py-1 text-sm text-gray-500 hover:border-gray-400 hover:text-gray-700 dark:border-gray-600 dark:text-gray-400 dark:hover:border-gray-500 dark:hover:text-gray-200"
+                        @click="showAllServices = !showAllServices"
+                    >
+                        {{ showAllServices ? 'Show fewer' : `+ ${hiddenServiceCount} more` }}
+                    </button>
+                </div>
+
+                <!-- Benchmark. Findings raised before F-4 carry no benchmark and are not
+                     counted under any of these — blank rather than guessed. -->
+                <template v-if="benchmarkFacets.length">
+                    <h2 class="mb-2 mt-4 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                        Benchmark
+                    </h2>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button
+                            type="button"
+                            :aria-pressed="selectedRuleset === ''"
+                            :class="[
+                                'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm transition-colors',
+                                selectedRuleset === ''
+                                    ? 'border-gray-900 bg-gray-900 text-white dark:border-white dark:bg-white dark:text-gray-900'
+                                    : 'border-gray-300 bg-white text-gray-600 hover:border-gray-400 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-gray-500',
+                            ]"
+                            @click="selectedRuleset = ''"
+                        >
+                            All
+                            <span class="text-xs tabular-nums opacity-70">{{ allBenchmarksCount }}</span>
+                        </button>
+
+                        <button
+                            v-for="facet in benchmarkFacets"
+                            :key="facet.ruleset"
+                            type="button"
+                            :aria-pressed="selectedRuleset === facet.ruleset"
+                            :class="[
+                                'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm transition-colors',
+                                selectedRuleset === facet.ruleset
+                                    ? 'border-gray-900 bg-gray-900 text-white dark:border-white dark:bg-white dark:text-gray-900'
+                                    : 'border-gray-300 bg-white text-gray-600 hover:border-gray-400 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-gray-500',
+                            ]"
+                            @click="selectRuleset(facet.ruleset)"
+                        >
+                            {{ facet.label }}
+                            <span class="text-xs tabular-nums opacity-70">{{ facet.count }}</span>
+                        </button>
+                    </div>
+                </template>
             </section>
 
             <!-- Detailed Findings -->
@@ -256,10 +445,17 @@ const goToFindingType = (findingType: string) => {
                                     </button>
                                 </div>
                             </div>
-                            <!-- Expanded remediation -->
+                            <!-- Expanded remediation.
+                                 The finding's own one-line remediation comes first and shows on
+                                 its own: only critical/high rules carry step-by-step guidance, so
+                                 gating the whole block on that guidance hid perfectly good text
+                                 for the 46 medium/low rules that have nothing else. -->
                             <div v-if="expandedId === finding.id" class="mt-4 rounded-md bg-gray-50 dark:bg-gray-900/50 p-4 text-sm">
+                                <p v-if="finding.remediation" class="font-medium text-gray-900 dark:text-white">
+                                    {{ finding.remediation }}
+                                </p>
                                 <template v-if="getRecommendation(finding)">
-                                    <p class="font-medium text-gray-900 dark:text-white">{{ getRecommendation(finding)!.recommendation }}</p>
+                                    <p :class="['font-medium text-gray-900 dark:text-white', finding.remediation ? 'mt-3' : '']">{{ getRecommendation(finding)!.recommendation }}</p>
                                     <p class="mt-1 text-gray-600 dark:text-gray-300">{{ getRecommendation(finding)!.description }}</p>
                                     <p class="mt-2 text-gray-500 dark:text-gray-400"><strong>Impact:</strong> {{ getRecommendation(finding)!.impact }}</p>
                                     <ul class="mt-2 list-disc pl-5 space-y-1 text-gray-600 dark:text-gray-300">
@@ -274,7 +470,9 @@ const goToFindingType = (findingType: string) => {
                                         </ul>
                                     </div>
                                 </template>
-                                <p v-else class="text-gray-500 dark:text-gray-400">No remediation steps for this finding type.</p>
+                                <p v-if="!finding.remediation && !getRecommendation(finding)" class="text-gray-500 dark:text-gray-400">
+                                    No remediation steps for this finding type.
+                                </p>
                             </div>
                         </li>
                     </ul>

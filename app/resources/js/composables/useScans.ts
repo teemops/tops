@@ -4,45 +4,61 @@ import { useOrganizations } from './useOrganizations';
 // Use the configured axios instance from bootstrap.ts
 const axios = (window as any).axios;
 
+export type Severity = 'critical' | 'high' | 'medium' | 'low';
+
+export type SeverityCounts = Record<Severity, number>;
+
+/**
+ * One row of a grouped, severity-stacked breakdown — by service, or by finding type.
+ * Insights (F-5/F-6) renders the same shape keyed on the organization.
+ */
+export interface BreakdownGroup {
+    key: string;
+    total: number;
+    severities: SeverityCounts;
+    weight: number;
+}
+
+/** A change that would clear several findings at once, ranked by severity. */
+export interface FixFirstEntry {
+    title: string;
+    clears: number;
+    weight: number;
+    rules: string[];
+    severities: SeverityCounts;
+    topSeverity: Severity | null;
+}
+
+/**
+ * What is open *now* for this scan's account — not what this scan personally saw. Since
+ * durable findings the two are the same thing only for the latest scan, which is why this
+ * is null on any older one.
+ */
+export interface ScanBreakdown {
+    summary: { total: number; bySeverity: SeverityCounts };
+    byService: BreakdownGroup[];
+    byFindingType: BreakdownGroup[];
+    fixFirst: FixFirstEntry[];
+}
+
 export interface Scan {
     id: string;
     awsAccountId: string;
     awsAccountName: string;
     status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
     scanTypes: string[];
+    rulesets?: string[];
+    /** Human labels for this scan's rulesets, already resolved server-side. */
+    rulesetLabels?: string[];
+    isPartial?: boolean;
     findingsCount: number;
     createdAt: string;
     startedAt?: string;
     completedAt?: string;
     errorMessage?: string;
-}
-
-export interface ScanResult {
-    id: string;
-    title: string;
-    description: string;
-    severity: 'critical' | 'high' | 'medium' | 'low';
-    service: string;
-    resourceId: string;
-    resourceType: string;
-    status: string;
-    remediation: string;
-    createdAt: string;
-}
-
-export interface ScanResultsResponse {
-    scanId: string;
-    findings: ScanResult[];
-    summary: {
-        total: number;
-        critical: number;
-        high: number;
-        medium: number;
-        low: number;
-    };
-    total: number;
-    limit: number;
-    offset: number;
+    isLatestForAccount?: boolean;
+    latestScanId?: string | null;
+    breakdown?: ScanBreakdown | null;
 }
 
 export interface ScanType {
@@ -232,33 +248,6 @@ export function useScans() {
         }
     };
 
-    const getScanResults = async (
-        scanId: string,
-        filters?: {
-            severity?: string;
-            service?: string;
-            status?: string;
-            limit?: number;
-            offset?: number;
-        }
-    ): Promise<ScanResultsResponse> => {
-        try {
-            const params = new URLSearchParams();
-            if (filters?.severity) params.append('severity', filters.severity);
-            if (filters?.service) params.append('service', filters.service);
-            if (filters?.status) params.append('status', filters.status);
-            if (filters?.limit) params.append('limit', filters.limit.toString());
-            if (filters?.offset) params.append('offset', filters.offset.toString());
-
-            const queryString = params.toString();
-            const url = `/api/scans/${scanId}/results${queryString ? `?${queryString}` : ''}`;
-            const response = await axios.get(url);
-            return response.data;
-        } catch (err: any) {
-            throw new Error(err.response?.data?.message || err.response?.data?.error || 'Failed to fetch scan results');
-        }
-    };
-
     const cancelScan = async (scanId: string): Promise<Scan> => {
         loading.value = true;
         error.value = null;
@@ -340,7 +329,6 @@ export function useScans() {
         createScan,
         createScanFromProfiles,
         getScan,
-        getScanResults,
         cancelScan,
         startPolling,
         stopPolling,

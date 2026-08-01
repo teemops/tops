@@ -98,6 +98,72 @@ Decisions already made, so we don't relitigate them. Each has a trigger for revi
 | **D-8** | **Ship prebuilt images from Docker Hub, cut by a real release pipeline.** `install.sh` pulls tagged images; it never builds. | 2026-07-30 | See below — this is the biggest single change to how TOPS is delivered. | A registry other than Docker Hub is chosen, or images stop being the distribution unit. |
 | **D-9** | **No application-level encryption at rest. `iam_role_arn` is stored plaintext; encryption is the host's job.** | 2026-07-30 | See below — deliberately reducing encryption on a security product needs its reasoning on the record. | A field is introduced that is genuinely a credential (an access key, a token, a password). Then encrypt *that* and revisit key rotation. |
 | **D-10** | **User documentation lives in a top-level `user-docs/` directory, not under `docs/`, and deploys to `docs.teemops.com`.** One site for technical and non-technical readers — no separate tracks. | 2026-07-31 | See below. | The content outgrows plain Markdown, or a contributor proposes a better home. |
+| **D-12** | **No security score.** Removed rather than recalibrated. Severity counts and the breakdown are what we show; a score can come back later if a design partner asks for one and we know what it should mean. | 2026-08-02 | See below. Closes [#91](https://github.com/teemops/tops/issues/91). | A design partner asks for a single headline number — and then design it so it can *move*. |
+| **D-11** | **A finding is a durable record keyed by AWS account + resource + rule, and findings are current state. No per-scan history, no observations table.** The most recent scan that examined a resource is authoritative for its content; status belongs to the user. | 2026-08-01 | See below. Shipped as [#81](https://github.com/teemops/tops/issues/81). | A design partner asks for trends over time — and then treat it as a new data model, not an addition to this one. |
+
+> **Naming collision, flagged 2026-08-01.** [`durable-findings.md`](./features/durable-findings.md)
+> and the wireframes label the durable-findings decision **D-1**, which in *this* document is
+> "open source, self-hosted first". They are different namespaces and the clash is only in
+> prose. The Decisions Log entry above is **D-11**; the story keeps its own ID until someone
+> renames it. **Worth renaming the story's ID to `DF-1`** — deferred rather than done
+> unilaterally, because it touches three docs and a settled wireframe.
+
+### D-12 in full: why the security score is gone rather than fixed
+
+The score was `100 − (critical×10 + high×5 + medium×2 + low×1)`, floored at zero.
+
+The reference install's 67 findings — 0 critical, 27 high, 37 medium, 3 low — compute to
+**−212**. It read **0** from the first scan and could not have read anything else until the
+findings dropped by roughly two thirds. **Every real account sits on the floor.**
+
+That is worse than showing nothing, for a specific reason: a number that cannot move still
+looks like information. Someone fixes ten things, rescans, sees 0 again, and concludes the
+product is broken or the work was pointless. The one job a score has — showing improvement —
+was the one thing it could not do.
+
+**Recalibrating was the obvious alternative and was rejected.** Any curve we picked would be
+invented: we have one real account's data, no partner has asked for a score, and nobody has
+told us what "good" looks like for a small AWS estate. Choosing a formula now means guessing
+at the answer and then defending the guess. That is building ahead of evidence, which the
+practices call out by name.
+
+So the score is **removed**, not replaced. The Findings summary keeps its severity counts,
+Dashboard shows open findings instead, and Scan detail and Insights already show a severity
+breakdown that says strictly more than one number could.
+
+**If it comes back**, the requirement is fixed in advance: it must visibly move when someone
+fixes ten things. That is the acceptance criterion any future scoring design has to meet.
+
+Note the weighting itself survives as `ScanResult::SEVERITY_WEIGHTS`, because "fix these
+first" still needs to rank a group of criticals above a larger group of mediums. What is gone
+is the pretence that the weighting rolls up into a meaningful headline figure.
+
+### D-11 in full: durable findings
+
+The rule that governs everything else: **the most recent scan that actually examined a
+resource is authoritative for that finding's content. Status belongs to the user.** A scan
+may change a finding's severity, title or remediation; only a person marks something
+ignored.
+
+**Not looking is not the same as looking and seeing nothing** — three outcomes, not two:
+
+| What the scan did | Outcome |
+| --- | --- |
+| Examined the resource, rule now passes | **Resolved — fixed** |
+| Enumerated that service in that region, resource absent | **Resolved — resource gone** |
+| Did not enumerate that service in that region at all | **Untouched.** Not resolved, not fixed |
+
+The third row is the safety rule, and it is what makes per-service scans (F-2) and partial
+region coverage safe to ship at all. Without it, scanning only S3 would silently "resolve"
+every EC2 finding.
+
+**`resource_gone` is deferred** and did not ship with #81. Its safety guard rests on
+`is_partial`, and [#92](https://github.com/teemops/tops/pull/92) showed `is_partial` reads
+`false` when regions silently failed to report. Fixing that is PERF-2
+([#65](https://github.com/teemops/tops/issues/65)); `resource_gone` waits behind it.
+
+**The price, accepted knowingly:** "what did scan X find?" is not answerable for any scan
+but the latest. Older scans become a thin audit record — what ran, when, how it went.
 
 ### D-7 in full: licensing
 
@@ -291,9 +357,13 @@ Sizes are rough and relative, for one person: **XS** under a day · **S** a day 
 
 ### Now — the path to a design partner
 
-**Now is empty as of 2026-08-01.** Every item on the sequenced path to a design partner has
-closed, four weeks ahead of the **2026-08-31** deadline. N-7 was the last of them: install →
-add AWS account → scan, on a real account, on v0.3.1, reaching Insights and Findings.
+**The original Now emptied on 2026-08-01.** Every item on the sequenced path to a design
+partner has closed, four weeks ahead of the **2026-08-31** deadline. N-7 was the last of them:
+install → add AWS account → scan, on a real account, on v0.3.1, reaching Insights and Findings.
+
+**It did not stay empty.** Running the product for real is what exposed the next tranche of
+work, and that work is now the active one — see
+[Workstream: Scans, Findings & Insights](#workstream-scans-findings--insights) below.
 
 **What that means, stated carefully.** The milestone's "done when" has two halves, and only
 one is closed. The *code* half — a documented path that takes someone from nothing to
@@ -302,13 +372,17 @@ and the maintainer running his own installer proves nothing about that. **The re
 on this milestone is finding and watching five real operators, not writing more code.** The
 most valuable thing the plan can do now is stay small enough to react to what they say.
 
-**What to pull, and in what order.** With Now empty, take from **Next** — but take one item,
-not the list. [X-6 (DCO in CI)](https://github.com/teemops/tops/issues/32) has the strongest
-claim: the repo is public, an external PR can arrive any day, and D-7's no-rug-pull guarantee
+**What to pull, and in what order.** Now emptied and was immediately refilled — not from
+**Next**, but from a workstream that did not exist when this section was written. See
+[Workstream: Scans, Findings & Insights](#workstream-scans-findings--insights) below, which
+is where the work actually went on 2026-08-01 and where it continues.
+
+The **Next** items are unchanged and still queued behind it.
+[X-6 (DCO in CI)](https://github.com/teemops/tops/issues/32) keeps the strongest claim among
+them: the repo is public, an external PR can arrive any day, and D-7's no-rug-pull guarantee
 rests on provenance that nothing currently checks. Then
 [X-3](https://github.com/teemops/tops/issues/30), which protects the default self-hosted
-path that every one of those five operators will run. Everything else waits for a partner to
-ask, which is the whole point of having partners.
+path that every one of those five operators will run.
 
 *The history that got here.* N-5 closed the same day it was found incomplete — v0.1.2 went through
 the fixed pipeline cleanly (see below), so the release process TOPS never had now exists
@@ -339,6 +413,114 @@ fixes are what made that run succeed, which is the sequencing argument justifyin
 | ~~**N-8**~~ | ~~Base image for the app container~~ | ✅ **Done** 2026-07-31 — `teem/tops-base:php8.3-1` published for both architectures and verified on Docker Hub; the app build pulls it instead of compiling. 48.5s → 13.8s on a cold clean build. Merged in PR #49; the CI number still gets recorded after the next release. | — |
 | ~~**N-3**~~ | ~~Setup docs a stranger can follow~~ | ✅ **Done** 2026-07-30 — README rebuilt around the one-liner, vendor defaults purged from `.env.example`, nine-symptom troubleshooting section, installer verified end to end. | — |
 | ~~**N-4**~~ | ~~Remediation for every finding~~ | ✅ **Done** 2026-07-30 — all 74 rules carry a remediation, all 28 critical/high rules carry step-by-step guidance, and `scan:validate-rules` now fails rather than warns. | — |
+
+### Workstream: Scans, Findings & Insights
+
+**Added to this document 2026-08-01, retrospectively.** The work below was designed, agreed
+and partly shipped on 2026-08-01 without ever appearing here — three feature docs, a signed-off
+wireframe set and 30-odd issues. This section closes that gap. **It is the reason Now stopped
+being empty**, and reading the section above without it gives a false picture of what is
+happening.
+
+**Why it exists.** N-7 put a real account through the product and the product was the weak
+part, not the installer. Three things were wrong at once: every scan re-created every finding
+from scratch, a scan could only cover a whole benchmark, and a full scan took ~10 minutes.
+
+**Sources.** [`durable-findings.md`](./features/durable-findings.md) ·
+[`scan-individual-services.md`](./features/scan-individual-services.md) ·
+[`parallel-region-scans.md`](./features/parallel-region-scans.md) · wireframes rev 3
+("Scans, Findings & Insights", agreed 2026-08-01).
+
+**The organising idea, from the wireframes:** *a finding is read in exactly one place.* Scan
+detail summarises and dispatches; Findings is where a finding is read. Every number on Scan
+detail becomes a link into Findings, filtered. The per-finding list comes **off** Scan detail
+— that deletion is what pays for the feature.
+
+#### Shipped
+
+| # | Item | What landed | Size |
+| --- | --- | --- | :---: |
+| ~~**#81**~~ | ~~D-1 · Durable findings~~ | ✅ **Done** 2026-08-01 — a finding is one lasting record per account + resource + rule, not one row per scan. Recorded as **D-11** above. `resource_gone` deferred behind PERF-2. PR #95. | M |
+| ~~**#84**~~ | ~~F-2 · Scan individual services~~ | ✅ **Done** 2026-08-01 — profiles and `scan_types` are now combinable, so "only S3, against CIS" is expressible; narrowing is validated, not silently intersected. Modal gained an expandable tree, indeterminate parent state and a live "2 of 11 services · 12 rules" summary. 34 `ScansControllerTest` tests green. | S–M |
+| ~~**#90**~~ | ~~B-1 · Status lost on rescan~~ | ✅ Closed by #81 — ignored stays ignored across a rescan. | — |
+| ~~**#64**~~ | ~~PERF-1 · Instrument scan phases~~ | ✅ **Done** 2026-08-01 — phase timing instrumented so the ~10 minutes is attributed rather than guessed. Baseline captured. PR #96. | S |
+| ~~**#85**~~ | ~~F-3 · Filter Findings by service~~ | ✅ **Done** 2026-08-02, verified on the reference install — service pills with server-computed facet counts, ordered by size, long tail behind `+ N more`. The facet deliberately does not constrain itself, so selecting one pill leaves the rest navigable, and counts follow list semantics so a pill reading N returns N rows. | S |
+| ~~**#83**~~ | ~~F-7 · Findings does not read its filters from the URL~~ | ✅ **Done** 2026-08-02 — shipped inside F-3, which could not meet its "and the URL reflects it" criterion without it. Filters now read from and write back to the URL, so a filtered view can be bookmarked or sent to a colleague. | XS |
+| ~~**#87**~~ | ~~F-4 · Filter Findings by compliance benchmark~~ | ✅ **Done** 2026-08-02 — **the only genuine schema change in the workstream.** `scan_results.rulesets` is a JSON *list*, because one rule may belong to several rulesets and a finding that is both a Basic and a CIS gap should say so; folding the ruleset into a finding's identity was rejected as it would recreate the duplication D-1 removed. No backfill: existing findings show blank rather than a guess. `evaluateScan` now dedupes by rule id, so a shared rule is evaluated once carrying both rulesets. | M |
+| ~~**#91**~~ | ~~B-2 · Security score pinned at 0~~ | ✅ **Done** 2026-08-02 — **removed rather than recalibrated**, recorded as **D-12**. It read 0 for every real account and could not move, and a number that cannot move still looks like information. Severity counts and the breakdown say more. Dashboard shows open findings instead. | XS |
+| ~~**#88**~~ | ~~F-5 · Insights by service with severity~~ | ✅ **Done** 2026-08-02, verified on the reference install — "Top affected services" became the same severity-stacked, drillable breakdown Scan detail shows, keyed on the organization. **The shared component and service were consumed byte-for-byte unchanged**, so the whole feature is ~20 lines of production code. Deliberately *not* period-scoped: it is current state, so a service reads the same number here as on Scan detail and Findings — pinned by a test. | S |
+| ~~**#86**~~ | ~~S-1 · Scan detail summarises and dispatches~~ | ✅ **Done** 2026-08-02, verified on the reference install — Scan detail now summarises and dispatches: run facts, severity totals, "fix these first" ranked by severity, and a drillable breakdown whose every row links into Findings filtered. The per-finding list, its remediation and its severity filter are **deleted**, which is what pays for the feature. Built as a shared service and component so Insights is a re-key, not a rewrite. | M |
+| ~~**#82**~~ | ~~F-1 · Findings drops the remediation it already has~~ | ✅ **Done** 2026-08-02 — the one-line remediation now renders on its own rather than being gated behind `tips.json` step-by-step guidance, which only critical/high rules carry. Fixed the empty state for **46 of 74 rules**. Landed *before* S-1 deliberately: S-1 makes Findings the only page showing remediation at all. | XS |
+
+#### Open — UI, in dependency order
+
+**The P0/P1 run is complete.** #81, #82, #83, #85 and #86 have all landed; what remains is P2
+and below. **#88 (F-5, Insights by service) is the cheapest next thing** — S-1 built the
+breakdown as a shared service and component precisely so Insights is a re-key rather than a
+rewrite, and there is already a test proving the organization-wide path works.
+
+| # | Item | Depends on | Size | Priority |
+| --- | --- | --- | :---: | :---: |
+| **#89** | F-6 · Insights by benchmark — **the last item in the milestone**; F-4 unblocked it | ✅ all met | XS | P3 |
+| **#87** | F-4 · Filter Findings by compliance benchmark — the one genuine data-model change left; nothing records a finding's benchmark | #81 | M | P2 |
+| **#88** | F-5 · Insights by service with severity breakdown | #86, #81 | S | P2 |
+| **#91** | B-2 · Security score pinned at 0 and cannot improve | — | XS–S | P2 · bug |
+| **#89** | F-6 · Insights by benchmark | #87, #88 | XS | P3 |
+
+**One architectural instruction, worth repeating from the wireframes:** S-1's grouped,
+severity-stacked, drillable breakdown must be built as a **reusable component**. F-5 and F-6
+are the same block keyed differently. If it does not come out shared, the Insights work
+doubles in cost.
+
+#### Open — performance ([#63](https://github.com/teemops/tops/issues/63) tracks)
+
+**The fan-out is already parallel; the deployment runs one worker.** Region jobs are
+independent and already dispatched one per (service, region) — roughly 153 of them on a full
+scan — and then executed strictly one at a time. That single fact reframes the whole series:
+most of it is deployment and bookkeeping, not rearchitecting.
+
+Two of these were **correctness bugs wearing a performance label**, and both are now fixed —
+they gated everything else:
+
+- ~~**PERF-2 ([#65](https://github.com/teemops/tops/issues/65))**~~ — ✅ **Done 2026-08-02.**
+  Region dispatch became a single `Bus::batch()`, so the batch size is fixed atomically and the
+  window in which a finishing job could complete a whole scan cannot exist. Completion moved to
+  the batch's `finally()` callback. **`checkAndMarkRegionBasedScanComplete()` was deleted rather
+  than deprecated** — it retained the branch that marked a barely-started scan `completed,
+  is_partial=false`, and a "reported clean when nobody looked" path has no business surviving on
+  a security scanner. Verified with multiple workers locally.
+- ~~**PERF-3 ([#66](https://github.com/teemops/tops/issues/66))**~~ — ✅ **Done 2026-08-02.**
+  `settleRegionScan()` claims a scan with a conditional `UPDATE`, so exactly one of the batch
+  callback and the stale sweep wins. The sweep now marks everything it settles **partial**,
+  unconditionally: it only runs when the normal path did not, so a fallback can never say "all
+  clear".
+
+~~**PERF-6 (#69, run more than one worker)**~~ — ✅ **Done 2026-08-02.** The worker container
+now runs two supervisord pools instead of one process: the orchestrator (`default`,
+`teemops_audit`) and region jobs (`teemops_audit_region`), the latter sized by
+`TOPS_WORKER_PROCESSES`, **default 5**. Split deliberately, so a long orchestrator job cannot
+block the ~153 region jobs queued behind it. The no-SQS path gets the same concurrency —
+it previously ran a single bare `queue:work`. Safe because the database driver uses
+`SELECT … FOR UPDATE SKIP LOCKED` on MySQL 8 and completion is settled by the batch from
+PERF-2, not by workers racing a counter. Costs ~0.6–0.8 GB at the default, which is now a
+documented minimum-spec note. Then the other cheap wins:
+PERF-11 (#74, index `scan_details`), PERF-12 (#75, bulk-insert), PERF-13 (#76, memoize AWS
+clients), PERF-14 (#77), PERF-15 (#78), PERF-18 (#94). Remaining: PERF-4 (#67),
+PERF-5 (#68), PERF-7 (#70), PERF-8 (#71), PERF-9 (#72), PERF-10 (#73), PERF-16 (#79),
+PERF-17 (#80).
+
+**Region pruning stays off by default** (`SCAN_PRUNE_REGIONS_WITH_TAGGING`) for the
+documented and correct reason that it can silently mark an untagged region clean. PERF-16
+revisits the default; it is not a free win.
+
+#### How this squares with the milestone
+
+It does not, entirely, and that is worth stating rather than smoothing over. The milestone's
+remaining constraint is **recruitment, not engineering** — and this workstream is engineering.
+The defence is that N-7 surfaced it by running the product for real, and that a partner who
+scans twice hits durable findings immediately. **The honest risk is that this workstream is
+large enough to absorb all remaining capacity before 2026-08-31 while nobody is recruited.**
+Keep it to the P0/P1 items until a partner is actually watching.
 
 ### Next — queued behind the design-partner milestone
 
@@ -1195,6 +1377,59 @@ Blocking nothing today, but each one shapes the plan:
 
 ## Changelog
 
+- **2026-08-02** — **S-1 landed, and the P0/P1 run of this workstream is complete.** Scan
+  detail summarises and dispatches: run facts, severity totals, "fix these first" ranked by
+  severity weight rather than raw count, and a drillable breakdown whose every row links into
+  Findings already filtered. **The per-finding list, its remediation and its severity filter
+  are deleted** — that duplication was the whole problem, and removing it is what pays for the
+  feature. An older scan now renders deliberately blank apart from its run facts and a link to
+  the latest, which follows directly from D-11: a current-state number under a July date would
+  be wrong *and* plausible. The cost, accepted knowingly, is that "what did scan X find?" is no
+  longer answerable for anything but the latest scan. Built as `FindingsBreakdownService` plus a
+  shared `FindingsBreakdown` component, both keyed on an organization with an *optional*
+  account, so F-5 is a re-key rather than a rewrite — there is a test covering that path
+  already. The severity weighting moved to `ScanResult::SEVERITY_WEIGHTS` so the security score
+  and the ranking cannot drift apart. **One bug found in review by Ben, not by the tests:** the
+  scan group rendered `[object Object]`, because `rulesetLabels()` returns a label/description
+  pair per ruleset and the whole map was shipped to the client typed as flat strings. Labels are
+  now resolved server-side. That is the second time the missing frontend test runner has cost
+  something — **worth deciding on Vitest rather than continuing to rely on manual checks.**
+- **2026-08-02** — **F-3, F-7 and F-1 landed; the Findings page is now the destination S-1
+  needs.** F-3 ([#85](https://github.com/teemops/tops/issues/85)) gained server-computed service
+  facets — one grouped query against the indexed `scan_results.service`, with the rule that
+  makes faceting usable: **the service filter does not constrain its own facet**, so selecting a
+  pill leaves the rest navigable instead of zeroing them. Counts follow the list's semantics
+  rather than the summary's, so a pill reading N returns N rows — a count the user can watch
+  disagree with the list is worse than no count. F-7
+  ([#83](https://github.com/teemops/tops/issues/83)) shipped inside it, because F-3's "and the
+  URL reflects it" criterion *is* F-7 and `Findings/Index.vue` read no query parameters at all.
+  F-1 ([#82](https://github.com/teemops/tops/issues/82)) was cleared first rather than after:
+  it fixes the empty remediation state for **46 of 74 rules**, and S-1 makes Findings the only
+  page that renders remediation, so shipping S-1 over a broken F-1 would have hidden it
+  product-wide. Verified by Ben on the reference install. Two gaps recorded honestly: the URL
+  parsing has **no automated test** (the repo has no JS unit runner, only Playwright), and the
+  `$except` faceting parameter is a generalization slightly ahead of need, kept because F-4
+  needs the same mechanism and a test covers the failure it invites.
+- **2026-08-01** — **The Scans/Findings/Insights workstream added to this document,
+  retrospectively.** Three feature docs
+  ([durable findings](./features/durable-findings.md),
+  [scan individual services](./features/scan-individual-services.md),
+  [parallel region scans](./features/parallel-region-scans.md)), a signed-off wireframe set
+  and roughly thirty issues (#63–#94) had been designed, agreed and partly shipped without
+  ever reaching the roadmap — which still said "Now is empty" while four items had landed and
+  twenty-odd were open. **This document was the stale half, again**, and in the same way the
+  2026-08-01 issue reconciliation found: the plan of record silently stopped recording.
+  Shipped and now marked as such: **#81** durable findings (recorded as **D-11**), **#84**
+  per-service scans, **#90** (closed by #81), **#64** scan-phase instrumentation. Two
+  observations that came out of writing it down. First, **#82 (F-1, remediation dropped) is a
+  P0 bug that gets strictly worse when S-1 ships**, because Findings becomes the only page
+  rendering remediation — it should go first and it is XS. Second, **PERF-2 (#65) is a
+  correctness bug wearing a performance label**: it is why `is_partial` reads `false` after
+  regions silently fail, which is why `resource_gone` was cut from #81, and it must land
+  before more queue workers are run rather than after. Also flagged, not fixed: the feature
+  docs call durable findings **D-1**, which collides with this document's D-1 ("open source,
+  self-hosted first") — a rename to `DF-1` is proposed but touches three docs and a settled
+  wireframe, so it is left as a decision rather than taken unilaterally.
 - **2026-08-01** — **N-7 closed, and with it the whole of Now.** Ben ran the documented path
   on a real AWS account against v0.3.1 — install, add AWS account, scan — and reached
   Insights and Findings. Verified against the install rather than a recollection:

@@ -1,6 +1,9 @@
 # Parallel multi-region scans — solution design
 
-**Status:** proposed
+**Status:** accepted — tracked as PERF-0 ([#63](https://github.com/teemops/tops/issues/63)),
+broken into PERF-1…PERF-18 (#64–#80, #94). **PERF-1 (#64) shipped 2026-08-01** (phase
+instrumentation and baseline, PR #96); the rest are open. See the workstream section in
+[`roadmap.md`](../roadmap.md).
 **Date:** 2026-08-01
 **Problem:** a full scan takes ~10 minutes. We want it materially faster.
 

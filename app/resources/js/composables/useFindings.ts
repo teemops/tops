@@ -4,7 +4,6 @@ import { useOrganizations } from './useOrganizations';
 const axios = (window as any).axios;
 
 export interface FindingSummary {
-    securityScore: number;
     total: number;
     bySeverity: {
         critical: number;
@@ -41,9 +40,28 @@ export interface Recommendation {
     rules: string[];
 }
 
+/**
+ * One service pill: how many findings you would get by selecting it, given whatever other
+ * filters are already active. Computed server-side — the list is paginated, so counting the
+ * loaded page would undercount.
+ */
+export interface ServiceFacet {
+    service: string;
+    count: number;
+}
+
+/** One benchmark pill. Benchmarks with no findings are not returned at all. */
+export interface BenchmarkFacet {
+    ruleset: string;
+    label: string;
+    count: number;
+}
+
 export interface FindingsIndexResponse {
     summary: FindingSummary;
     findings: Finding[];
+    serviceFacets: ServiceFacet[];
+    benchmarkFacets: BenchmarkFacet[];
     recommendationsMap: Record<string, Recommendation>;
     total: number;
     limit: number;
@@ -74,6 +92,8 @@ export interface FindingByTypeResponse {
 
 const findings = ref<Finding[]>([]);
 const summary = ref<FindingSummary | null>(null);
+const serviceFacets = ref<ServiceFacet[]>([]);
+const benchmarkFacets = ref<BenchmarkFacet[]>([]);
 const recommendationsMap = ref<Record<string, Recommendation>>({});
 const loading = ref(false);
 const error = ref<string | null>(null);
@@ -86,6 +106,7 @@ export function useFindings() {
         awsAccountId?: string;
         findingType?: string;
         service?: string;
+        ruleset?: string;
         status?: string;
         limit?: number;
         offset?: number;
@@ -103,6 +124,7 @@ export function useFindings() {
             if (filters?.awsAccountId) params.set('aws_account_id', filters.awsAccountId);
             if (filters?.findingType) params.set('finding_type', filters.findingType);
             if (filters?.service) params.set('service', filters.service);
+            if (filters?.ruleset) params.set('ruleset', filters.ruleset);
             if (filters?.status) params.set('status', filters.status);
             if (filters?.limit) params.set('limit', String(filters.limit));
             if (filters?.offset) params.set('offset', String(filters.offset));
@@ -113,6 +135,8 @@ export function useFindings() {
 
             summary.value = data.summary;
             findings.value = data.findings;
+            serviceFacets.value = data.serviceFacets ?? [];
+            benchmarkFacets.value = data.benchmarkFacets ?? [];
             recommendationsMap.value = data.recommendationsMap ?? {};
             pagination.value = {
                 total: data.total,
@@ -123,6 +147,8 @@ export function useFindings() {
             error.value = err.response?.data?.error ?? 'Failed to load findings';
             findings.value = [];
             summary.value = null;
+            serviceFacets.value = [];
+            benchmarkFacets.value = [];
         } finally {
             loading.value = false;
         }
@@ -183,6 +209,8 @@ export function useFindings() {
     return {
         findings,
         summary,
+        serviceFacets,
+        benchmarkFacets,
         recommendationsMap,
         loading,
         error,

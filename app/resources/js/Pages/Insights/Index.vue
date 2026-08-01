@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, router } from '@inertiajs/vue3';
 import SidebarAppLayout from '@/Layouts/SidebarAppLayout.vue';
 import FindingsTrendChart from '@/Components/Charts/FindingsTrendChart.vue';
 import SeverityDonutChart from '@/Components/Charts/SeverityDonutChart.vue';
+import FindingsBreakdown, { type BreakdownTab } from '@/Components/FindingsBreakdown.vue';
 import { useInsights } from '@/composables/useInsights';
 import { useOrganizations } from '@/composables/useOrganizations';
 
@@ -55,8 +56,26 @@ const summary = computed(() => insights.value?.summary);
 const severityDistribution = computed(() => insights.value?.severityDistribution);
 const frameworks = computed(() => insights.value?.compliance?.frameworks ?? []);
 const trend = computed(() => insights.value?.trend ?? []);
-const topServices = computed(() => insights.value?.topServices ?? []);
 const keyInsights = computed(() => insights.value?.keyInsights ?? []);
+
+/**
+ * The same block Scan detail renders, keyed on the whole organization. Deliberately not
+ * period-scoped: it is current state, so a service reads the same number here as it does
+ * on Scan detail and Findings.
+ */
+const breakdownTabs = computed<BreakdownTab[]>(() => {
+    const breakdown = insights.value?.breakdown;
+    if (!breakdown) return [];
+
+    return [
+        { key: 'service', label: 'Service', groups: breakdown.byService, uppercase: true },
+        { key: 'finding_type', label: 'Finding type', groups: breakdown.byFindingType },
+    ];
+});
+
+const openFindings = (tabKey: string, groupKey: string) => {
+    router.visit(`/findings?${tabKey}=${encodeURIComponent(groupKey)}`);
+};
 
 const periodLabels: Record<Period, string> = {
     '30d': 'Last 30 days',
@@ -274,18 +293,14 @@ const scoreBarClass = (score: number) => {
                         </div>
                     </div>
 
-                    <div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-                        <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Top affected services</h2>
-                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Highest-volume services in the selected period</p>
-                        <div class="mt-6 space-y-4">
-                            <div v-for="service in topServices" :key="service.service" class="flex items-center justify-between rounded-md bg-gray-50 px-3 py-2 dark:bg-gray-900/60">
-                                <span class="font-medium text-gray-900 dark:text-white">{{ service.service }}</span>
-                                <span class="text-sm text-gray-500 dark:text-gray-400">{{ service.count }} findings</span>
-                            </div>
-                            <p v-if="!topServices.length" class="text-sm text-gray-500 dark:text-gray-400">
-                                No findings in this period.
-                            </p>
+                    <!-- Current state, not the selected period — labelled so, because every
+                         other block on this page is period-scoped. -->
+                    <div>
+                        <div class="mb-2 flex items-baseline justify-between gap-2">
+                            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Findings by</h2>
+                            <span class="text-xs text-gray-500 dark:text-gray-400">Across all scans, open now</span>
                         </div>
+                        <FindingsBreakdown :tabs="breakdownTabs" @select="openFindings" />
                     </div>
                 </section>
 

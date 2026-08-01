@@ -7,6 +7,7 @@ use App\Models\Scan;
 use App\Models\ScanResult;
 use App\Services\OrganizationPermission;
 use App\Services\RecommendationsLoader;
+use App\Services\ScanProfilesService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -33,27 +34,8 @@ class FindingsController extends Controller
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
-        $query = ScanResult::query()
-            ->join('scans', 'scan_results.scan_id', '=', 'scans.id')
-            ->where('scans.organization_id', $organization->id)
-            ->where('scans.status', 'completed')
+        $query = $this->filteredFindings($request, $organization->id)
             ->select('scan_results.*');
-
-        if ($request->filled('aws_account_id')) {
-            $query->where('scans.aws_account_id', $request->input('aws_account_id'));
-        }
-
-        if ($request->filled('finding_type')) {
-            $query->where('scan_results.finding_type', $request->input('finding_type'));
-        }
-
-        if ($request->filled('service')) {
-            $query->where('scan_results.service', $request->input('service'));
-        }
-
-        if ($request->filled('status')) {
-            $query->where('scan_results.status', $request->input('status'));
-        }
 
         $limit = min($request->input('limit', 50), 200);
         $offset = max($request->input('offset', 0), 0);
@@ -90,23 +72,7 @@ class FindingsController extends Controller
             ];
         });
 
-        $baseQuery = ScanResult::query()
-            ->join('scans', 'scan_results.scan_id', '=', 'scans.id')
-            ->where('scans.organization_id', $organization->id)
-            ->where('scans.status', 'completed');
-
-        if ($request->filled('aws_account_id')) {
-            $baseQuery->where('scans.aws_account_id', $request->input('aws_account_id'));
-        }
-        if ($request->filled('finding_type')) {
-            $baseQuery->where('scan_results.finding_type', $request->input('finding_type'));
-        }
-        if ($request->filled('service')) {
-            $baseQuery->where('scan_results.service', $request->input('service'));
-        }
-        if ($request->filled('status')) {
-            $baseQuery->where('scan_results.status', $request->input('status'));
-        }
+        $baseQuery = $this->filteredFindings($request, $organization->id);
 
         // A resolved finding is not an open problem, so it does not count toward the
         // totals or the score. This matters more than it used to: before durable findings
@@ -128,14 +94,12 @@ class FindingsController extends Controller
             'low' => (clone $baseQuery)->where('scan_results.severity', 'low')->count(),
         ];
 
-        $totalForScore = array_sum($bySeverity);
-        $securityScore = $totalForScore === 0
-            ? 100
-            : max(0, 100 - ($bySeverity['critical'] * 10 + $bySeverity['high'] * 5 + $bySeverity['medium'] * 2 + $bySeverity['low']));
-
+        // No security score. It was 100 minus a weighted penalty, floored at zero, which
+        // put every real account at zero and kept it there — fixing ten things moved
+        // nothing. A number that cannot move is worse than no number, because it looks
+        // like information. Severity counts are honest and already say more. See D-12.
         $summary = [
-            'securityScore' => $securityScore,
-            'total' => $totalForScore,
+            'total' => array_sum($bySeverity),
             'bySeverity' => $bySeverity,
         ];
 
@@ -144,11 +108,111 @@ class FindingsController extends Controller
         return response()->json([
             'summary' => $summary,
             'findings' => $findings,
+            'serviceFacets' => $this->serviceFacets($request, $organization->id),
+            'benchmarkFacets' => $this->benchmarkFacets($request, $organization->id),
             'recommendationsMap' => $recommendationsMap,
             'total' => $total,
             'limit' => $limit,
             'offset' => $offset,
         ]);
+    }
+
+    /**
+     * The organization-scoped base for every findings query on the index page.
+     *
+     * $except names a filter to leave off, which is what makes faceting work: a facet has
+     * to be computed without the filter it is offering, or selecting one service collapses
+     * every other pill to zero and there is no way back.
+     */
+    private function filteredFindings(Request $request, string $organizationId, ?string $except = null)
+    {
+        $query = ScanResult::query()
+            ->join('scans', 'scan_results.scan_id', '=', 'scans.id')
+            ->where('scans.organization_id', $organizationId)
+            ->where('scans.status', 'completed');
+
+        if ($except !== 'aws_account_id' && $request->filled('aws_account_id')) {
+            $query->where('scans.aws_account_id', $request->input('aws_account_id'));
+        }
+
+        if ($except !== 'finding_type' && $request->filled('finding_type')) {
+            $query->where('scan_results.finding_type', $request->input('finding_type'));
+        }
+
+        if ($except !== 'service' && $request->filled('service')) {
+            $query->where('scan_results.service', $request->input('service'));
+        }
+
+        if ($except !== 'ruleset' && $request->filled('ruleset')) {
+            $query->whereJsonContains('scan_results.rulesets', $request->input('ruleset'));
+        }
+
+        if ($except !== 'status' && $request->filled('status')) {
+            $query->where('scan_results.status', $request->input('status'));
+        }
+
+        return $query;
+    }
+
+    /**
+     * How many findings each benchmark would yield if it were the selected one.
+     *
+     * This loops where the service facet uses one grouped query, and that is deliberate.
+     * Services number eleven and grow, so looping there would not scale; benchmarks number
+     * two, and grouping over a JSON array needs `json_each`, whose syntax differs between
+     * MySQL and the SQLite the tests run on. Two counts are simpler, portable and cheaper
+     * than the query avoiding them. Revisit if benchmarks ever reach double figures.
+     *
+     * Only benchmarks that actually have rules are offered — the same rule the New Scan
+     * modal follows, which is why an empty PCI never appears.
+     */
+    private function benchmarkFacets(Request $request, string $organizationId): array
+    {
+        $facets = [];
+
+        foreach (ScanProfilesService::rulesetLabels() as $ruleset => $meta) {
+            $count = (clone $this->filteredFindings($request, $organizationId, except: 'ruleset'))
+                ->whereJsonContains('scan_results.rulesets', $ruleset)
+                ->count();
+
+            if ($count === 0) {
+                continue;
+            }
+
+            $facets[] = [
+                'ruleset' => $ruleset,
+                'label' => $meta['label'] ?? $ruleset,
+                'count' => $count,
+            ];
+        }
+
+        usort($facets, fn ($a, $b) => [$b['count'], $a['ruleset']] <=> [$a['count'], $b['ruleset']]);
+
+        return $facets;
+    }
+
+    /**
+     * How many findings each service would yield if it were the selected one — one grouped
+     * query, not a count per service.
+     *
+     * These deliberately follow the *list* semantics rather than the summary's, which drops
+     * resolved findings. A pill reading 12 has to produce 12 rows when clicked; a count the
+     * user can see disagree with the list is worse than no count at all.
+     */
+    private function serviceFacets(Request $request, string $organizationId): array
+    {
+        return $this->filteredFindings($request, $organizationId, except: 'service')
+            ->select('scan_results.service')
+            ->selectRaw('COUNT(*) as facet_count')
+            ->groupBy('scan_results.service')
+            ->orderByDesc('facet_count')
+            ->orderBy('scan_results.service')
+            ->get()
+            ->map(fn ($row) => [
+                'service' => $row->service,
+                'count' => (int) $row->facet_count,
+            ])
+            ->all();
     }
 
     /**

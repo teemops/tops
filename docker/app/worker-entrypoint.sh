@@ -19,16 +19,24 @@ until php -r "
     sleep 2
 done
 
+# supervisord expands these with %(ENV_...)s and refuses to start if either is unset,
+# so they are defaulted here rather than relied on from the compose file.
+#
+# Five region workers is the default from #69: enough to turn a ~10 minute serial scan
+# into something a person will wait for, while staying inside the memory and AWS
+# rate-limit budget a small self-hosted box has. Each process holds the AWS SDK
+# (~60-120 MB) and a MySQL connection.
+export TOPS_WORKER_PROCESSES="${TOPS_WORKER_PROCESSES:-5}"
+
+# Account linking is the only thing that needs SQS. Without it the worker would
+# restart-loop and bury every other log line.
 if [ -n "$TOPS_SQS_ARN" ]; then
-    echo "AWS messaging configured — starting SQS workers (supervisord)..."
-    exec /usr/bin/supervisord -c /etc/supervisor/worker-supervisord.conf
+    export TOPS_ACCOUNT_QUEUE_AUTOSTART=true
+    echo "AWS messaging configured — account-linking worker enabled."
+else
+    export TOPS_ACCOUNT_QUEUE_AUTOSTART=false
+    echo "No AWS messaging — account-linking worker disabled; scans run on the database queue."
 fi
 
-# No AWS messaging: everything (including scan + region jobs) runs on the
-# database queue. Region jobs are pushed to the 'teemops_audit_region' queue and
-# audit jobs to 'default', so this single worker must listen to all of them or
-# region scans are enqueued but never consumed (scan stays "running" forever).
-echo "Starting database queue worker..."
-exec php artisan queue:work database \
-    --queue=default,teemops_audit,teemops_audit_region \
-    --sleep=3 --tries=3 --max-time=3600
+echo "Starting workers (supervisord): ${TOPS_WORKER_PROCESSES} region worker(s)..."
+exec /usr/bin/supervisord -c /etc/supervisor/worker-supervisord.conf

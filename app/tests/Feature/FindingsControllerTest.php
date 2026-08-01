@@ -160,6 +160,256 @@ class FindingsControllerTest extends TestCase
         $this->assertEquals(2, $byAccount->json('total'));
     }
 
+    /**
+     * The pills: one per service that has findings, busiest first, and nothing for a
+     * service with none.
+     */
+    public function test_service_facets_are_counted_and_ordered_by_size(): void
+    {
+        $scan = $this->completedScan();
+        $this->finding($scan, ['service' => 's3']);
+        $this->finding($scan, ['service' => 'ec2']);
+        $this->finding($scan, ['service' => 'ec2']);
+        $this->finding($scan, ['service' => 'ec2']);
+        $this->finding($scan, ['service' => 'iam']);
+        $this->finding($scan, ['service' => 'iam']);
+
+        $facets = $this->actingAs($this->user)->getJson($this->findingsUrl())->json('serviceFacets');
+
+        $this->assertSame([
+            ['service' => 'ec2', 'count' => 3],
+            ['service' => 'iam', 'count' => 2],
+            ['service' => 's3', 'count' => 1],
+        ], $facets);
+    }
+
+    /**
+     * The rule that makes faceting usable: the service filter must not constrain its own
+     * facet, or picking one pill zeroes the rest and there is no way to switch.
+     */
+    public function test_the_service_filter_does_not_constrain_its_own_facet(): void
+    {
+        $scan = $this->completedScan();
+        $this->finding($scan, ['service' => 'ec2']);
+        $this->finding($scan, ['service' => 'ec2']);
+        $this->finding($scan, ['service' => 's3']);
+
+        $facets = $this->actingAs($this->user)
+            ->getJson($this->findingsUrl(['service' => 'ec2']))
+            ->json('serviceFacets');
+
+        $this->assertSame([
+            ['service' => 'ec2', 'count' => 2],
+            ['service' => 's3', 'count' => 1],
+        ], $facets);
+    }
+
+    /**
+     * Every other filter *does* narrow the facets — that is what makes the counts mean
+     * "what you would get", rather than "what exists somewhere".
+     */
+    public function test_service_facets_respect_the_other_active_filters(): void
+    {
+        $scan = $this->completedScan();
+        $otherAccount = AwsAccount::factory()->completed()->create([
+            'organization_id' => $this->organization->id,
+        ]);
+        $otherScan = Scan::factory()->create([
+            'organization_id' => $this->organization->id,
+            'aws_account_id' => $otherAccount->id,
+            'status' => 'completed',
+        ]);
+
+        $this->finding($scan, ['service' => 'ec2', 'status' => 'open']);
+        $this->finding($scan, ['service' => 's3', 'status' => 'ignored']);
+        $this->finding($otherScan, ['service' => 'ec2']);
+
+        $byAccount = $this->actingAs($this->user)
+            ->getJson($this->findingsUrl(['aws_account_id' => $this->awsAccount->id]))
+            ->json('serviceFacets');
+
+        $this->assertSame([
+            ['service' => 'ec2', 'count' => 1],
+            ['service' => 's3', 'count' => 1],
+        ], $byAccount);
+
+        $byStatus = $this->actingAs($this->user)
+            ->getJson($this->findingsUrl(['status' => 'ignored']))
+            ->json('serviceFacets');
+
+        $this->assertSame([['service' => 's3', 'count' => 1]], $byStatus);
+    }
+
+    /**
+     * A pill reading N must produce N rows when clicked. The summary drops resolved
+     * findings and the list does not, so the facets have to follow the list.
+     */
+    public function test_a_service_facet_count_matches_the_rows_that_pill_returns(): void
+    {
+        $scan = $this->completedScan();
+        $this->finding($scan, ['service' => 'ec2', 'status' => 'open']);
+        $this->finding($scan, ['service' => 'ec2', 'status' => 'resolved']);
+        $this->finding($scan, ['service' => 'ec2', 'status' => 'ignored']);
+
+        $facets = $this->actingAs($this->user)->getJson($this->findingsUrl())->json('serviceFacets');
+        $this->assertSame([['service' => 'ec2', 'count' => 3]], $facets);
+
+        $rows = $this->actingAs($this->user)->getJson($this->findingsUrl(['service' => 'ec2']));
+        $this->assertEquals(3, $rows->json('total'));
+    }
+
+    public function test_service_facets_exclude_other_organizations(): void
+    {
+        $this->finding(
+            Scan::factory()->create(['status' => 'completed']),
+            ['service' => 'ec2']
+        );
+        $this->finding($this->completedScan(), ['service' => 's3']);
+
+        $facets = $this->actingAs($this->user)->getJson($this->findingsUrl())->json('serviceFacets');
+
+        $this->assertSame([['service' => 's3', 'count' => 1]], $facets);
+    }
+
+    /**
+     * Findings the list itself excludes must not appear as a pill, or the pill leads
+     * somewhere empty.
+     */
+    public function test_service_facets_exclude_incomplete_scans(): void
+    {
+        $pending = Scan::factory()->create([
+            'organization_id' => $this->organization->id,
+            'aws_account_id' => $this->awsAccount->id,
+            'status' => 'pending',
+        ]);
+        $this->finding($pending, ['service' => 'ec2']);
+        $this->finding($this->completedScan(), ['service' => 's3']);
+
+        $facets = $this->actingAs($this->user)->getJson($this->findingsUrl())->json('serviceFacets');
+
+        $this->assertSame([['service' => 's3', 'count' => 1]], $facets);
+    }
+
+    public function test_findings_can_be_filtered_by_benchmark(): void
+    {
+        $scan = $this->completedScan();
+        $this->finding($scan, ['service' => 's3', 'rulesets' => ['basic']]);
+        $this->finding($scan, ['service' => 'ec2', 'rulesets' => ['cis']]);
+
+        $response = $this->actingAs($this->user)->getJson($this->findingsUrl(['ruleset' => 'cis']));
+
+        $this->assertEquals(1, $response->json('total'));
+        $this->assertEquals('ec2', $response->json('findings.0.service'));
+    }
+
+    /**
+     * A rule can belong to more than one ruleset, and such a finding is a gap under both.
+     */
+    public function test_a_finding_in_two_benchmarks_matches_either(): void
+    {
+        $scan = $this->completedScan();
+        $this->finding($scan, ['rulesets' => ['basic', 'cis']]);
+
+        foreach (['basic', 'cis'] as $ruleset) {
+            $this->assertEquals(
+                1,
+                $this->actingAs($this->user)->getJson($this->findingsUrl(['ruleset' => $ruleset]))->json('total')
+            );
+        }
+    }
+
+    /**
+     * Findings raised before F-4 have no benchmark. They must not be guessed into one —
+     * a finding wrongly labelled CIS is worse than one honestly labelled nothing.
+     */
+    public function test_findings_from_before_this_shipped_match_no_benchmark(): void
+    {
+        $scan = $this->completedScan();
+        $this->finding($scan, ['finding_type' => 'cis-5.1', 'rulesets' => null]);
+
+        $this->assertEquals(
+            0,
+            $this->actingAs($this->user)->getJson($this->findingsUrl(['ruleset' => 'cis']))->json('total')
+        );
+
+        // Still visible unfiltered — blank benchmark, not hidden.
+        $this->assertEquals(1, $this->actingAs($this->user)->getJson($this->findingsUrl())->json('total'));
+    }
+
+    public function test_benchmark_facets_count_what_each_would_return(): void
+    {
+        $scan = $this->completedScan();
+        $this->finding($scan, ['rulesets' => ['basic']]);
+        $this->finding($scan, ['rulesets' => ['basic']]);
+        $this->finding($scan, ['rulesets' => ['cis']]);
+
+        $facets = $this->actingAs($this->user)->getJson($this->findingsUrl())->json('benchmarkFacets');
+
+        $this->assertSame(
+            [
+                ['ruleset' => 'basic', 'label' => 'Basic', 'count' => 2],
+                ['ruleset' => 'cis', 'label' => 'CIS', 'count' => 1],
+            ],
+            $facets
+        );
+    }
+
+    /**
+     * PCI has no rules, so it is never offered — the same rule the New Scan modal follows.
+     */
+    public function test_a_benchmark_with_no_findings_is_not_offered(): void
+    {
+        $scan = $this->completedScan();
+        $this->finding($scan, ['rulesets' => ['basic']]);
+
+        $facets = $this->actingAs($this->user)->getJson($this->findingsUrl())->json('benchmarkFacets');
+
+        $this->assertSame(['basic'], array_column($facets, 'ruleset'));
+    }
+
+    /**
+     * Same rule as the service facet: a filter must not constrain its own facet, or
+     * selecting one benchmark leaves no way to reach the other.
+     */
+    public function test_the_benchmark_filter_does_not_constrain_its_own_facet(): void
+    {
+        $scan = $this->completedScan();
+        $this->finding($scan, ['rulesets' => ['basic']]);
+        $this->finding($scan, ['rulesets' => ['cis']]);
+
+        $facets = $this->actingAs($this->user)
+            ->getJson($this->findingsUrl(['ruleset' => 'cis']))
+            ->json('benchmarkFacets');
+
+        $this->assertSame(['basic', 'cis'], array_column($facets, 'ruleset'));
+    }
+
+    public function test_benchmark_and_service_filters_combine(): void
+    {
+        $scan = $this->completedScan();
+        $this->finding($scan, ['service' => 'ec2', 'rulesets' => ['cis']]);
+        $this->finding($scan, ['service' => 's3', 'rulesets' => ['cis']]);
+        $this->finding($scan, ['service' => 'ec2', 'rulesets' => ['basic']]);
+
+        $response = $this->actingAs($this->user)
+            ->getJson($this->findingsUrl(['ruleset' => 'cis', 'service' => 'ec2']));
+
+        $this->assertEquals(1, $response->json('total'));
+    }
+
+    public function test_benchmark_facets_exclude_other_organizations(): void
+    {
+        ScanResult::factory()->create([
+            'scan_id' => Scan::factory()->create(['status' => 'completed'])->id,
+            'rulesets' => ['cis'],
+        ]);
+        $this->finding($this->completedScan(), ['rulesets' => ['basic']]);
+
+        $facets = $this->actingAs($this->user)->getJson($this->findingsUrl())->json('benchmarkFacets');
+
+        $this->assertSame(['basic'], array_column($facets, 'ruleset'));
+    }
+
     public function test_findings_are_paginated(): void
     {
         $scan = $this->completedScan();
@@ -232,18 +482,18 @@ class FindingsControllerTest extends TestCase
             ->assertJsonPath('summary.bySeverity.high', 2);
     }
 
-    public function test_the_security_score_is_perfect_with_no_findings(): void
+    public function test_an_organization_with_no_findings_reports_zero(): void
     {
         $response = $this->actingAs($this->user)->getJson($this->findingsUrl());
 
-        $this->assertEquals(100, $response->json('summary.securityScore'));
         $this->assertEquals(0, $response->json('summary.total'));
+        $this->assertEquals(
+            ['critical' => 0, 'high' => 0, 'medium' => 0, 'low' => 0],
+            $response->json('summary.bySeverity')
+        );
     }
 
-    /**
-     * Score deducts 10 per critical, 5 per high, 2 per medium and 1 per low.
-     */
-    public function test_the_security_score_is_weighted_by_severity(): void
+    public function test_the_summary_counts_findings_by_severity(): void
     {
         $scan = $this->completedScan();
         $this->finding($scan, ['severity' => 'critical']);
@@ -253,7 +503,6 @@ class FindingsControllerTest extends TestCase
 
         $response = $this->actingAs($this->user)->getJson($this->findingsUrl());
 
-        $this->assertEquals(100 - (10 + 5 + 2 + 1), $response->json('summary.securityScore'));
         $this->assertEquals(4, $response->json('summary.total'));
         $this->assertEquals(
             ['critical' => 1, 'high' => 1, 'medium' => 1, 'low' => 1],
@@ -261,7 +510,11 @@ class FindingsControllerTest extends TestCase
         );
     }
 
-    public function test_the_security_score_never_goes_below_zero(): void
+    /**
+     * The score this replaced read 0 for any account with more than a handful of findings
+     * and could not move. Counts keep counting. See D-12.
+     */
+    public function test_the_summary_keeps_counting_past_where_the_old_score_bottomed_out(): void
     {
         $scan = $this->completedScan();
         ScanResult::factory()->count(15)->create([
@@ -271,7 +524,9 @@ class FindingsControllerTest extends TestCase
 
         $response = $this->actingAs($this->user)->getJson($this->findingsUrl());
 
-        $this->assertEquals(0, $response->json('summary.securityScore'));
+        $this->assertEquals(15, $response->json('summary.total'));
+        $this->assertEquals(15, $response->json('summary.bySeverity.critical'));
+        $this->assertNull($response->json('summary.securityScore'));
     }
 
     public function test_it_shows_a_single_finding_with_its_recommendation(): void
