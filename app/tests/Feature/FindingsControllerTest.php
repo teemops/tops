@@ -290,6 +290,126 @@ class FindingsControllerTest extends TestCase
         $this->assertSame([['service' => 's3', 'count' => 1]], $facets);
     }
 
+    public function test_findings_can_be_filtered_by_benchmark(): void
+    {
+        $scan = $this->completedScan();
+        $this->finding($scan, ['service' => 's3', 'rulesets' => ['basic']]);
+        $this->finding($scan, ['service' => 'ec2', 'rulesets' => ['cis']]);
+
+        $response = $this->actingAs($this->user)->getJson($this->findingsUrl(['ruleset' => 'cis']));
+
+        $this->assertEquals(1, $response->json('total'));
+        $this->assertEquals('ec2', $response->json('findings.0.service'));
+    }
+
+    /**
+     * A rule can belong to more than one ruleset, and such a finding is a gap under both.
+     */
+    public function test_a_finding_in_two_benchmarks_matches_either(): void
+    {
+        $scan = $this->completedScan();
+        $this->finding($scan, ['rulesets' => ['basic', 'cis']]);
+
+        foreach (['basic', 'cis'] as $ruleset) {
+            $this->assertEquals(
+                1,
+                $this->actingAs($this->user)->getJson($this->findingsUrl(['ruleset' => $ruleset]))->json('total')
+            );
+        }
+    }
+
+    /**
+     * Findings raised before F-4 have no benchmark. They must not be guessed into one —
+     * a finding wrongly labelled CIS is worse than one honestly labelled nothing.
+     */
+    public function test_findings_from_before_this_shipped_match_no_benchmark(): void
+    {
+        $scan = $this->completedScan();
+        $this->finding($scan, ['finding_type' => 'cis-5.1', 'rulesets' => null]);
+
+        $this->assertEquals(
+            0,
+            $this->actingAs($this->user)->getJson($this->findingsUrl(['ruleset' => 'cis']))->json('total')
+        );
+
+        // Still visible unfiltered — blank benchmark, not hidden.
+        $this->assertEquals(1, $this->actingAs($this->user)->getJson($this->findingsUrl())->json('total'));
+    }
+
+    public function test_benchmark_facets_count_what_each_would_return(): void
+    {
+        $scan = $this->completedScan();
+        $this->finding($scan, ['rulesets' => ['basic']]);
+        $this->finding($scan, ['rulesets' => ['basic']]);
+        $this->finding($scan, ['rulesets' => ['cis']]);
+
+        $facets = $this->actingAs($this->user)->getJson($this->findingsUrl())->json('benchmarkFacets');
+
+        $this->assertSame(
+            [
+                ['ruleset' => 'basic', 'label' => 'Basic', 'count' => 2],
+                ['ruleset' => 'cis', 'label' => 'CIS', 'count' => 1],
+            ],
+            $facets
+        );
+    }
+
+    /**
+     * PCI has no rules, so it is never offered — the same rule the New Scan modal follows.
+     */
+    public function test_a_benchmark_with_no_findings_is_not_offered(): void
+    {
+        $scan = $this->completedScan();
+        $this->finding($scan, ['rulesets' => ['basic']]);
+
+        $facets = $this->actingAs($this->user)->getJson($this->findingsUrl())->json('benchmarkFacets');
+
+        $this->assertSame(['basic'], array_column($facets, 'ruleset'));
+    }
+
+    /**
+     * Same rule as the service facet: a filter must not constrain its own facet, or
+     * selecting one benchmark leaves no way to reach the other.
+     */
+    public function test_the_benchmark_filter_does_not_constrain_its_own_facet(): void
+    {
+        $scan = $this->completedScan();
+        $this->finding($scan, ['rulesets' => ['basic']]);
+        $this->finding($scan, ['rulesets' => ['cis']]);
+
+        $facets = $this->actingAs($this->user)
+            ->getJson($this->findingsUrl(['ruleset' => 'cis']))
+            ->json('benchmarkFacets');
+
+        $this->assertSame(['basic', 'cis'], array_column($facets, 'ruleset'));
+    }
+
+    public function test_benchmark_and_service_filters_combine(): void
+    {
+        $scan = $this->completedScan();
+        $this->finding($scan, ['service' => 'ec2', 'rulesets' => ['cis']]);
+        $this->finding($scan, ['service' => 's3', 'rulesets' => ['cis']]);
+        $this->finding($scan, ['service' => 'ec2', 'rulesets' => ['basic']]);
+
+        $response = $this->actingAs($this->user)
+            ->getJson($this->findingsUrl(['ruleset' => 'cis', 'service' => 'ec2']));
+
+        $this->assertEquals(1, $response->json('total'));
+    }
+
+    public function test_benchmark_facets_exclude_other_organizations(): void
+    {
+        ScanResult::factory()->create([
+            'scan_id' => Scan::factory()->create(['status' => 'completed'])->id,
+            'rulesets' => ['cis'],
+        ]);
+        $this->finding($this->completedScan(), ['rulesets' => ['basic']]);
+
+        $facets = $this->actingAs($this->user)->getJson($this->findingsUrl())->json('benchmarkFacets');
+
+        $this->assertSame(['basic'], array_column($facets, 'ruleset'));
+    }
+
     public function test_findings_are_paginated(): void
     {
         $scan = $this->completedScan();

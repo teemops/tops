@@ -7,7 +7,7 @@ import { useAwsAccounts } from '@/composables/useAwsAccounts';
 import { useOrganizations } from '@/composables/useOrganizations';
 import { useNotifications } from '@/composables/useNotifications';
 
-const { findings, summary, serviceFacets, recommendationsMap, loading, error, fetchFindings, updateFindingStatus } = useFindings();
+const { findings, summary, serviceFacets, benchmarkFacets, recommendationsMap, loading, error, fetchFindings, updateFindingStatus } = useFindings();
 const { accounts, fetchAccounts } = useAwsAccounts();
 const { currentOrganization } = useOrganizations();
 const { showSuccess, showError } = useNotifications();
@@ -28,6 +28,7 @@ const readFiltersFromUrl = () => {
         awsAccountId: params.get('aws_account_id') ?? '',
         findingType: params.get('finding_type') ?? '',
         service: params.get('service') ?? '',
+        ruleset: params.get('ruleset') ?? '',
         // The only parameter with a known valid set, so the only one we can reject up
         // front. An unrecognised service or type simply matches nothing, which the empty
         // state already handles.
@@ -40,6 +41,7 @@ const initial = readFiltersFromUrl();
 const selectedAwsAccountId = ref<string>(initial.awsAccountId);
 const selectedFindingType = ref<string>(initial.findingType);
 const selectedService = ref<string>(initial.service);
+const selectedRuleset = ref<string>(initial.ruleset);
 const selectedStatus = ref<string>(initial.status);
 const expandedId = ref<string | null>(null);
 
@@ -65,6 +67,16 @@ const selectService = (service: string) => {
     selectedService.value = selectedService.value === service ? '' : service;
 };
 
+/** Same toggle behaviour as the service pills — clicking the active one clears it. */
+const selectRuleset = (ruleset: string) => {
+    selectedRuleset.value = selectedRuleset.value === ruleset ? '' : ruleset;
+};
+
+/** The "All" benchmark pill. Findings with no benchmark are not counted under any. */
+const allBenchmarksCount = computed(() =>
+    benchmarkFacets.value.reduce((sum, facet) => sum + facet.count, 0)
+);
+
 /**
  * Mirror the filters into the address bar so the view can be bookmarked or sent to a
  * colleague. replaceState rather than pushState — the back button should leave Findings,
@@ -75,6 +87,7 @@ const syncUrl = () => {
     if (selectedAwsAccountId.value) params.set('aws_account_id', selectedAwsAccountId.value);
     if (selectedFindingType.value) params.set('finding_type', selectedFindingType.value);
     if (selectedService.value) params.set('service', selectedService.value);
+    if (selectedRuleset.value) params.set('ruleset', selectedRuleset.value);
     if (selectedStatus.value) params.set('status', selectedStatus.value);
 
     const query = params.toString();
@@ -95,6 +108,7 @@ const loadData = async () => {
             awsAccountId: selectedAwsAccountId.value || undefined,
             findingType: selectedFindingType.value || undefined,
             service: selectedService.value || undefined,
+            ruleset: selectedRuleset.value || undefined,
             status: selectedStatus.value || undefined,
             limit: 100,
             offset: 0,
@@ -111,6 +125,7 @@ watch(() => currentOrganization.value?.org_id, () => {
     selectedAwsAccountId.value = '';
     selectedFindingType.value = '';
     selectedService.value = '';
+    selectedRuleset.value = '';
     selectedStatus.value = '';
     showAllServices.value = false;
 });
@@ -124,6 +139,7 @@ watch(
         selectedAwsAccountId,
         selectedFindingType,
         selectedService,
+        selectedRuleset,
         selectedStatus,
     ],
     () => {
@@ -318,6 +334,47 @@ const goToFindingType = (findingType: string) => {
                         {{ showAllServices ? 'Show fewer' : `+ ${hiddenServiceCount} more` }}
                     </button>
                 </div>
+
+                <!-- Benchmark. Findings raised before F-4 carry no benchmark and are not
+                     counted under any of these — blank rather than guessed. -->
+                <template v-if="benchmarkFacets.length">
+                    <h2 class="mb-2 mt-4 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                        Benchmark
+                    </h2>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button
+                            type="button"
+                            :aria-pressed="selectedRuleset === ''"
+                            :class="[
+                                'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm transition-colors',
+                                selectedRuleset === ''
+                                    ? 'border-gray-900 bg-gray-900 text-white dark:border-white dark:bg-white dark:text-gray-900'
+                                    : 'border-gray-300 bg-white text-gray-600 hover:border-gray-400 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-gray-500',
+                            ]"
+                            @click="selectedRuleset = ''"
+                        >
+                            All
+                            <span class="text-xs tabular-nums opacity-70">{{ allBenchmarksCount }}</span>
+                        </button>
+
+                        <button
+                            v-for="facet in benchmarkFacets"
+                            :key="facet.ruleset"
+                            type="button"
+                            :aria-pressed="selectedRuleset === facet.ruleset"
+                            :class="[
+                                'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm transition-colors',
+                                selectedRuleset === facet.ruleset
+                                    ? 'border-gray-900 bg-gray-900 text-white dark:border-white dark:bg-white dark:text-gray-900'
+                                    : 'border-gray-300 bg-white text-gray-600 hover:border-gray-400 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-gray-500',
+                            ]"
+                            @click="selectRuleset(facet.ruleset)"
+                        >
+                            {{ facet.label }}
+                            <span class="text-xs tabular-nums opacity-70">{{ facet.count }}</span>
+                        </button>
+                    </div>
+                </template>
             </section>
 
             <!-- Detailed Findings -->

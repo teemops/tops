@@ -22,6 +22,7 @@ class ScanResult extends Model
         'resource_type',
         'resource_id',
         'finding_type',
+        'rulesets',
         'title',
         'description',
         'remediation',
@@ -37,6 +38,9 @@ class ScanResult extends Model
         'resolved_at' => 'datetime',
         'first_seen_at' => 'datetime',
         'last_seen_at' => 'datetime',
+        // Which benchmarks raised this finding. A list because one rule may belong to
+        // several rulesets; null on findings raised before F-4 shipped.
+        'rulesets' => 'array',
     ];
 
     /**
