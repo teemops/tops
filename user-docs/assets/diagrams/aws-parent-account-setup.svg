@@ -1,0 +1,122 @@
+<svg role="img" aria-labelledby="t d" viewBox="0 0 900 572" xmlns="http://www.w3.org/2000/svg">
+  <title id="t">TOPS parent account setup</title>
+  <desc id="d">The installer container on your own machine deploys two CloudFormation stacks into an AWS account you choose, creating an SNS topic, four SQS queues and an S3 bucket, then writes the stack outputs back to generated/teemops.env.</desc>
+  <style>
+    /* Self-contained: this file is embedded as an image, so it cannot inherit the
+       page's theme tokens. It carries its own and follows the reader's OS setting.
+       Authored at a 900px viewBox so the text survives scaling into a docs column. */
+    svg {
+      --surface:#ffffff; --surface-2:#eef1f7;
+      --ink:#0d1526; --ink-2:#33405a; --muted:#5f6d88;
+      --line:#d3dae6; --line-soft:#e4e9f1;
+      --host:#2255d6; --parent:#0d7168; --child:#a8570b;
+      --tint-host:rgba(34,85,214,.05); --tint-parent:rgba(13,113,104,.055); --tint-child:rgba(168,87,11,.055);
+      --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+      --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: var(--surface);
+    }
+    @media (prefers-color-scheme: dark) {
+      svg {
+        --surface:#0f1725; --surface-2:#18222f;
+        --ink:#e3e9f5; --ink-2:#b6c1d6; --muted:#8a97af;
+        --line:#273246; --line-soft:#1c2534;
+        --host:#6e9bff; --parent:#45c9b8; --child:#e8a33d;
+        --tint-host:rgba(110,155,255,.08); --tint-parent:rgba(69,201,184,.08); --tint-child:rgba(232,163,61,.08);
+      }
+    }
+    .d-zone { fill:none; stroke-width:1.5; stroke-dasharray:7 5; }
+    .z-host { stroke:var(--host); fill:var(--tint-host); }
+    .z-parent { stroke:var(--parent); fill:var(--tint-parent); }
+    .z-child { stroke:var(--child); fill:var(--tint-child); }
+    .d-zlabel { font-family:var(--mono); font-size:11.5px; letter-spacing:.13em; text-transform:uppercase; font-weight:600; }
+    .zl-host { fill:var(--host); } .zl-parent { fill:var(--parent); } .zl-child { fill:var(--child); }
+    .d-card { fill:var(--surface); stroke:var(--line); stroke-width:1.25; }
+    .d-card-ghost { fill:var(--surface); stroke:var(--line); stroke-width:1.25; opacity:.5; }
+    .d-card-soft { fill:var(--surface-2); stroke:var(--line-soft); stroke-width:1.25; }
+    .d-title { font-family:var(--sans); font-size:15.5px; font-weight:620; fill:var(--ink); }
+    .d-mono { font-family:var(--mono); font-size:13px; fill:var(--ink-2); }
+    .d-sub { font-family:var(--sans); font-size:12.5px; fill:var(--muted); }
+    .d-tag { font-family:var(--mono); font-size:11px; letter-spacing:.11em; text-transform:uppercase; fill:var(--muted); }
+    .d-note { font-family:var(--sans); font-size:13px; fill:var(--muted); font-style:italic; }
+    .d-flow { fill:none; stroke:var(--ink-2); stroke-width:1.6; }
+    .d-flow-dash { fill:none; stroke:var(--muted); stroke-width:1.5; stroke-dasharray:5 4; }
+    .d-chip { fill:var(--ink); }
+    .d-chip-t { font-family:var(--mono); font-size:12px; font-weight:600; fill:var(--surface); text-anchor:middle; }
+    .d-dim { opacity:.6; }
+    .arw-head { fill:var(--ink-2); }
+    .arw-head-dim { fill:var(--muted); }
+  </style>
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path class="arw-head" d="M 0 0 L 10 5 L 0 10 z"/>
+    </marker>
+    <marker id="arw-dim" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path class="arw-head-dim" d="M 0 0 L 10 5 L 0 10 z"/>
+    </marker>
+  </defs>
+
+  <rect class="d-zone z-host" x="14" y="48" width="872" height="132" rx="12"/>
+  <text class="d-zlabel zl-host" x="32" y="72">Your machine</text>
+
+  <rect class="d-card" x="32" y="88" width="406" height="76" rx="8"/>
+  <text class="d-title" x="48" y="114">Installer container</text>
+  <text class="d-mono" x="48" y="136">./install.sh --aws</text>
+  <text class="d-sub" x="48" y="156">One-shot. Uses your own AWS CLI credentials.</text>
+
+  <rect class="d-card-soft" x="456" y="88" width="414" height="76" rx="8"/>
+  <text class="d-tag" x="472" y="110">Written back to disk</text>
+  <text class="d-mono" x="472" y="132">generated/teemops.env</text>
+  <text class="d-sub" x="472" y="154">Queue names, ARNs and the template URL.</text>
+
+  <rect class="d-zone z-parent" x="14" y="214" width="872" height="316" rx="12"/>
+  <text class="d-zlabel zl-parent" x="32" y="238">Your parent AWS account</text>
+
+  <rect class="d-card" x="32" y="256" width="248" height="126" rx="8"/>
+  <text class="d-title" x="48" y="282">CloudFormation</text>
+  <text class="d-mono" x="48" y="306">teemops-core-docker</text>
+  <text class="d-mono" x="48" y="328">teemops-messaging</text>
+  <text class="d-sub" x="48" y="352">Two stacks, one region.</text>
+  <text class="d-sub" x="48" y="371">Re-runnable.</text>
+
+  <rect class="d-card" x="328" y="256" width="248" height="92" rx="8"/>
+  <text class="d-title" x="344" y="282">SNS topic</text>
+  <text class="d-mono" x="344" y="306">teemops-sns</text>
+  <text class="d-sub" x="344" y="330">The one inbound path.</text>
+
+  <rect class="d-card" x="328" y="378" width="248" height="140" rx="8"/>
+  <text class="d-title" x="344" y="404">SQS queues</text>
+  <text class="d-mono" x="344" y="428">teemops_main</text>
+  <text class="d-mono" x="344" y="450">teemops_main_dlq</text>
+  <text class="d-mono d-dim" x="344" y="472">teemops_audit</text>
+  <text class="d-mono d-dim" x="344" y="494">teemops_audit_region</text>
+
+  <rect class="d-card" x="624" y="256" width="246" height="126" rx="8"/>
+  <text class="d-title" x="640" y="282">S3 bucket</text>
+  <text class="d-mono" x="640" y="306">&#60;env&#62;-&#60;id&#62;-tops-deploy</text>
+  <text class="d-sub" x="640" y="330">Hosts the child-account</text>
+  <text class="d-sub" x="640" y="349">template. Public read on</text>
+  <text class="d-sub" x="640" y="368">/templates/* only.</text>
+
+  <rect class="d-card-soft" x="624" y="396" width="246" height="130" rx="8"/>
+  <text class="d-tag" x="640" y="418">Why four queues</text>
+  <text class="d-sub" x="640" y="440">teemops_main carries the</text>
+  <text class="d-sub" x="640" y="459">account-link callbacks, and</text>
+  <text class="d-sub" x="640" y="478">_dlq catches them after five</text>
+  <text class="d-sub" x="640" y="497">failures. The audit pair is</text>
+  <text class="d-sub" x="640" y="516">for SQS-mode scanning: idle.</text>
+
+  <path class="d-flow" d="M 235 164 V 206" marker-end="url(#arw)"/>
+  <circle class="d-chip" cx="235" cy="185" r="10"/>
+  <text class="d-chip-t" x="235" y="189">1</text>
+  <path class="d-flow" d="M 280 302 H 320" marker-end="url(#arw)"/>
+  <circle class="d-chip" cx="300" cy="302" r="10"/>
+  <text class="d-chip-t" x="300" y="306">2</text>
+  <path class="d-flow" d="M 452 348 V 370" marker-end="url(#arw)"/>
+  <circle class="d-chip" cx="452" cy="359" r="10"/>
+  <text class="d-chip-t" x="452" y="363">3</text>
+  <path class="d-flow-dash" d="M 663 214 V 172" marker-end="url(#arw-dim)"/>
+  <circle class="d-chip" cx="663" cy="193" r="10"/>
+  <text class="d-chip-t" x="663" y="197">4</text>
+
+  <text class="d-note" x="16" y="552">Two stacks, one region, one account. Idle when you are not scanning.</text>
+</svg>

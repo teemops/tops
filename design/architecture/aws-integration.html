@@ -1,0 +1,1107 @@
+<title>How TOPS connects to AWS</title>
+<style>
+  :root {
+    --ground: #f4f6fa;
+    --surface: #ffffff;
+    --surface-2: #eef1f7;
+    --ink: #0d1526;
+    --ink-2: #33405a;
+    --muted: #5f6d88;
+    --line: #d3dae6;
+    --line-soft: #e4e9f1;
+
+    --host: #2255d6;
+    --parent: #0d7168;
+    --child: #a8570b;
+    --write: #c0332b;
+    --read: #0d7168;
+
+    --tint-host: rgba(34, 85, 214, 0.045);
+    --tint-parent: rgba(13, 113, 104, 0.05);
+    --tint-child: rgba(168, 87, 11, 0.05);
+
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, "JetBrains Mono", Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+    --shadow: 0 1px 2px rgba(13, 21, 38, 0.05), 0 8px 24px -16px rgba(13, 21, 38, 0.22);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground: #070c15;
+      --surface: #0f1725;
+      --surface-2: #16202f;
+      --ink: #e3e9f5;
+      --ink-2: #b6c1d6;
+      --muted: #8a97af;
+      --line: #26314400;
+      --line: #273246;
+      --line-soft: #1c2534;
+
+      --host: #6e9bff;
+      --parent: #45c9b8;
+      --child: #e8a33d;
+      --write: #f0837a;
+      --read: #45c9b8;
+
+      --tint-host: rgba(110, 155, 255, 0.07);
+      --tint-parent: rgba(69, 201, 184, 0.07);
+      --tint-child: rgba(232, 163, 61, 0.07);
+
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 30px -18px rgba(0, 0, 0, 0.9);
+    }
+  }
+
+  :root[data-theme="light"] {
+    --ground: #f4f6fa;
+    --surface: #ffffff;
+    --surface-2: #eef1f7;
+    --ink: #0d1526;
+    --ink-2: #33405a;
+    --muted: #5f6d88;
+    --line: #d3dae6;
+    --line-soft: #e4e9f1;
+    --host: #2255d6;
+    --parent: #0d7168;
+    --child: #a8570b;
+    --write: #c0332b;
+    --read: #0d7168;
+    --tint-host: rgba(34, 85, 214, 0.045);
+    --tint-parent: rgba(13, 113, 104, 0.05);
+    --tint-child: rgba(168, 87, 11, 0.05);
+    --shadow: 0 1px 2px rgba(13, 21, 38, 0.05), 0 8px 24px -16px rgba(13, 21, 38, 0.22);
+  }
+
+  :root[data-theme="dark"] {
+    --ground: #070c15;
+    --surface: #0f1725;
+    --surface-2: #16202f;
+    --ink: #e3e9f5;
+    --ink-2: #b6c1d6;
+    --muted: #8a97af;
+    --line: #273246;
+    --line-soft: #1c2534;
+    --host: #6e9bff;
+    --parent: #45c9b8;
+    --child: #e8a33d;
+    --write: #f0837a;
+    --read: #45c9b8;
+    --tint-host: rgba(110, 155, 255, 0.07);
+    --tint-parent: rgba(69, 201, 184, 0.07);
+    --tint-child: rgba(232, 163, 61, 0.07);
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 30px -18px rgba(0, 0, 0, 0.9);
+  }
+
+  html { background: var(--ground); }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page {
+    max-width: 1220px;
+    margin: 0 auto;
+    padding: 56px 28px 96px;
+    display: flex;
+    flex-direction: column;
+    gap: 64px;
+  }
+
+  /* ---------- masthead ---------- */
+
+  .masthead { display: flex; flex-direction: column; gap: 22px; }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  h1 {
+    font-size: clamp(30px, 4.4vw, 50px);
+    line-height: 1.04;
+    letter-spacing: -0.028em;
+    font-weight: 680;
+    text-wrap: balance;
+    max-width: 20ch;
+  }
+
+  .thesis {
+    font-size: clamp(17px, 1.6vw, 20px);
+    line-height: 1.55;
+    color: var(--ink-2);
+    max-width: 62ch;
+  }
+
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 10px;
+    padding-top: 6px;
+  }
+
+  .tag {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.02em;
+    padding: 5px 10px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    color: var(--ink-2);
+    background: var(--surface);
+    white-space: nowrap;
+  }
+
+  /* ---------- zone legend ---------- */
+
+  .legend {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 1px;
+    background: var(--line-soft);
+    border: 1px solid var(--line-soft);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .legend-item {
+    background: var(--surface);
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .legend-key {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink);
+  }
+
+  .swatch {
+    width: 22px;
+    height: 10px;
+    border-radius: 2px;
+    border: 1.5px dashed currentColor;
+    flex: none;
+  }
+
+  .k-host { color: var(--host); background: var(--tint-host); }
+  .k-parent { color: var(--parent); background: var(--tint-parent); }
+  .k-child { color: var(--child); background: var(--tint-child); }
+
+  .legend-item p { font-size: 13.5px; line-height: 1.5; color: var(--muted); }
+
+  /* ---------- stages ---------- */
+
+  .stage {
+    display: grid;
+    grid-template-columns: 58px minmax(0, 1fr);
+    gap: 0 28px;
+  }
+
+  .stage-num {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--muted);
+    padding-top: 6px;
+    border-top: 2px solid var(--ink);
+    letter-spacing: 0.06em;
+  }
+
+  .stage-body {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+    border-top: 2px solid var(--line);
+    padding-top: 6px;
+    min-width: 0;
+  }
+
+  .stage h2 {
+    font-size: clamp(22px, 2.6vw, 30px);
+    line-height: 1.14;
+    letter-spacing: -0.02em;
+    font-weight: 660;
+    text-wrap: balance;
+  }
+
+  .stage-when {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--muted);
+    letter-spacing: 0.03em;
+    margin-top: -16px;
+    margin-bottom: -6px;
+  }
+
+  .lede { font-size: 16.5px; color: var(--ink-2); max-width: 68ch; }
+
+  .frame {
+    overflow-x: auto;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 10px;
+    box-shadow: var(--shadow);
+  }
+
+  .frame svg { display: block; width: 100%; min-width: 940px; height: auto; }
+
+  /* ---------- numbered captions ---------- */
+
+  .steps {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 14px 30px;
+    list-style: none;
+    counter-reset: step;
+  }
+
+  .steps li {
+    counter-increment: step;
+    position: relative;
+    padding-left: 34px;
+    font-size: 14.5px;
+    line-height: 1.5;
+    color: var(--ink-2);
+  }
+
+  .steps li::before {
+    content: counter(step);
+    position: absolute;
+    left: 0;
+    top: 2px;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    color: var(--surface);
+    background: var(--ink);
+  }
+
+  .steps b { font-weight: 620; color: var(--ink); }
+
+  code, .steps code, td code {
+    font-family: var(--mono);
+    font-size: 0.88em;
+    background: var(--surface-2);
+    padding: 1px 5px;
+    border-radius: 4px;
+    color: var(--ink);
+    word-break: break-word;
+  }
+
+  /* ---------- note ---------- */
+
+  .note {
+    border-left: 3px solid var(--host);
+    background: var(--tint-host);
+    padding: 14px 18px;
+    border-radius: 0 8px 8px 0;
+    font-size: 14.5px;
+    color: var(--ink-2);
+    max-width: 78ch;
+  }
+
+  .note b { color: var(--ink); font-weight: 620; }
+
+  /* ---------- reference sections ---------- */
+
+  .ref { display: flex; flex-direction: column; gap: 20px; }
+
+  .ref h2 {
+    font-size: clamp(21px, 2.4vw, 28px);
+    letter-spacing: -0.02em;
+    font-weight: 660;
+    line-height: 1.15;
+  }
+
+  .table-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--surface);
+  }
+
+  table { border-collapse: collapse; width: 100%; min-width: 720px; }
+
+  th {
+    text-align: left;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+    padding: 13px 18px;
+    border-bottom: 1px solid var(--line);
+    white-space: nowrap;
+  }
+
+  td {
+    padding: 15px 18px;
+    font-size: 14.5px;
+    line-height: 1.5;
+    color: var(--ink-2);
+    border-bottom: 1px solid var(--line-soft);
+    vertical-align: top;
+  }
+
+  tr:last-child td { border-bottom: none; }
+
+  td:first-child { color: var(--ink); font-weight: 560; white-space: nowrap; }
+
+  .dir {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    padding: 3px 8px;
+    border-radius: 999px;
+    border: 1px solid currentColor;
+    white-space: nowrap;
+  }
+
+  .dir-out { color: var(--host); }
+  .dir-in { color: var(--parent); }
+  .dir-never { color: var(--write); }
+
+  /* ---------- permissions split ---------- */
+
+  .perms {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 18px;
+  }
+
+  .perm-card {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--surface);
+    padding: 20px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .perm-head {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+  }
+
+  .perm-read .perm-head { color: var(--read); }
+  .perm-write .perm-head { color: var(--write); }
+
+  .perm-head span:last-child {
+    letter-spacing: 0.02em;
+    text-transform: none;
+    color: var(--muted);
+    font-size: 11.5px;
+  }
+
+  .perm-card ul { list-style: none; display: flex; flex-direction: column; gap: 7px; }
+
+  .perm-card li {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    line-height: 1.45;
+    color: var(--ink-2);
+    padding-left: 16px;
+    position: relative;
+    word-break: break-word;
+  }
+
+  .perm-card li::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 8px;
+    width: 6px;
+    height: 1.5px;
+    background: currentColor;
+    opacity: 0.55;
+  }
+
+  .perm-card p { font-size: 13.5px; color: var(--muted); }
+
+  /* ---------- closing facts ---------- */
+
+  .facts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1px;
+    background: var(--line-soft);
+    border: 1px solid var(--line-soft);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .fact { background: var(--surface); padding: 20px; display: flex; flex-direction: column; gap: 7px; }
+
+  .fact-n {
+    font-size: 27px;
+    font-weight: 660;
+    letter-spacing: -0.025em;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+  }
+
+  .fact-l {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .fact p { font-size: 13.5px; color: var(--ink-2); line-height: 1.5; }
+
+  footer {
+    border-top: 1px solid var(--line);
+    padding-top: 22px;
+    font-size: 13.5px;
+    color: var(--muted);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  footer code { background: none; padding: 0; color: var(--ink-2); }
+
+  /* ---------- SVG diagram vocabulary ---------- */
+
+  .d-zone { fill: none; stroke-width: 1.5; stroke-dasharray: 7 5; rx: 12; }
+  .z-host { stroke: var(--host); fill: var(--tint-host); }
+  .z-parent { stroke: var(--parent); fill: var(--tint-parent); }
+  .z-child { stroke: var(--child); fill: var(--tint-child); }
+
+  .d-zlabel {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+
+  .zl-host { fill: var(--host); }
+  .zl-parent { fill: var(--parent); }
+  .zl-child { fill: var(--child); }
+
+  .d-card { fill: var(--surface); stroke: var(--line); stroke-width: 1.25; }
+  .d-card-ghost { fill: var(--surface); stroke: var(--line); stroke-width: 1.25; opacity: 0.55; }
+  .d-card-soft { fill: var(--surface-2); stroke: var(--line-soft); stroke-width: 1.25; }
+
+  .d-title { font-family: var(--sans); font-size: 13.5px; font-weight: 620; fill: var(--ink); letter-spacing: -0.005em; }
+  .d-mono { font-family: var(--mono); font-size: 11.5px; fill: var(--ink-2); }
+  .d-sub { font-family: var(--sans); font-size: 11.5px; fill: var(--muted); }
+  .d-tag {
+    font-family: var(--mono);
+    font-size: 9.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    fill: var(--muted);
+  }
+  .d-note { font-family: var(--sans); font-size: 12px; fill: var(--muted); font-style: italic; }
+
+  .d-flow { fill: none; stroke: var(--ink-2); stroke-width: 1.5; }
+  .d-flow-dash { fill: none; stroke: var(--muted); stroke-width: 1.4; stroke-dasharray: 5 4; }
+  .d-rule { stroke: var(--line-soft); stroke-width: 1; }
+
+  .d-chip { fill: var(--ink); }
+  .d-chip-t { font-family: var(--mono); font-size: 10.5px; font-weight: 600; fill: var(--surface); text-anchor: middle; }
+
+  .d-dim { opacity: 0.62; }
+
+  @media (max-width: 640px) {
+    .page { padding: 36px 16px 64px; gap: 48px; }
+    .stage { grid-template-columns: 1fr; gap: 0; }
+    .stage-num { border-top: none; padding-top: 0; margin-bottom: 8px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+
+  a { color: var(--host); }
+  a:focus-visible, .frame:focus-visible { outline: 2px solid var(--host); outline-offset: 3px; }
+</style>
+
+<div class="page">
+
+  <header class="masthead">
+    <div class="eyebrow">TOPS &middot; self-hosted AWS security scanning &middot; architecture</div>
+    <h1>How TOPS connects to AWS</h1>
+    <p class="thesis">
+      TOPS runs on your infrastructure and reads your AWS accounts through cross-account IAM roles.
+      There are no stored access keys, no inbound network path to the install, and no data path to us.
+      This page shows exactly what gets created, who creates it, and what crosses each boundary.
+    </p>
+    <div class="meta">
+      <span class="tag">v0.4.0</span>
+      <span class="tag">Docker Compose</span>
+      <span class="tag">Laravel 11 + Vue</span>
+      <span class="tag">CloudFormation &middot; SNS &middot; SQS &middot; STS</span>
+      <span class="tag">Apache-2.0, source-available</span>
+    </div>
+  </header>
+
+  <div class="legend" aria-label="Trust zones used in the diagrams">
+    <div class="legend-item">
+      <div class="legend-key"><span class="swatch k-host"></span> Your infrastructure</div>
+      <p>The server you run TOPS on. Owns the database, the findings, and the only copy of the encrypted role ARNs.</p>
+    </div>
+    <div class="legend-item">
+      <div class="legend-key"><span class="swatch k-parent"></span> Your parent AWS account</div>
+      <p>One account you nominate. Holds the messaging resources &mdash; an SNS topic, SQS queues, one S3 bucket. Deployed once.</p>
+    </div>
+    <div class="legend-item">
+      <div class="legend-key"><span class="swatch k-child"></span> Child accounts</div>
+      <p>Every account you want scanned. Each gets one CloudFormation stack and one IAM role. Add as many as you have.</p>
+    </div>
+  </div>
+
+  <!-- ================= STAGE 1 ================= -->
+  <section class="stage">
+    <div class="stage-num">STAGE<br>01</div>
+    <div class="stage-body">
+      <h2>Standing up the parent account</h2>
+      <p class="stage-when">Run once &middot; <code>./install.sh --aws</code> &middot; one region</p>
+      <p class="lede">
+        The installer runs as a throwaway container on your own machine, using your own AWS CLI credentials.
+        It deploys two CloudFormation stacks into an account you choose, then writes the resulting queue names and
+        ARNs back to disk. Nothing here is shared with other installs &mdash; these are your resources, in your account.
+      </p>
+
+      <div class="frame" tabindex="0" role="img"
+           aria-label="Diagram: the installer container on your machine deploys two CloudFormation stacks into your parent AWS account, creating an SNS topic, four SQS queues and an S3 bucket, then writes the outputs back to generated/teemops.env.">
+        <svg viewBox="0 0 1160 486" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path>
+            </marker>
+          </defs>
+
+          <!-- zone: host -->
+          <rect class="d-zone z-host" x="14" y="52" width="264" height="348" rx="12"></rect>
+          <text class="d-zlabel zl-host" x="32" y="78">Your machine</text>
+
+          <rect class="d-card" x="32" y="96" width="228" height="112" rx="8"></rect>
+          <text class="d-title" x="48" y="122">Installer container</text>
+          <text class="d-mono" x="48" y="144">./install.sh --aws</text>
+          <text class="d-sub" x="48" y="164">One-shot. Exits when done.</text>
+          <text class="d-sub" x="48" y="182">Uses your AWS CLI credentials &mdash;</text>
+          <text class="d-sub" x="48" y="198">TOPS never stores them.</text>
+
+          <rect class="d-card-soft" x="32" y="272" width="228" height="106" rx="8"></rect>
+          <text class="d-tag" x="48" y="294">Written back to disk</text>
+          <text class="d-mono" x="48" y="316">generated/teemops.env</text>
+          <text class="d-sub" x="48" y="338">Queue names and ARNs, the</text>
+          <text class="d-sub" x="48" y="354">template URL, and the parent</text>
+          <text class="d-sub" x="48" y="370">account id.</text>
+
+          <!-- zone: parent -->
+          <rect class="d-zone z-parent" x="316" y="52" width="830" height="348" rx="12"></rect>
+          <text class="d-zlabel zl-parent" x="336" y="78">Your parent AWS account</text>
+
+          <rect class="d-card" x="336" y="96" width="212" height="132" rx="8"></rect>
+          <text class="d-title" x="352" y="122">CloudFormation</text>
+          <text class="d-mono" x="352" y="146">teemops-core-docker</text>
+          <text class="d-mono" x="352" y="166">teemops-messaging-&lt;env&gt;</text>
+          <text class="d-sub" x="352" y="188">Two stacks, one region.</text>
+          <text class="d-sub" x="352" y="206">Re-runnable &mdash; no-ops if</text>
+          <text class="d-sub" x="352" y="222">nothing changed.</text>
+
+          <rect class="d-card" x="596" y="96" width="238" height="94" rx="8"></rect>
+          <text class="d-title" x="612" y="122">SNS topic</text>
+          <text class="d-mono" x="612" y="146">teemops-sns</text>
+          <text class="d-sub" x="612" y="168">The one inbound path into TOPS.</text>
+
+          <rect class="d-card" x="596" y="228" width="238" height="140" rx="8"></rect>
+          <text class="d-title" x="612" y="254">SQS queues</text>
+          <text class="d-mono" x="612" y="278">teemops_main</text>
+          <text class="d-mono" x="612" y="298">teemops_main_dlq</text>
+          <text class="d-mono d-dim" x="612" y="318">teemops_audit</text>
+          <text class="d-mono d-dim" x="612" y="338">teemops_audit_region</text>
+          <text class="d-sub" x="612" y="358">Standard queues, pay-per-use.</text>
+
+          <rect class="d-card" x="882" y="96" width="246" height="132" rx="8"></rect>
+          <text class="d-title" x="898" y="122">S3 bucket</text>
+          <text class="d-mono" x="898" y="146">&lt;env&gt;-&lt;account&gt;-tops-deploy</text>
+          <text class="d-sub" x="898" y="168">Hosts the child-account</text>
+          <text class="d-sub" x="898" y="184">CloudFormation template.</text>
+          <text class="d-sub" x="898" y="204">Public read on /templates/*</text>
+          <text class="d-sub" x="898" y="220">only; nothing else is exposed.</text>
+
+          <rect class="d-card-soft" x="882" y="252" width="246" height="116" rx="8"></rect>
+          <text class="d-tag" x="898" y="274">Why four queues</text>
+          <text class="d-sub" x="898" y="296">teemops_main carries account-link</text>
+          <text class="d-sub" x="898" y="312">callbacks; _dlq catches them after</text>
+          <text class="d-sub" x="898" y="328">five failed receives. The two audit</text>
+          <text class="d-sub" x="898" y="344">queues are created for SQS-mode</text>
+          <text class="d-sub" x="898" y="360">scanning and stay idle by default.</text>
+
+          <!-- flows -->
+          <g style="color: var(--ink-2)">
+            <path class="d-flow" d="M 260 152 H 328" marker-end="url(#a1)"></path>
+            <path class="d-flow" d="M 548 162 H 588" marker-end="url(#a1)"></path>
+            <path class="d-flow" d="M 715 190 V 220" marker-end="url(#a1)"></path>
+          </g>
+          <g style="color: var(--muted)">
+            <path class="d-flow-dash" d="M 660 400 V 436 H 146 V 386" marker-end="url(#a1)"></path>
+          </g>
+
+          <circle class="d-chip" cx="294" cy="152" r="11"></circle>
+          <text class="d-chip-t" x="294" y="156">1</text>
+          <circle class="d-chip" cx="568" cy="162" r="11"></circle>
+          <text class="d-chip-t" x="568" y="166">2</text>
+          <circle class="d-chip" cx="715" cy="205" r="11"></circle>
+          <text class="d-chip-t" x="715" y="209">3</text>
+          <circle class="d-chip" cx="404" cy="436" r="11"></circle>
+          <text class="d-chip-t" x="404" y="440">4</text>
+
+          <text class="d-note" x="14" y="470">Two stacks, one region, one account. Idle when you are not scanning &mdash; cents per month at typical volumes.</text>
+        </svg>
+      </div>
+
+      <ol class="steps">
+        <li><b>Deploy.</b> The installer checks <code>sts:get-caller-identity</code>, confirms the account and region with you, then runs <code>sam deploy</code>.</li>
+        <li><b>Create.</b> CloudFormation creates the topic, the queues, the dead-letter queue and the bucket. You own all of it.</li>
+        <li><b>Subscribe.</b> <code>teemops-sns</code> is subscribed to <code>teemops_main</code>, so a notification becomes a queue message.</li>
+        <li><b>Report back.</b> Stack outputs are written to <code>generated/teemops.env</code> and loaded by the containers on restart.</li>
+      </ol>
+
+      <p class="note">
+        <b>Skippable.</b> TOPS runs without this step &mdash; you just cannot link an account yet. Come back later with
+        <code>./install.sh --aws-only</code>. Everything above can be deleted by removing two CloudFormation stacks.
+      </p>
+    </div>
+  </section>
+
+  <!-- ================= STAGE 2 ================= -->
+  <section class="stage">
+    <div class="stage-num">STAGE<br>02</div>
+    <div class="stage-body">
+      <h2>Connecting child accounts, one link at a time</h2>
+      <p class="stage-when">Repeat per account &middot; no limit &middot; no per-account infrastructure in the parent</p>
+      <p class="lede">
+        TOPS never asks for credentials to a child account. It hands the account's own administrator a
+        CloudFormation quick-create link, pre-filled with an <code>ExternalId</code> generated for that account alone.
+        The administrator creates the stack in their own console, under their own session. The stack calls home once
+        to say which role ARN was created &mdash; and that is the whole handshake.
+      </p>
+
+      <div class="frame" tabindex="0" role="img"
+           aria-label="Diagram: TOPS generates a CloudFormation quick-create URL, the child account admin creates a stack that makes a read-scoped IAM role plus a custom resource, the custom resource publishes the role ARN to the parent SNS topic, the SQS worker matches and stores it encrypted, and CloudFormation is told the stack succeeded.">
+        <svg viewBox="0 0 1160 600" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path>
+            </marker>
+          </defs>
+
+          <!-- zone: host -->
+          <rect class="d-zone z-host" x="14" y="88" width="286" height="404" rx="12"></rect>
+          <text class="d-zlabel zl-host" x="32" y="114">Your TOPS install</text>
+
+          <rect class="d-card" x="32" y="132" width="250" height="122" rx="8"></rect>
+          <text class="d-title" x="48" y="158">Add AWS account</text>
+          <text class="d-sub" x="48" y="180">Creates a pending record, then</text>
+          <text class="d-sub" x="48" y="196">builds the console link.</text>
+          <text class="d-mono" x="48" y="220">external_id &middot; random</text>
+          <text class="d-mono" x="48" y="240">unique_id   &middot; per org</text>
+
+          <rect class="d-card" x="32" y="300" width="250" height="140" rx="8"></rect>
+          <text class="d-title" x="48" y="326">aws:process-sqs</text>
+          <text class="d-sub" x="48" y="348">Long-polls the queue from inside</text>
+          <text class="d-sub" x="48" y="364">your network. Matches the message</text>
+          <text class="d-sub" x="48" y="380">on unique_id + external_id against</text>
+          <text class="d-sub" x="48" y="396">the pending record, then stores the</text>
+          <text class="d-sub" x="48" y="412">role ARN encrypted in MySQL.</text>
+          <text class="d-mono" x="48" y="432">supervisord: tops-account-queue</text>
+
+          <!-- zone: parent -->
+          <rect class="d-zone z-parent" x="330" y="312" width="330" height="180" rx="12"></rect>
+          <text class="d-zlabel zl-parent" x="348" y="338">Parent account</text>
+
+          <rect class="d-card" x="500" y="352" width="146" height="76" rx="8"></rect>
+          <text class="d-title" x="516" y="378">SNS</text>
+          <text class="d-mono" x="516" y="400">teemops-sns</text>
+
+          <rect class="d-card" x="344" y="352" width="140" height="76" rx="8"></rect>
+          <text class="d-title" x="360" y="378">SQS</text>
+          <text class="d-mono" x="360" y="400">teemops_main</text>
+
+          <text class="d-sub" x="348" y="462">Messaging only. No credentials,</text>
+          <text class="d-sub" x="348" y="478">no findings, no customer data.</text>
+
+          <!-- zone: child -->
+          <rect class="d-zone z-child" x="690" y="88" width="456" height="404" rx="12"></rect>
+          <text class="d-zlabel zl-child" x="710" y="114">Any account you want scanned  &times;N</text>
+
+          <rect class="d-card-ghost" x="722" y="146" width="300" height="98" rx="8"></rect>
+          <rect class="d-card-ghost" x="716" y="140" width="300" height="98" rx="8"></rect>
+          <rect class="d-card" x="710" y="134" width="300" height="98" rx="8"></rect>
+          <text class="d-title" x="726" y="160">CloudFormation stack</text>
+          <text class="d-mono" x="726" y="182">tops-vendor-audit</text>
+          <text class="d-sub" x="726" y="204">Created by that account's own admin,</text>
+          <text class="d-sub" x="726" y="220">in their own console session.</text>
+
+          <rect class="d-card" x="710" y="290" width="196" height="122" rx="8"></rect>
+          <text class="d-title" x="726" y="316">IAM role</text>
+          <text class="d-sub" x="726" y="338">Trusts only your parent</text>
+          <text class="d-sub" x="726" y="354">account, and only with</text>
+          <text class="d-sub" x="726" y="370">the matching external id.</text>
+          <text class="d-mono" x="726" y="392">sts:ExternalId</text>
+
+          <rect class="d-card" x="930" y="290" width="196" height="122" rx="8"></rect>
+          <text class="d-title" x="946" y="316">Custom resource</text>
+          <text class="d-sub" x="946" y="338">Fires once, on stack</text>
+          <text class="d-sub" x="946" y="354">create &mdash; and again on</text>
+          <text class="d-sub" x="946" y="370">delete, to unlink.</text>
+          <text class="d-mono" x="946" y="392">sns:Publish</text>
+
+          <!-- flows -->
+          <g style="color: var(--ink-2)">
+            <path class="d-flow" d="M 286 180 H 702" marker-end="url(#a2)"></path>
+            <path class="d-flow" d="M 800 232 V 282" marker-end="url(#a2)"></path>
+            <path class="d-flow" d="M 1010 232 V 282" marker-end="url(#a2)"></path>
+            <path class="d-flow" d="M 1028 412 V 448 H 672 V 390 H 654" marker-end="url(#a2)"></path>
+            <path class="d-flow" d="M 500 390 H 492" marker-end="url(#a2)"></path>
+            <path class="d-flow" d="M 344 390 H 290" marker-end="url(#a2)"></path>
+          </g>
+          <g style="color: var(--muted)">
+            <path class="d-flow-dash" d="M 157 440 V 528 H 1076 V 500" marker-end="url(#a2)"></path>
+          </g>
+
+          <circle class="d-chip" cx="494" cy="180" r="11"></circle>
+          <text class="d-chip-t" x="494" y="184">1</text>
+          <circle class="d-chip" cx="905" cy="258" r="11"></circle>
+          <text class="d-chip-t" x="905" y="262">2</text>
+          <circle class="d-chip" cx="672" cy="448" r="11"></circle>
+          <text class="d-chip-t" x="672" y="452">3</text>
+          <circle class="d-chip" cx="314" cy="390" r="11"></circle>
+          <text class="d-chip-t" x="314" y="394">4</text>
+          <circle class="d-chip" cx="616" cy="528" r="11"></circle>
+          <text class="d-chip-t" x="616" y="532">5</text>
+
+          <text class="d-note" x="14" y="572">The link is the only thing that travels outward. Everything the child account sends back is one message, on one topic, that you own.</text>
+        </svg>
+      </div>
+
+      <ol class="steps">
+        <li><b>Hand over a link.</b> A console quick-create URL carrying four parameters: your parent account id, the region, the account's <code>ExternalId</code> and its <code>UniqueId</code>.</li>
+        <li><b>The admin creates the stack.</b> In their account, with their permissions. TOPS has no session there and cannot create it for them.</li>
+        <li><b>The stack calls home.</b> A custom resource publishes the new role ARN, external id and unique id to your SNS topic, which fans into <code>teemops_main</code>.</li>
+        <li><b>Your worker picks it up.</b> Outbound long-poll from inside your network. The message is accepted only if both ids match a record you already created.</li>
+        <li><b>The stack completes.</b> TOPS replies to the CloudFormation <code>ResponseURL</code>; the admin sees <code>CREATE_COMPLETE</code>, or a failure with a reason.</li>
+      </ol>
+
+      <p class="note">
+        <b>Why there is no account limit.</b> Linking adds one stack in the child account and one database row in yours &mdash;
+        no queue, no topic, no bucket, no per-account resource in the parent. The tenth account and the thousandth cost the
+        same to connect. Deleting the stack fires the same custom resource in reverse and unlinks it.
+      </p>
+    </div>
+  </section>
+
+  <!-- ================= STAGE 3 ================= -->
+  <section class="stage">
+    <div class="stage-num">STAGE<br>03</div>
+    <div class="stage-body">
+      <h2>What actually runs: six containers</h2>
+      <p class="stage-when">One <code>docker-compose.yml</code> &middot; one host &middot; <code>docker compose up -d</code></p>
+      <p class="lede">
+        TOPS is a Laravel monolith and a MySQL database, split across containers by role rather than by service boundary.
+        The web tier never talks to AWS. The worker tier does &mdash; outbound only, assuming a role per scan and holding the
+        credentials for the life of one job. Scan jobs travel on the database queue, so a scan needs no AWS messaging at all.
+      </p>
+
+      <div class="frame" tabindex="0" role="img"
+           aria-label="Diagram: the Docker Compose project runs app, mysql, worker, backup, db-restore and maildev containers. The worker's supervisord pools poll the database queue for scan jobs and SQS for account linking, and reach AWS through STS AssumeRole to make read-only calls against each child account.">
+        <svg viewBox="0 0 1160 600" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path>
+            </marker>
+          </defs>
+
+          <!-- zone: host -->
+          <rect class="d-zone z-host" x="14" y="52" width="792" height="482" rx="12"></rect>
+          <text class="d-zlabel zl-host" x="34" y="78">One Docker Compose project &mdash; your server</text>
+
+          <rect class="d-card" x="34" y="96" width="212" height="136" rx="8"></rect>
+          <text class="d-title" x="50" y="122">app</text>
+          <text class="d-mono" x="50" y="144">teem/tops:&lt;tag&gt;</text>
+          <text class="d-sub" x="50" y="166">nginx + php-fpm on :8080</text>
+          <text class="d-sub" x="50" y="184">Inertia/Vue UI and API</text>
+          <text class="d-sub" x="50" y="202">Runs migrations on boot</text>
+          <text class="d-sub" x="50" y="220">No AWS credentials needed</text>
+
+          <rect class="d-card" x="278" y="96" width="192" height="136" rx="8"></rect>
+          <text class="d-title" x="294" y="122">mysql 8.0</text>
+          <text class="d-mono" x="294" y="144">volume: mysql-data</text>
+          <text class="d-sub" x="294" y="166">Organizations, accounts,</text>
+          <text class="d-sub" x="294" y="184">findings &mdash; role ARNs</text>
+          <text class="d-sub" x="294" y="202">encrypted at rest, and</text>
+          <text class="d-sub" x="294" y="220">the job queue itself.</text>
+
+          <rect class="d-card" x="502" y="96" width="286" height="266" rx="8"></rect>
+          <text class="d-title" x="518" y="122">worker</text>
+          <text class="d-sub" x="518" y="142">Same image, different entrypoint.</text>
+          <text class="d-tag" x="518" y="168">supervisord pools</text>
+
+          <line class="d-rule" x1="518" y1="180" x2="772" y2="180"></line>
+          <text class="d-mono" x="518" y="200">tops-queue &times;1</text>
+          <text class="d-sub" x="518" y="216">default, teemops_audit &mdash; orchestrates</text>
+          <line class="d-rule" x1="518" y1="228" x2="772" y2="228"></line>
+          <text class="d-mono" x="518" y="248">tops-region-queue &times;5</text>
+          <text class="d-sub" x="518" y="264">teemops_audit_region &mdash; does the scanning</text>
+          <line class="d-rule" x1="518" y1="276" x2="772" y2="276"></line>
+          <text class="d-mono" x="518" y="296">tops-account-queue</text>
+          <text class="d-sub" x="518" y="312">aws:process-sqs &mdash; off unless SQS is set up</text>
+          <line class="d-rule" x1="518" y1="324" x2="772" y2="324"></line>
+          <text class="d-mono" x="518" y="340">tops-scheduler</text>
+          <text class="d-sub" x="518" y="356">schedule:work &mdash; retention, housekeeping</text>
+
+          <rect class="d-card" x="278" y="268" width="192" height="112" rx="8"></rect>
+          <text class="d-title" x="294" y="294">backup</text>
+          <text class="d-sub" x="294" y="316">Full 17:00 &middot; differential</text>
+          <text class="d-sub" x="294" y="334">hourly &middot; binlog every 15m</text>
+          <text class="d-mono" x="294" y="356">~/.tops/backups</text>
+
+          <rect class="d-card d-dim" x="34" y="268" width="212" height="112" rx="8"></rect>
+          <text class="d-title" x="50" y="294">db-restore</text>
+          <text class="d-sub" x="50" y="316">Never starts on its own &mdash;</text>
+          <text class="d-sub" x="50" y="334">behind a compose profile.</text>
+          <text class="d-mono" x="50" y="356">./backup.sh restore</text>
+
+          <rect class="d-card d-dim" x="34" y="408" width="212" height="72" rx="8"></rect>
+          <text class="d-title" x="50" y="434">maildev</text>
+          <text class="d-sub" x="50" y="456">Local mail catcher on :8090</text>
+
+          <rect class="d-card-soft" x="278" y="408" width="510" height="94" rx="8"></rect>
+          <text class="d-tag" x="294" y="430">One full scan of one account</text>
+          <text class="d-mono" x="294" y="456">1 orchestrator job  &rarr;  ~153 region jobs  &rarr;  5 workers in parallel</text>
+          <text class="d-sub" x="294" y="480">Raise TOPS_WORKER_PROCESSES with the memory and the API rate limits to match.</text>
+
+          <!-- zone: aws -->
+          <rect class="d-zone z-child" x="842" y="52" width="304" height="482" rx="12"></rect>
+          <text class="d-zlabel zl-child" x="862" y="78">AWS &mdash; outbound only</text>
+
+          <rect class="d-card" x="862" y="112" width="266" height="84" rx="8"></rect>
+          <text class="d-title" x="878" y="138">SQS long-poll</text>
+          <text class="d-mono" x="878" y="160">teemops_main</text>
+          <text class="d-sub" x="878" y="180">Account linking only.</text>
+
+          <rect class="d-card" x="862" y="230" width="266" height="94" rx="8"></rect>
+          <text class="d-title" x="878" y="256">sts:AssumeRole</text>
+          <text class="d-sub" x="878" y="278">Role ARN plus external id.</text>
+          <text class="d-sub" x="878" y="296">Temporary credentials, held</text>
+          <text class="d-sub" x="878" y="312">for the life of one job.</text>
+
+          <rect class="d-card-ghost" x="886" y="370" width="242" height="110" rx="8"></rect>
+          <rect class="d-card-ghost" x="880" y="364" width="242" height="110" rx="8"></rect>
+          <rect class="d-card" x="874" y="358" width="242" height="110" rx="8"></rect>
+          <text class="d-title" x="890" y="384">Child accounts &times;N</text>
+          <text class="d-sub" x="890" y="406">Describe / List / Get calls</text>
+          <text class="d-sub" x="890" y="424">across every enabled region.</text>
+          <text class="d-sub" x="890" y="446">Results come back to your</text>
+          <text class="d-sub" x="890" y="462">database and stop there.</text>
+
+          <text class="d-sub" x="862" y="504">No TOPS code runs inside AWS.</text>
+          <text class="d-sub" x="862" y="520">Only your workers call out.</text>
+
+          <!-- flows -->
+          <g style="color: var(--ink-2)">
+            <path class="d-flow" d="M 246 152 H 270" marker-end="url(#a3)"></path>
+            <path class="d-flow" d="M 470 164 H 494" marker-end="url(#a3)"></path>
+            <path class="d-flow" d="M 374 232 V 260" marker-end="url(#a3)"></path>
+            <path class="d-flow" d="M 788 154 H 854" marker-end="url(#a3)"></path>
+            <path class="d-flow" d="M 788 276 H 854" marker-end="url(#a3)"></path>
+            <path class="d-flow" d="M 995 324 V 350" marker-end="url(#a3)"></path>
+          </g>
+
+          <circle class="d-chip" cx="258" cy="152" r="11"></circle>
+          <text class="d-chip-t" x="258" y="156">1</text>
+          <circle class="d-chip" cx="482" cy="164" r="11"></circle>
+          <text class="d-chip-t" x="482" y="168">2</text>
+          <circle class="d-chip" cx="821" cy="154" r="11"></circle>
+          <text class="d-chip-t" x="821" y="158">3</text>
+          <circle class="d-chip" cx="821" cy="276" r="11"></circle>
+          <text class="d-chip-t" x="821" y="280">4</text>
+
+          <text class="d-note" x="14" y="572">Nothing listens for AWS. Every arrow leaving this box was started from inside it.</text>
+        </svg>
+      </div>
+
+      <ol class="steps">
+        <li><b>The UI enqueues, it does not scan.</b> Starting a scan writes a job row. The web tier holds no AWS credentials at all.</li>
+        <li><b>Workers poll the database.</b> Scan jobs use the database queue driver, with <code>SELECT &hellip; FOR UPDATE SKIP LOCKED</code> so five workers never collide.</li>
+        <li><b>Account linking polls SQS.</b> The only pool that needs AWS messaging, and it stays switched off until <code>TOPS_SQS_ARN</code> is set.</li>
+        <li><b>Scanning assumes the role.</b> One <code>AssumeRole</code> per job, temporary credentials, read calls, results written home.</li>
+      </ol>
+
+      <p class="note">
+        <b>Air-gapped from us by construction.</b> The parent account, the queues, the database and the findings are all yours.
+        There is no telemetry endpoint, no license check, and no hosted control plane in this path &mdash; the container image is
+        the only thing you pull from outside, and you can build it yourself with <code>install-build.sh</code>.
+      </p>
+    </div>
+  </section>
+
+  <!-- ================= REFERENCE: BOUNDARY ================= -->
+  <section class="ref">
+    <h2>What crosses the boundary</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Direction</th>
+            <th>Traffic</th>
+            <th>Carries</th>
+            <th>When</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="dir dir-out">outbound</span></td>
+            <td>HTTPS to AWS API endpoints, signed with credentials from <code>sts:AssumeRole</code></td>
+            <td>Describe / List / Get calls against the account being scanned</td>
+            <td>During a scan</td>
+          </tr>
+          <tr>
+            <td><span class="dir dir-out">outbound</span></td>
+            <td>SQS <code>ReceiveMessage</code> / <code>DeleteMessage</code> long-poll</td>
+            <td>Nothing &mdash; an empty poll until a stack is created</td>
+            <td>Continuously, if AWS messaging is set up</td>
+          </tr>
+          <tr>
+            <td><span class="dir dir-in">into your AWS</span></td>
+            <td>One <code>sns:Publish</code> from the child account's CloudFormation stack</td>
+            <td>Role ARN, external id, unique id</td>
+            <td>Once per account, at link and at unlink</td>
+          </tr>
+          <tr>
+            <td><span class="dir dir-never">never</span></td>
+            <td>Inbound connections to the TOPS host</td>
+            <td>There is no listener. AWS is polled, not called back.</td>
+            <td>&mdash;</td>
+          </tr>
+          <tr>
+            <td><span class="dir dir-never">never</span></td>
+            <td>Long-lived AWS access keys</td>
+            <td>None are requested, entered, or stored. Only role ARNs, encrypted.</td>
+            <td>&mdash;</td>
+          </tr>
+          <tr>
+            <td><span class="dir dir-never">never</span></td>
+            <td>Findings, resource inventory, or account metadata leaving your install</td>
+            <td>Scan output is written to your MySQL and stays there</td>
+            <td>&mdash;</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ================= REFERENCE: PERMISSIONS ================= -->
+  <section class="ref">
+    <h2>What the child-account role can actually do</h2>
+    <p class="lede">
+      Worth being precise about, because this is the first question every security reviewer asks. The role is
+      <em>not</em> read-only. Scanning uses only the read half; the write half exists for the operational features
+      that provision and manage AWS security services on your behalf.
+    </p>
+    <div class="perms">
+      <div class="perm-card perm-read">
+        <div class="perm-head"><span>Read</span><span>used by every scan</span></div>
+        <ul>
+          <li>ReadOnlyAccess <span style="opacity:.7">(AWS managed)</span></li>
+          <li>ResourceGroupsandTagEditorReadOnlyAccess</li>
+        </ul>
+        <p>This is the whole permission set the scanner exercises. If you only want scanning, this is all you need.</p>
+      </div>
+      <div class="perm-card perm-write">
+        <div class="perm-head"><span>Write</span><span>only for the ops features</span></div>
+        <ul>
+          <li>securityhub:* &middot; guardduty:* &middot; macie:* &middot; inspector:*</li>
+          <li>config:Put* / Delete* &mdash; rules, recorders, delivery channels, conformance packs</li>
+          <li>cloudtrail: create, update, delete, start/stop logging</li>
+          <li>logs: create/delete log groups, streams, metric filters</li>
+          <li>cloudformation: create, update, delete, change sets</li>
+          <li>s3:CreateBucket / DeleteBucket <span style="opacity:.7">(for Config delivery)</span></li>
+          <li>iam:PassRole &rarr; arn:aws:iam::*:role/tops*</li>
+        </ul>
+        <p>
+          The template is a plain CloudFormation file in your own S3 bucket. Strip the policies you do not want before
+          you publish the link &mdash; the scanner keeps working, the ops features stop.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= FACTS ================= -->
+  <section class="ref">
+    <h2>The shape of it, in numbers</h2>
+    <div class="facts">
+      <div class="fact">
+        <div class="fact-n">2</div>
+        <div class="fact-l">stacks in the parent</div>
+        <p>Deployed once. Delete them and the integration is gone.</p>
+      </div>
+      <div class="fact">
+        <div class="fact-n">1</div>
+        <div class="fact-l">stack per child account</div>
+        <p>Created by that account's own admin. Revocable by them at any time.</p>
+      </div>
+      <div class="fact">
+        <div class="fact-n">0</div>
+        <div class="fact-l">stored AWS keys</div>
+        <p>Cross-account roles with a per-account external id, assumed per job.</p>
+      </div>
+      <div class="fact">
+        <div class="fact-n">0</div>
+        <div class="fact-l">inbound ports to AWS</div>
+        <p>Every connection is opened from inside your network.</p>
+      </div>
+      <div class="fact">
+        <div class="fact-n">~153</div>
+        <div class="fact-l">region jobs per full scan</div>
+        <p>Fanned across five worker processes by default.</p>
+      </div>
+      <div class="fact">
+        <div class="fact-n">6</div>
+        <div class="fact-l">containers on one host</div>
+        <p>app, worker, mysql, backup, maildev, and a restore container that stays parked.</p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div>TOPS v0.4.0 &mdash; self-hosted AWS security posture scanning. Architecture as built, not as planned.</div>
+    <div>Templates: <code>templates/iam.role.child.account.cfn.yaml</code> &middot; Parent stacks: <code>infra/cloud-stack/</code> &middot; Runtime: <code>docker-compose.yml</code></div>
+  </footer>
+
+</div>
