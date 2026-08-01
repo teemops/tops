@@ -43,6 +43,8 @@ class ProcessRegionScanJob implements ShouldQueue
      */
     public function handle(): void
     {
+        $jobStartedAt = microtime(true);
+
         // Reload scan to ensure we have latest data
         $this->scan->refresh();
 
@@ -83,6 +85,12 @@ class ProcessRegionScanJob implements ShouldQueue
             // The check comes before assuming the role so a redelivered job costs nothing
             // at AWS. Phases 2 and 3 below still run: a redelivery must be able to carry
             // the scan to completion even when it has no new data to add.
+            // Phase timings feed the parallel-scan baseline (see PERF-1, #64). They are
+            // reported together on the 'Region scan completed' line below rather than
+            // one line per phase, so a whole scan's ~153 jobs stay greppable.
+            $assumeRoleMs = 0;
+            $collectionMs = 0;
+
             if ($this->hasAlreadyCollected()) {
                 Log::info('Skipping data collection, this service/region already has scan_details', [
                     'scan_id' => $this->scan->id,
@@ -91,10 +99,16 @@ class ProcessRegionScanJob implements ShouldQueue
                 ]);
             } else {
                 $scanner = new AwsSecurityScanner($roleArn, $externalId, $this->region);
+
+                $assumeRoleStartedAt = microtime(true);
                 $credentials = $scanner->assumeRole();
+                $assumeRoleMs = $this->elapsedMs($assumeRoleStartedAt);
+
+                $collectionStartedAt = microtime(true);
 
                 try {
                     (new RulesEngine())->executeScan($this->scan, $this->service, $credentials, $this->region);
+                    $collectionMs = $this->elapsedMs($collectionStartedAt);
                     Log::info("{$this->service} region scan data collection completed", [
                         'scan_id' => $this->scan->id,
                         'service' => $this->service,
@@ -114,7 +128,9 @@ class ProcessRegionScanJob implements ShouldQueue
             // Phase 2: Evaluate findings using FindingsEngine
             $conditionEvaluator = new ConditionEvaluator();
             $findingsEngine = new FindingsEngine($conditionEvaluator);
-            
+
+            $findingsStartedAt = microtime(true);
+
             try {
                 // Evaluate findings using the scan's ruleset(s) (defaults to basic)
                 $findingsEngine->evaluateScan($this->scan, $this->scan->rulesets ?? ['basic']);
@@ -134,15 +150,27 @@ class ProcessRegionScanJob implements ShouldQueue
                 // Don't fail the scan if findings evaluation fails
             }
 
+            $findingsMs = $this->elapsedMs($findingsStartedAt);
+
+            // Check if all regions are complete and mark scan as completed if so
+            $completionCheckStartedAt = microtime(true);
+            $this->scan->refresh();
+            $this->scan->checkAndMarkRegionBasedScanComplete();
+            $completionCheckMs = $this->elapsedMs($completionCheckStartedAt);
+
+            // Logged after the completion check, not before it, so total_ms covers the
+            // whole job. findings_ms and completion_check_ms are the two that grow with
+            // the scan — both re-read every scan_detail collected so far.
             Log::info('Region scan completed', [
                 'scan_id' => $this->scan->id,
                 'service' => $this->service,
                 'region' => $this->region,
+                'assume_role_ms' => $assumeRoleMs,
+                'collection_ms' => $collectionMs,
+                'findings_ms' => $findingsMs,
+                'completion_check_ms' => $completionCheckMs,
+                'total_ms' => $this->elapsedMs($jobStartedAt),
             ]);
-
-            // Check if all regions are complete and mark scan as completed if so
-            $this->scan->refresh();
-            $this->scan->checkAndMarkRegionBasedScanComplete();
         } catch (\Exception $e) {
             Log::error('Region scan failed', [
                 'scan_id' => $this->scan->id,
@@ -154,6 +182,14 @@ class ProcessRegionScanJob implements ShouldQueue
             // Re-throw to trigger retry mechanism
             throw $e;
         }
+    }
+
+    /**
+     * Milliseconds since a microtime(true) mark, for the phase timings above.
+     */
+    private function elapsedMs(float $startedAt): int
+    {
+        return (int) round((microtime(true) - $startedAt) * 1000);
     }
 
     /**

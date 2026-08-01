@@ -10,6 +10,8 @@ use App\Models\ScanDetail;
 use App\Models\ScanResult;
 use App\Services\AwsSecurityScanner;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Log\Events\MessageLogged;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
 use Mockery;
 use Tests\TestCase;
@@ -101,6 +103,55 @@ class ProcessRegionScanJobTest extends TestCase
         $this->assertTrue($collected('ec2', 'us-east-1'));
         $this->assertFalse($collected('ec2', 'eu-west-1'), 'A different region still needs collecting');
         $this->assertFalse($collected('kms', 'us-east-1'), 'A different service still needs collecting');
+    }
+
+    /**
+     * The completion line has to carry every phase timing, because it is the only
+     * per-job record of where a scan's time goes.
+     *
+     * A full scan fans out ~153 of these, so the baseline (PERF-1) is built by
+     * aggregating this one line rather than one line per phase. If a key is dropped or
+     * renamed, the aggregation silently reports zero for that phase instead of failing.
+     */
+    public function test_the_completion_log_carries_every_phase_timing(): void
+    {
+        $organization = Organization::factory()->create();
+        $awsAccount = AwsAccount::factory()->completed()->create([
+            'organization_id' => $organization->id,
+        ]);
+
+        $scan = Scan::factory()->running()->create([
+            'organization_id' => $organization->id,
+            'aws_account_id' => $awsAccount->id,
+            'scan_types' => ['ec2'],
+            'rulesets' => ['basic'],
+            'expected_regions_count' => 1,
+        ]);
+
+        // Pre-collected, so the job runs end to end without needing AWS credentials.
+        ScanDetail::create([
+            'scan_id' => $scan->id,
+            'service' => 'ec2',
+            'api_method' => 'describeInstances',
+            'raw_data' => ['Reservations' => []],
+            'region' => 'us-east-1',
+        ]);
+
+        $context = null;
+        Event::listen(MessageLogged::class, function (MessageLogged $event) use (&$context) {
+            if ($event->message === 'Region scan completed') {
+                $context = $event->context;
+            }
+        });
+
+        (new ProcessRegionScanJob($scan, 'us-east-1', 'ec2'))->handle();
+
+        $this->assertNotNull($context, 'The job did not log a completion line');
+
+        foreach (['assume_role_ms', 'collection_ms', 'findings_ms', 'completion_check_ms', 'total_ms'] as $key) {
+            $this->assertArrayHasKey($key, $context, "Completion line is missing {$key}");
+            $this->assertIsInt($context[$key], "{$key} must be an integer count of milliseconds");
+        }
     }
 
     /**

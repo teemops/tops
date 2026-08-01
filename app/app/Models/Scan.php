@@ -177,6 +177,12 @@ class Scan extends Model
                 'processed_region_jobs' => $processedRegionJobs,
                 'expected_region_jobs' => $expectedRegionJobs,
                 'timed_out' => $timedOut,
+                // Wall time for the whole scan — the headline number for the
+                // parallel-scan baseline (PERF-1, #64). Compare against the sum of
+                // 'Region scan completed' total_ms to see how much of it was serial.
+                'total_ms' => $this->started_at
+                    ? (int) $this->started_at->diffInMilliseconds(now())
+                    : null,
             ]);
         } else {
             // Without this, a scan that never reaches its expected count is silently
