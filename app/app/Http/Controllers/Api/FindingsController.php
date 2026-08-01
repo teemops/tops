@@ -93,14 +93,12 @@ class FindingsController extends Controller
             'low' => (clone $baseQuery)->where('scan_results.severity', 'low')->count(),
         ];
 
-        $totalForScore = array_sum($bySeverity);
-        $securityScore = $totalForScore === 0
-            ? 100
-            : max(0, 100 - ($bySeverity['critical'] * 10 + $bySeverity['high'] * 5 + $bySeverity['medium'] * 2 + $bySeverity['low']));
-
+        // No security score. It was 100 minus a weighted penalty, floored at zero, which
+        // put every real account at zero and kept it there — fixing ten things moved
+        // nothing. A number that cannot move is worse than no number, because it looks
+        // like information. Severity counts are honest and already say more. See D-12.
         $summary = [
-            'securityScore' => $securityScore,
-            'total' => $totalForScore,
+            'total' => array_sum($bySeverity),
             'bySeverity' => $bySeverity,
         ];
 

@@ -4,7 +4,6 @@ import { useOrganizations } from './useOrganizations';
 const axios = (window as any).axios;
 
 export interface FindingSummary {
-    securityScore: number;
     total: number;
     bySeverity: {
         critical: number;

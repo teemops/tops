@@ -98,6 +98,7 @@ Decisions already made, so we don't relitigate them. Each has a trigger for revi
 | **D-8** | **Ship prebuilt images from Docker Hub, cut by a real release pipeline.** `install.sh` pulls tagged images; it never builds. | 2026-07-30 | See below — this is the biggest single change to how TOPS is delivered. | A registry other than Docker Hub is chosen, or images stop being the distribution unit. |
 | **D-9** | **No application-level encryption at rest. `iam_role_arn` is stored plaintext; encryption is the host's job.** | 2026-07-30 | See below — deliberately reducing encryption on a security product needs its reasoning on the record. | A field is introduced that is genuinely a credential (an access key, a token, a password). Then encrypt *that* and revisit key rotation. |
 | **D-10** | **User documentation lives in a top-level `user-docs/` directory, not under `docs/`, and deploys to `docs.teemops.com`.** One site for technical and non-technical readers — no separate tracks. | 2026-07-31 | See below. | The content outgrows plain Markdown, or a contributor proposes a better home. |
+| **D-12** | **No security score.** Removed rather than recalibrated. Severity counts and the breakdown are what we show; a score can come back later if a design partner asks for one and we know what it should mean. | 2026-08-02 | See below. Closes [#91](https://github.com/teemops/tops/issues/91). | A design partner asks for a single headline number — and then design it so it can *move*. |
 | **D-11** | **A finding is a durable record keyed by AWS account + resource + rule, and findings are current state. No per-scan history, no observations table.** The most recent scan that examined a resource is authoritative for its content; status belongs to the user. | 2026-08-01 | See below. Shipped as [#81](https://github.com/teemops/tops/issues/81). | A design partner asks for trends over time — and then treat it as a new data model, not an addition to this one. |
 
 > **Naming collision, flagged 2026-08-01.** [`durable-findings.md`](./features/durable-findings.md)
@@ -106,6 +107,36 @@ Decisions already made, so we don't relitigate them. Each has a trigger for revi
 > prose. The Decisions Log entry above is **D-11**; the story keeps its own ID until someone
 > renames it. **Worth renaming the story's ID to `DF-1`** — deferred rather than done
 > unilaterally, because it touches three docs and a settled wireframe.
+
+### D-12 in full: why the security score is gone rather than fixed
+
+The score was `100 − (critical×10 + high×5 + medium×2 + low×1)`, floored at zero.
+
+The reference install's 67 findings — 0 critical, 27 high, 37 medium, 3 low — compute to
+**−212**. It read **0** from the first scan and could not have read anything else until the
+findings dropped by roughly two thirds. **Every real account sits on the floor.**
+
+That is worse than showing nothing, for a specific reason: a number that cannot move still
+looks like information. Someone fixes ten things, rescans, sees 0 again, and concludes the
+product is broken or the work was pointless. The one job a score has — showing improvement —
+was the one thing it could not do.
+
+**Recalibrating was the obvious alternative and was rejected.** Any curve we picked would be
+invented: we have one real account's data, no partner has asked for a score, and nobody has
+told us what "good" looks like for a small AWS estate. Choosing a formula now means guessing
+at the answer and then defending the guess. That is building ahead of evidence, which the
+practices call out by name.
+
+So the score is **removed**, not replaced. The Findings summary keeps its severity counts,
+Dashboard shows open findings instead, and Scan detail and Insights already show a severity
+breakdown that says strictly more than one number could.
+
+**If it comes back**, the requirement is fixed in advance: it must visibly move when someone
+fixes ten things. That is the acceptance criterion any future scoring design has to meet.
+
+Note the weighting itself survives as `ScanResult::SEVERITY_WEIGHTS`, because "fix these
+first" still needs to rank a group of criticals above a larger group of mediums. What is gone
+is the pretence that the weighting rolls up into a meaningful headline figure.
 
 ### D-11 in full: durable findings
 
@@ -415,6 +446,7 @@ detail becomes a link into Findings, filtered. The per-finding list comes **off*
 | ~~**#64**~~ | ~~PERF-1 · Instrument scan phases~~ | ✅ **Done** 2026-08-01 — phase timing instrumented so the ~10 minutes is attributed rather than guessed. Baseline captured. PR #96. | S |
 | ~~**#85**~~ | ~~F-3 · Filter Findings by service~~ | ✅ **Done** 2026-08-02, verified on the reference install — service pills with server-computed facet counts, ordered by size, long tail behind `+ N more`. The facet deliberately does not constrain itself, so selecting one pill leaves the rest navigable, and counts follow list semantics so a pill reading N returns N rows. | S |
 | ~~**#83**~~ | ~~F-7 · Findings does not read its filters from the URL~~ | ✅ **Done** 2026-08-02 — shipped inside F-3, which could not meet its "and the URL reflects it" criterion without it. Filters now read from and write back to the URL, so a filtered view can be bookmarked or sent to a colleague. | XS |
+| ~~**#91**~~ | ~~B-2 · Security score pinned at 0~~ | ✅ **Done** 2026-08-02 — **removed rather than recalibrated**, recorded as **D-12**. It read 0 for every real account and could not move, and a number that cannot move still looks like information. Severity counts and the breakdown say more. Dashboard shows open findings instead. | XS |
 | ~~**#88**~~ | ~~F-5 · Insights by service with severity~~ | ✅ **Done** 2026-08-02, verified on the reference install — "Top affected services" became the same severity-stacked, drillable breakdown Scan detail shows, keyed on the organization. **The shared component and service were consumed byte-for-byte unchanged**, so the whole feature is ~20 lines of production code. Deliberately *not* period-scoped: it is current state, so a service reads the same number here as on Scan detail and Findings — pinned by a test. | S |
 | ~~**#86**~~ | ~~S-1 · Scan detail summarises and dispatches~~ | ✅ **Done** 2026-08-02, verified on the reference install — Scan detail now summarises and dispatches: run facts, severity totals, "fix these first" ranked by severity, and a drillable breakdown whose every row links into Findings filtered. The per-finding list, its remediation and its severity filter are **deleted**, which is what pays for the feature. Built as a shared service and component so Insights is a re-key, not a rewrite. | M |
 | ~~**#82**~~ | ~~F-1 · Findings drops the remediation it already has~~ | ✅ **Done** 2026-08-02 — the one-line remediation now renders on its own rather than being gated behind `tips.json` step-by-step guidance, which only critical/high rules carry. Fixed the empty state for **46 of 74 rules**. Landed *before* S-1 deliberately: S-1 makes Findings the only page showing remediation at all. | XS |
@@ -428,7 +460,6 @@ rewrite, and there is already a test proving the organization-wide path works.
 
 | # | Item | Depends on | Size | Priority |
 | --- | --- | --- | :---: | :---: |
-| **#91** | B-2 · Security score pinned at 0 and cannot improve | — | XS–S | P2 · bug |
 | **#87** | F-4 · Filter Findings by compliance benchmark — the one genuine data-model change left; nothing records a finding's benchmark | #81 | M | P2 |
 | **#89** | F-6 · Insights by benchmark | #87, #88 | XS | P3 |
 | **#87** | F-4 · Filter Findings by compliance benchmark — the one genuine data-model change left; nothing records a finding's benchmark | #81 | M | P2 |

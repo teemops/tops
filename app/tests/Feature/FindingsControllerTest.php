@@ -362,18 +362,18 @@ class FindingsControllerTest extends TestCase
             ->assertJsonPath('summary.bySeverity.high', 2);
     }
 
-    public function test_the_security_score_is_perfect_with_no_findings(): void
+    public function test_an_organization_with_no_findings_reports_zero(): void
     {
         $response = $this->actingAs($this->user)->getJson($this->findingsUrl());
 
-        $this->assertEquals(100, $response->json('summary.securityScore'));
         $this->assertEquals(0, $response->json('summary.total'));
+        $this->assertEquals(
+            ['critical' => 0, 'high' => 0, 'medium' => 0, 'low' => 0],
+            $response->json('summary.bySeverity')
+        );
     }
 
-    /**
-     * Score deducts 10 per critical, 5 per high, 2 per medium and 1 per low.
-     */
-    public function test_the_security_score_is_weighted_by_severity(): void
+    public function test_the_summary_counts_findings_by_severity(): void
     {
         $scan = $this->completedScan();
         $this->finding($scan, ['severity' => 'critical']);
@@ -383,7 +383,6 @@ class FindingsControllerTest extends TestCase
 
         $response = $this->actingAs($this->user)->getJson($this->findingsUrl());
 
-        $this->assertEquals(100 - (10 + 5 + 2 + 1), $response->json('summary.securityScore'));
         $this->assertEquals(4, $response->json('summary.total'));
         $this->assertEquals(
             ['critical' => 1, 'high' => 1, 'medium' => 1, 'low' => 1],
@@ -391,7 +390,11 @@ class FindingsControllerTest extends TestCase
         );
     }
 
-    public function test_the_security_score_never_goes_below_zero(): void
+    /**
+     * The score this replaced read 0 for any account with more than a handful of findings
+     * and could not move. Counts keep counting. See D-12.
+     */
+    public function test_the_summary_keeps_counting_past_where_the_old_score_bottomed_out(): void
     {
         $scan = $this->completedScan();
         ScanResult::factory()->count(15)->create([
@@ -401,7 +404,9 @@ class FindingsControllerTest extends TestCase
 
         $response = $this->actingAs($this->user)->getJson($this->findingsUrl());
 
-        $this->assertEquals(0, $response->json('summary.securityScore'));
+        $this->assertEquals(15, $response->json('summary.total'));
+        $this->assertEquals(15, $response->json('summary.bySeverity.critical'));
+        $this->assertNull($response->json('summary.securityScore'));
     }
 
     public function test_it_shows_a_single_finding_with_its_recommendation(): void

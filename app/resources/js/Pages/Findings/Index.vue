@@ -211,11 +211,7 @@ const goToFindingType = (findingType: string) => {
             <!-- Executive Summary -->
             <section v-if="summary" class="mb-8">
                 <h2 class="text-lg font-medium text-gray-900 dark:text-white mb-4">Executive Summary</h2>
-                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-                    <div class="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 shadow-sm">
-                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Security Score</dt>
-                        <dd class="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">{{ summary.securityScore }}</dd>
-                    </div>
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <div class="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 shadow-sm">
                         <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Findings</dt>
                         <dd class="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">{{ summary.total }}</dd>

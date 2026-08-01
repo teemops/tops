@@ -59,9 +59,10 @@ class ScanResult extends Model
     /**
      * How much each severity counts when findings are weighed against each other.
      *
-     * Lives here because more than one thing needs it — the security score and the
-     * "fix these first" ranking. Two weightings would let two numbers in the same
-     * product disagree about which of two problems is worse.
+     * Used by the "fix these first" ranking, so eighteen mediums do not outrank eighteen
+     * highs. Lives here rather than in the caller so that anything else needing to rank
+     * findings picks up the same answer about which of two problems is worse — the
+     * security score removed in D-12 had its own copy, and that is how numbers drift.
      */
     public const SEVERITY_WEIGHTS = [
         'critical' => 10,

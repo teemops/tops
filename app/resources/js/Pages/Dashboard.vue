@@ -25,10 +25,10 @@ const criticalFindingsCount = computed(
     () => findingsSummary.value?.bySeverity?.critical ?? 0
 );
 
-const complianceScore = computed(() => {
-    const score = findingsSummary.value?.securityScore;
-    return score !== undefined && score !== null ? `${score}%` : '—';
-});
+// Was a "Security Score" — 100 minus a weighted penalty, floored at zero, which meant
+// every real account read 0 and stayed there no matter what got fixed. Replaced with the
+// open count, which is honest and actually moves. See D-12.
+const openFindingsCount = computed(() => findingsSummary.value?.total ?? 0);
 
 const recentScans = computed(() => scans.value.slice(0, 5));
 
@@ -397,10 +397,10 @@ const handleViewScan = (scanId: string) => {
                             <div class="ml-5 w-0 flex-1">
                                 <dl>
                                     <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
-                                        Security Score
+                                        Open Findings
                                     </dt>
                                     <dd class="text-2xl font-semibold text-gray-900 dark:text-white">
-                                        {{ complianceScore }}
+                                        {{ openFindingsCount }}
                                     </dd>
                                 </dl>
                             </div>
