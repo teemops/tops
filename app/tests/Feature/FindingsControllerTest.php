@@ -160,6 +160,136 @@ class FindingsControllerTest extends TestCase
         $this->assertEquals(2, $byAccount->json('total'));
     }
 
+    /**
+     * The pills: one per service that has findings, busiest first, and nothing for a
+     * service with none.
+     */
+    public function test_service_facets_are_counted_and_ordered_by_size(): void
+    {
+        $scan = $this->completedScan();
+        $this->finding($scan, ['service' => 's3']);
+        $this->finding($scan, ['service' => 'ec2']);
+        $this->finding($scan, ['service' => 'ec2']);
+        $this->finding($scan, ['service' => 'ec2']);
+        $this->finding($scan, ['service' => 'iam']);
+        $this->finding($scan, ['service' => 'iam']);
+
+        $facets = $this->actingAs($this->user)->getJson($this->findingsUrl())->json('serviceFacets');
+
+        $this->assertSame([
+            ['service' => 'ec2', 'count' => 3],
+            ['service' => 'iam', 'count' => 2],
+            ['service' => 's3', 'count' => 1],
+        ], $facets);
+    }
+
+    /**
+     * The rule that makes faceting usable: the service filter must not constrain its own
+     * facet, or picking one pill zeroes the rest and there is no way to switch.
+     */
+    public function test_the_service_filter_does_not_constrain_its_own_facet(): void
+    {
+        $scan = $this->completedScan();
+        $this->finding($scan, ['service' => 'ec2']);
+        $this->finding($scan, ['service' => 'ec2']);
+        $this->finding($scan, ['service' => 's3']);
+
+        $facets = $this->actingAs($this->user)
+            ->getJson($this->findingsUrl(['service' => 'ec2']))
+            ->json('serviceFacets');
+
+        $this->assertSame([
+            ['service' => 'ec2', 'count' => 2],
+            ['service' => 's3', 'count' => 1],
+        ], $facets);
+    }
+
+    /**
+     * Every other filter *does* narrow the facets — that is what makes the counts mean
+     * "what you would get", rather than "what exists somewhere".
+     */
+    public function test_service_facets_respect_the_other_active_filters(): void
+    {
+        $scan = $this->completedScan();
+        $otherAccount = AwsAccount::factory()->completed()->create([
+            'organization_id' => $this->organization->id,
+        ]);
+        $otherScan = Scan::factory()->create([
+            'organization_id' => $this->organization->id,
+            'aws_account_id' => $otherAccount->id,
+            'status' => 'completed',
+        ]);
+
+        $this->finding($scan, ['service' => 'ec2', 'status' => 'open']);
+        $this->finding($scan, ['service' => 's3', 'status' => 'ignored']);
+        $this->finding($otherScan, ['service' => 'ec2']);
+
+        $byAccount = $this->actingAs($this->user)
+            ->getJson($this->findingsUrl(['aws_account_id' => $this->awsAccount->id]))
+            ->json('serviceFacets');
+
+        $this->assertSame([
+            ['service' => 'ec2', 'count' => 1],
+            ['service' => 's3', 'count' => 1],
+        ], $byAccount);
+
+        $byStatus = $this->actingAs($this->user)
+            ->getJson($this->findingsUrl(['status' => 'ignored']))
+            ->json('serviceFacets');
+
+        $this->assertSame([['service' => 's3', 'count' => 1]], $byStatus);
+    }
+
+    /**
+     * A pill reading N must produce N rows when clicked. The summary drops resolved
+     * findings and the list does not, so the facets have to follow the list.
+     */
+    public function test_a_service_facet_count_matches_the_rows_that_pill_returns(): void
+    {
+        $scan = $this->completedScan();
+        $this->finding($scan, ['service' => 'ec2', 'status' => 'open']);
+        $this->finding($scan, ['service' => 'ec2', 'status' => 'resolved']);
+        $this->finding($scan, ['service' => 'ec2', 'status' => 'ignored']);
+
+        $facets = $this->actingAs($this->user)->getJson($this->findingsUrl())->json('serviceFacets');
+        $this->assertSame([['service' => 'ec2', 'count' => 3]], $facets);
+
+        $rows = $this->actingAs($this->user)->getJson($this->findingsUrl(['service' => 'ec2']));
+        $this->assertEquals(3, $rows->json('total'));
+    }
+
+    public function test_service_facets_exclude_other_organizations(): void
+    {
+        $this->finding(
+            Scan::factory()->create(['status' => 'completed']),
+            ['service' => 'ec2']
+        );
+        $this->finding($this->completedScan(), ['service' => 's3']);
+
+        $facets = $this->actingAs($this->user)->getJson($this->findingsUrl())->json('serviceFacets');
+
+        $this->assertSame([['service' => 's3', 'count' => 1]], $facets);
+    }
+
+    /**
+     * Findings the list itself excludes must not appear as a pill, or the pill leads
+     * somewhere empty.
+     */
+    public function test_service_facets_exclude_incomplete_scans(): void
+    {
+        $pending = Scan::factory()->create([
+            'organization_id' => $this->organization->id,
+            'aws_account_id' => $this->awsAccount->id,
+            'status' => 'pending',
+        ]);
+        $this->finding($pending, ['service' => 'ec2']);
+        $this->finding($this->completedScan(), ['service' => 's3']);
+
+        $facets = $this->actingAs($this->user)->getJson($this->findingsUrl())->json('serviceFacets');
+
+        $this->assertSame([['service' => 's3', 'count' => 1]], $facets);
+    }
+
     public function test_findings_are_paginated(): void
     {
         $scan = $this->completedScan();

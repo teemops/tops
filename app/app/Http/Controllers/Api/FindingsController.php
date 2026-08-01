@@ -33,27 +33,8 @@ class FindingsController extends Controller
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
-        $query = ScanResult::query()
-            ->join('scans', 'scan_results.scan_id', '=', 'scans.id')
-            ->where('scans.organization_id', $organization->id)
-            ->where('scans.status', 'completed')
+        $query = $this->filteredFindings($request, $organization->id)
             ->select('scan_results.*');
-
-        if ($request->filled('aws_account_id')) {
-            $query->where('scans.aws_account_id', $request->input('aws_account_id'));
-        }
-
-        if ($request->filled('finding_type')) {
-            $query->where('scan_results.finding_type', $request->input('finding_type'));
-        }
-
-        if ($request->filled('service')) {
-            $query->where('scan_results.service', $request->input('service'));
-        }
-
-        if ($request->filled('status')) {
-            $query->where('scan_results.status', $request->input('status'));
-        }
 
         $limit = min($request->input('limit', 50), 200);
         $offset = max($request->input('offset', 0), 0);
@@ -90,23 +71,7 @@ class FindingsController extends Controller
             ];
         });
 
-        $baseQuery = ScanResult::query()
-            ->join('scans', 'scan_results.scan_id', '=', 'scans.id')
-            ->where('scans.organization_id', $organization->id)
-            ->where('scans.status', 'completed');
-
-        if ($request->filled('aws_account_id')) {
-            $baseQuery->where('scans.aws_account_id', $request->input('aws_account_id'));
-        }
-        if ($request->filled('finding_type')) {
-            $baseQuery->where('scan_results.finding_type', $request->input('finding_type'));
-        }
-        if ($request->filled('service')) {
-            $baseQuery->where('scan_results.service', $request->input('service'));
-        }
-        if ($request->filled('status')) {
-            $baseQuery->where('scan_results.status', $request->input('status'));
-        }
+        $baseQuery = $this->filteredFindings($request, $organization->id);
 
         // A resolved finding is not an open problem, so it does not count toward the
         // totals or the score. This matters more than it used to: before durable findings
@@ -144,11 +109,69 @@ class FindingsController extends Controller
         return response()->json([
             'summary' => $summary,
             'findings' => $findings,
+            'serviceFacets' => $this->serviceFacets($request, $organization->id),
             'recommendationsMap' => $recommendationsMap,
             'total' => $total,
             'limit' => $limit,
             'offset' => $offset,
         ]);
+    }
+
+    /**
+     * The organization-scoped base for every findings query on the index page.
+     *
+     * $except names a filter to leave off, which is what makes faceting work: a facet has
+     * to be computed without the filter it is offering, or selecting one service collapses
+     * every other pill to zero and there is no way back.
+     */
+    private function filteredFindings(Request $request, string $organizationId, ?string $except = null)
+    {
+        $query = ScanResult::query()
+            ->join('scans', 'scan_results.scan_id', '=', 'scans.id')
+            ->where('scans.organization_id', $organizationId)
+            ->where('scans.status', 'completed');
+
+        if ($except !== 'aws_account_id' && $request->filled('aws_account_id')) {
+            $query->where('scans.aws_account_id', $request->input('aws_account_id'));
+        }
+
+        if ($except !== 'finding_type' && $request->filled('finding_type')) {
+            $query->where('scan_results.finding_type', $request->input('finding_type'));
+        }
+
+        if ($except !== 'service' && $request->filled('service')) {
+            $query->where('scan_results.service', $request->input('service'));
+        }
+
+        if ($except !== 'status' && $request->filled('status')) {
+            $query->where('scan_results.status', $request->input('status'));
+        }
+
+        return $query;
+    }
+
+    /**
+     * How many findings each service would yield if it were the selected one — one grouped
+     * query, not a count per service.
+     *
+     * These deliberately follow the *list* semantics rather than the summary's, which drops
+     * resolved findings. A pill reading 12 has to produce 12 rows when clicked; a count the
+     * user can see disagree with the list is worse than no count at all.
+     */
+    private function serviceFacets(Request $request, string $organizationId): array
+    {
+        return $this->filteredFindings($request, $organizationId, except: 'service')
+            ->select('scan_results.service')
+            ->selectRaw('COUNT(*) as facet_count')
+            ->groupBy('scan_results.service')
+            ->orderByDesc('facet_count')
+            ->orderBy('scan_results.service')
+            ->get()
+            ->map(fn ($row) => [
+                'service' => $row->service,
+                'count' => (int) $row->facet_count,
+            ])
+            ->all();
     }
 
     /**

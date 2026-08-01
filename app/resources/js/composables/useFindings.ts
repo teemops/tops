@@ -41,9 +41,20 @@ export interface Recommendation {
     rules: string[];
 }
 
+/**
+ * One service pill: how many findings you would get by selecting it, given whatever other
+ * filters are already active. Computed server-side — the list is paginated, so counting the
+ * loaded page would undercount.
+ */
+export interface ServiceFacet {
+    service: string;
+    count: number;
+}
+
 export interface FindingsIndexResponse {
     summary: FindingSummary;
     findings: Finding[];
+    serviceFacets: ServiceFacet[];
     recommendationsMap: Record<string, Recommendation>;
     total: number;
     limit: number;
@@ -74,6 +85,7 @@ export interface FindingByTypeResponse {
 
 const findings = ref<Finding[]>([]);
 const summary = ref<FindingSummary | null>(null);
+const serviceFacets = ref<ServiceFacet[]>([]);
 const recommendationsMap = ref<Record<string, Recommendation>>({});
 const loading = ref(false);
 const error = ref<string | null>(null);
@@ -113,6 +125,7 @@ export function useFindings() {
 
             summary.value = data.summary;
             findings.value = data.findings;
+            serviceFacets.value = data.serviceFacets ?? [];
             recommendationsMap.value = data.recommendationsMap ?? {};
             pagination.value = {
                 total: data.total,
@@ -123,6 +136,7 @@ export function useFindings() {
             error.value = err.response?.data?.error ?? 'Failed to load findings';
             findings.value = [];
             summary.value = null;
+            serviceFacets.value = [];
         } finally {
             loading.value = false;
         }
@@ -183,6 +197,7 @@ export function useFindings() {
     return {
         findings,
         summary,
+        serviceFacets,
         recommendationsMap,
         loading,
         error,
