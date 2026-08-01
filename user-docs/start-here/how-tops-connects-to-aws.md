@@ -118,8 +118,10 @@ container image is the only thing you pull from outside, and you can build it yo
 ## What the child-account role can actually do
 
 Worth being precise about, because it is the first question every security reviewer asks. **The
-role is not read-only.** Scanning uses only the read half; the write half exists for the
-operational features that manage AWS security services on your behalf.
+role is not read-only.** Scanning uses only the read half — and as of v0.4.0 **nothing uses the
+write half**, which is provisioned ahead of operational features that are not built yet.
+[What the IAM role can do](../aws-accounts/what-the-iam-role-can-do.md) goes through it policy
+by policy, including how to strip the parts you do not want.
 
 **Read — used by every scan**
 
@@ -140,7 +142,7 @@ This is the whole permission set the scanner exercises.
 
 **If you only want scanning, remove the write policies.** The template is a plain
 CloudFormation file in your own S3 bucket. Strip the policies you do not want before you
-publish the link — the scanner keeps working, the operational features stop.
+publish the link — the scanner keeps working, because it never used them.
 
 ---
 

@@ -132,7 +132,7 @@ somewhere and needs porting and a change of voice, not that a `user-docs/` page 
 | Insights | User | ✍️ Write | `Pages/Insights/`, `docs/features/insights-by-service.md` | 3 |
 | **AWS accounts** |
 | Adding an account | Operator | ✅ Exists | `docs/features/onboarding-flow.md` (rewrite — it is a spec, not a guide) | 2 |
-| What the IAM role can do | Evaluator | ✅ **Built this session** | `templates/iam.role.child.account.cfn.yaml` | **1** |
+| What the IAM role can do | Evaluator | ✅ **Written** | `templates/iam.role.child.account.cfn.yaml` | **1** |
 | Removing an account | Operator | ✍️ Write | Stack deletion → `Delete` custom resource | 3 |
 | Many accounts at once | Operator, Evaluator | ✍️ Write | This session's research | 3 |
 | **Your organization** |

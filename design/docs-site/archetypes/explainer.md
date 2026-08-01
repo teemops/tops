@@ -38,8 +38,12 @@ and what happens to it when you remove an account or uninstall.
 
 ![Description of what the diagram shows, written as a full sentence for screen readers and for anyone the image fails to load for.](../assets/diagrams/name.svg)
 
-<!-- Diagram before prose. It is the fastest way to answer "what is the shape of this",
-     which is the question under all the other questions.
+<!-- Lead with whatever answers "what is the shape of this" fastest, because that is the
+     question under all the other questions. Usually a diagram. Sometimes not: on a
+     permissions page an at-a-glance table beats any diagram, because the shape *is*
+     counts and categories. What matters is that the reader can stop after the first
+     screen and have the answer. See "At a glance" in
+     user-docs/aws-accounts/what-the-iam-role-can-do.md for the table form.
 
      Authoring rules are in user-docs/README.md and they are not optional: 900px viewBox,
      numeric entities only, own dark-mode block, geometry checked. Wrap it in a link to

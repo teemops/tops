@@ -5,7 +5,7 @@ to `docs/`, which is the contributor and maintainer knowledge base. See
 [D-10](../docs/roadmap.md#d-10-in-full-where-user-documentation-lives) for why the two are
 kept apart.
 
-**Status: first slice.** One page so far. The structure it will grow into is designed in
+**Status: first slice.** Two pages so far. The structure it will grow into is designed in
 [`design/docs-site/information-architecture.md`](../design/docs-site/information-architecture.md)
 — 34 pages across 8 sections, with a content map showing what already exists elsewhere in
 the repo and needs porting rather than writing.
@@ -15,6 +15,7 @@ the repo and needs porting rather than writing.
 | Page | For |
 | --- | --- |
 | [How TOPS connects to AWS](start-here/how-tops-connects-to-aws.md) | Security reviewers approving TOPS for an AWS organisation |
+| [What the IAM role can do](aws-accounts/what-the-iam-role-can-do.md) | The same reviewers, once they ask what the permissions actually grant |
 
 ## Conventions
 
