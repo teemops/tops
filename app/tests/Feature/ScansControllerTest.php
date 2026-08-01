@@ -190,6 +190,142 @@ class ScansControllerTest extends TestCase
     }
 
     /**
+     * Narrowing a profile to a subset of its services — the point of F-2.
+     */
+    public function test_a_profile_can_be_narrowed_to_individual_services(): void
+    {
+        $user = User::factory()->create();
+        $organization = Organization::factory()->create([
+            'user_id' => $user->id,
+        ]);
+        $awsAccount = AwsAccount::factory()->completed()->create([
+            'organization_id' => $organization->id,
+        ]);
+
+        $response = $this->actingAs($user)
+            ->postJson("/api/organizations/{$organization->org_id}/scans", [
+                'aws_account_id' => $awsAccount->id,
+                'scan_profiles' => ['basic'],
+                'scan_types' => ['s3', 'ec2'],
+            ]);
+
+        $response->assertStatus(201);
+
+        $scan = Scan::where('aws_account_id', $awsAccount->id)->firstOrFail();
+        $this->assertEqualsCanonicalizing(['s3', 'ec2'], $scan->scan_types);
+        // The ruleset comes from the profile, not the hardcoded 'basic' the
+        // explicit-services path used to fall back to.
+        $this->assertEqualsCanonicalizing(['basic'], $scan->rulesets);
+    }
+
+    /**
+     * The case that could not be expressed before: one service, a non-basic ruleset.
+     */
+    public function test_a_single_service_can_be_scanned_against_a_non_basic_ruleset(): void
+    {
+        $user = User::factory()->create();
+        $organization = Organization::factory()->create([
+            'user_id' => $user->id,
+        ]);
+        $awsAccount = AwsAccount::factory()->completed()->create([
+            'organization_id' => $organization->id,
+        ]);
+
+        $response = $this->actingAs($user)
+            ->postJson("/api/organizations/{$organization->org_id}/scans", [
+                'aws_account_id' => $awsAccount->id,
+                'scan_profiles' => ['cis'],
+                'scan_types' => ['s3'],
+            ]);
+
+        $response->assertStatus(201);
+
+        $scan = Scan::where('aws_account_id', $awsAccount->id)->firstOrFail();
+        $this->assertSame(['s3'], $scan->scan_types);
+        $this->assertSame(['cis'], $scan->rulesets);
+    }
+
+    /**
+     * Omitting scan_types must keep the pre-F-2 behaviour exactly.
+     */
+    public function test_a_profile_without_services_still_scans_everything_it_covers(): void
+    {
+        $user = User::factory()->create();
+        $organization = Organization::factory()->create([
+            'user_id' => $user->id,
+        ]);
+        $awsAccount = AwsAccount::factory()->completed()->create([
+            'organization_id' => $organization->id,
+        ]);
+
+        $response = $this->actingAs($user)
+            ->postJson("/api/organizations/{$organization->org_id}/scans", [
+                'aws_account_id' => $awsAccount->id,
+                'scan_profiles' => ['cis'],
+            ]);
+
+        $response->assertStatus(201);
+
+        $scan = Scan::where('aws_account_id', $awsAccount->id)->firstOrFail();
+        $this->assertEqualsCanonicalizing(
+            \App\Services\ScanProfilesService::servicesFor(['cis']),
+            $scan->scan_types
+        );
+    }
+
+    /**
+     * A service the profile has no rules for would scan and find nothing, which reads
+     * as "compliant". Reject it instead.
+     */
+    public function test_a_service_the_profile_has_no_rules_for_is_rejected(): void
+    {
+        $user = User::factory()->create();
+        $organization = Organization::factory()->create([
+            'user_id' => $user->id,
+        ]);
+        $awsAccount = AwsAccount::factory()->completed()->create([
+            'organization_id' => $organization->id,
+        ]);
+
+        // dynamodb is a real service with basic rules, but CIS has none for it.
+        $response = $this->actingAs($user)
+            ->postJson("/api/organizations/{$organization->org_id}/scans", [
+                'aws_account_id' => $awsAccount->id,
+                'scan_profiles' => ['cis'],
+                'scan_types' => ['dynamodb'],
+            ]);
+
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors('scan_types');
+
+        $this->assertDatabaseCount('scans', 0);
+    }
+
+    /**
+     * Narrowing must not become a way to reach another organization's account.
+     */
+    public function test_cannot_narrow_a_scan_onto_another_organizations_account(): void
+    {
+        $user = User::factory()->create();
+        Organization::factory()->create(['user_id' => $user->id]);
+
+        $otherOrganization = Organization::factory()->create();
+        $otherAccount = AwsAccount::factory()->completed()->create([
+            'organization_id' => $otherOrganization->id,
+        ]);
+
+        $response = $this->actingAs($user)
+            ->postJson("/api/organizations/{$otherOrganization->org_id}/scans", [
+                'aws_account_id' => $otherAccount->id,
+                'scan_profiles' => ['basic'],
+                'scan_types' => ['s3'],
+            ]);
+
+        $this->assertContains($response->status(), [403, 404]);
+        $this->assertDatabaseCount('scans', 0);
+    }
+
+    /**
      * Test an unknown scan profile is rejected
      */
     public function test_validation_rejects_an_unknown_scan_profile(): void

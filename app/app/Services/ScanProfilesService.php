@@ -83,15 +83,87 @@ class ScanProfilesService
     {
         $result = [];
         foreach (self::getAvailable() as $value) {
+            $ruleCounts = self::ruleCountsByService($value);
+
+            // A service can belong to a profile (via its tasks.json) while the profile's
+            // ruleset has no rules for it — scanning it would collect data that nothing
+            // evaluates. Those services are not offered for selection.
+            $services = array_values(array_filter(
+                ServiceRegistry::namesForProfile($value),
+                fn (string $service) => ($ruleCounts[$service] ?? 0) > 0
+            ));
+
             $result[] = [
                 'value' => $value,
                 'label' => self::$profiles[$value]['label'],
                 'description' => self::$profiles[$value]['description'],
-                'services' => ServiceRegistry::namesForProfile($value),
+                'services' => $services,
+                // Per-service rule counts let the modal say what a selection will actually
+                // run before the user commits to the time and the API calls.
+                'serviceRuleCounts' => array_intersect_key($ruleCounts, array_flip($services)),
+                'ruleCount' => array_sum(array_intersect_key($ruleCounts, array_flip($services))),
             ];
         }
 
         return $result;
+    }
+
+    /**
+     * Services a profile can meaningfully scan — those its rulesets actually have rules for.
+     *
+     * @return string[]
+     */
+    private static function selectableServicesFor(string $profileValue): array
+    {
+        if (!isset(self::$profiles[$profileValue])) {
+            return [];
+        }
+
+        $ruleCounts = self::ruleCountsByService($profileValue);
+
+        return array_values(array_filter(
+            ServiceRegistry::namesForProfile($profileValue),
+            fn (string $service) => ($ruleCounts[$service] ?? 0) > 0
+        ));
+    }
+
+    /**
+     * Union of the services the given profiles can meaningfully scan.
+     *
+     * @param string[] $profileValues
+     * @return string[]
+     */
+    public static function selectableServicesForAll(array $profileValues): array
+    {
+        $services = [];
+        foreach ($profileValues as $value) {
+            foreach (self::selectableServicesFor($value) as $service) {
+                $services[] = $service;
+            }
+        }
+
+        return array_values(array_unique($services));
+    }
+
+    /**
+     * How many rules a profile's rulesets hold, per service.
+     *
+     * @return array<string, int>
+     */
+    private static function ruleCountsByService(string $profileValue): array
+    {
+        $counts = [];
+        foreach (self::$profiles[$profileValue]['rulesets'] ?? [] as $ruleset) {
+            foreach (self::rulesOf($ruleset) as $rule) {
+                $service = $rule['service'] ?? null;
+                if ($service === null) {
+                    continue;
+                }
+                $counts[$service] = ($counts[$service] ?? 0) + 1;
+            }
+        }
+
+        return $counts;
     }
 
     /**
@@ -174,13 +246,28 @@ class ScanProfilesService
      */
     private static function rulesetHasRules(string $ruleset): bool
     {
+        return self::rulesOf($ruleset) !== [];
+    }
+
+    /**
+     * A ruleset's rules, or an empty array if the file is missing or malformed.
+     *
+     * Deliberately not memoized. The files are small, the callers are a single
+     * profile-listing endpoint and a validation rule, and a static cache here would
+     * serve stale rules to any test that writes a ruleset file — which is exactly why
+     * ServiceRegistry has to expose flush().
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private static function rulesOf(string $ruleset): array
+    {
         $path = base_path("rules/rulesets/{$ruleset}.json");
         if (!File::exists($path)) {
-            return false;
+            return [];
         }
 
         $decoded = json_decode(File::get($path), true);
 
-        return !empty($decoded['rules'] ?? []);
+        return $decoded['rules'] ?? [];
     }
 }

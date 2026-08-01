@@ -37,6 +37,14 @@ AWS account, run a scan, and act on the findings — without a call.
 is what sizes the **Now** bucket below — everything in it is on the critical path to that
 date, and nothing else is.
 
+**Status 2026-08-01: the code side of that sentence is demonstrated, and Now is empty.**
+N-7 closed with a real account, on v0.3.1: install → add AWS account → scan → Insights and
+Findings. What is *not* demonstrated is the subject of the sentence — a **design partner**,
+doing it **without a call**. Nobody outside the project has run this path. **From here the
+milestone is limited by finding and watching five operators, not by shipping features**, and
+the plan should be read that way: pull from Next sparingly, and keep capacity free to react
+to what the first partner actually hits.
+
 Note this milestone was **not** "the repo goes public" — public release was meant to be a
 later, higher-barred milestone (D-4). **The repo went public on 2026-07-30 anyway**, ahead
 of that sequencing, which promoted several items. See D-4 and N-6.
@@ -283,22 +291,41 @@ Sizes are rough and relative, for one person: **XS** under a day · **S** a day 
 
 ### Now — the path to a design partner
 
-**Three items as of 2026-07-31**, against a **2026-08-31** deadline. **N-10** was added
-that day and is critical, not queued: the install experience is the first thing a design
-partner touches, and shipping it with two scripts and no warning about what lands in their
-AWS account undoes the work N-3 and N-5 did. It is sequenced *before* N-7, because N-7
-verifies the documented onboarding path and there is no sense verifying a path that is
-about to change. N-5 closed the
-same day it was found incomplete — v0.1.2 went through the fixed pipeline cleanly (see
-below), so the release process TOPS never had now exists and is proven. N-9 was found and
-closed the same day: the published default database passwords are gone, generated at
-install time instead. That leaves **N-7** (was X-9, promoted rather than left in Next — the
-milestone target makes it explicitly critical-path, not queued) as the only thing between
-the code and a design partner. N-8 doesn't block it — it's here rather than in Next because
-the four weeks after N-7 closes are exactly when releases need to go out fast in response
-to partner feedback, and a build that eats most of a 45-minute CI budget on every single one
-works against that. Pull anything else from **Next** only after N-7 closes, or the plan
-starts optimising for imagined users again with a month on the clock.
+**Now is empty as of 2026-08-01.** Every item on the sequenced path to a design partner has
+closed, four weeks ahead of the **2026-08-31** deadline. N-7 was the last of them: install →
+add AWS account → scan, on a real account, on v0.3.1, reaching Insights and Findings.
+
+**What that means, stated carefully.** The milestone's "done when" has two halves, and only
+one is closed. The *code* half — a documented path that takes someone from nothing to
+findings — is demonstrated. The other half is "**a design partner** … **without a call**",
+and the maintainer running his own installer proves nothing about that. **The remaining work
+on this milestone is finding and watching five real operators, not writing more code.** The
+most valuable thing the plan can do now is stay small enough to react to what they say.
+
+**What to pull, and in what order.** With Now empty, take from **Next** — but take one item,
+not the list. [X-6 (DCO in CI)](https://github.com/teemops/tops/issues/32) has the strongest
+claim: the repo is public, an external PR can arrive any day, and D-7's no-rug-pull guarantee
+rests on provenance that nothing currently checks. Then
+[X-3](https://github.com/teemops/tops/issues/30), which protects the default self-hosted
+path that every one of those five operators will run. Everything else waits for a partner to
+ask, which is the whole point of having partners.
+
+*The history that got here.* N-5 closed the same day it was found incomplete — v0.1.2 went through
+the fixed pipeline cleanly (see below), so the release process TOPS never had now exists
+and is proven. N-9 was found and closed the same day: the published default database
+passwords are gone, generated at install time instead. N-8 took the OS layer out of the
+release path. **N-10** was added on 2026-07-31 as critical rather than queued — the install
+experience is the first thing a design partner touches, and shipping it with two scripts
+and no warning about what lands in their AWS account undoes the work N-3 and N-5 did — and
+shipped the same day as v0.3.0, deliberately *ahead* of N-7, because there is no sense
+verifying an onboarding path that is about to change. That call paid for itself within a
+day: [#56](https://github.com/teemops/tops/issues/56) found the unified installer's AWS
+step failing on a real machine, fixed in v0.3.1 before anyone verified anything against it.
+
+**N-7** (was X-9, promoted rather than left in Next when the milestone target made it
+explicitly critical-path) was the last thing between the code and a design partner, and it
+closed on 2026-08-01 — [#60](https://github.com/teemops/tops/issues/60). v0.3.1's installer
+fixes are what made that run succeed, which is the sequencing argument justifying itself.
 
 | # | Feature | Why it's here | Size |
 | --- | --- | --- | :---: |
@@ -306,14 +333,14 @@ starts optimising for imagined users again with a month on the clock.
 | ~~**N-2**~~ | ~~Choose and add a licence~~ | ✅ **Done** 2026-07-29 — Apache-2.0, trademark held separately, DCO for contributions. See D-7. | — |
 | ~~**N-6**~~ | ~~SNS signature verification~~ | ✅ **Done** 2026-07-30 — real signature verification via AWS's validator package, plus a topic allowlist that fails closed. Promoted from X-2 that morning when going public expired its deferral. | — |
 | ~~**N-5**~~ | ~~Release pipeline + Docker Hub images~~ | ✅ **Done** 2026-07-31 — v0.1.2 went `prepare → merge → tag → publish` cleanly: tag content matches, images published on Docker Hub for both architectures, `latest` digest matches `v0.1.2`. See D-8 and below. | — |
-| **N-7** | Verify AWS onboarding end to end | Promoted from X-9. The milestone's literal unmet criterion: nobody has connected a real account and run a scan through the documented path. | S |
-| **N-10** | One installer, in colour | Two root install scripts is two decisions a first-time user has to get right before anything works, and neither script says what it is about to create in their AWS account. Time-to-first-scan is the metric; this is friction sitting directly on it. | S |
-| **N-9** | Generate real database passwords at install time | `docker-compose.yml` defaults `MYSQL_ROOT_PASSWORD` to `mysql` and `DB_PASSWORD` to `teemops_dev_password` — both published in `.env.docker.example`, in a public repo, with MySQL's port bound to the host by default. Generate them the way `install.sh` already generates `APP_KEY`. | S |
-| ~~**N-8**~~ | ~~Base image for the app container~~ | ✅ **Done** 2026-07-31 — `teem/tops-base:php8.3-1` published for both architectures and verified on Docker Hub; the app build pulls it instead of compiling. 48.5s → 13.8s on a cold clean build. Awaiting merge, and the CI number gets recorded after the next release. | — |
+| ~~**N-7**~~ | ~~Verify AWS onboarding end to end~~ | ✅ **Done** 2026-08-01 — install → add AWS account → scan on a real account, on v0.3.1, reaching Insights and Findings. `generated/teemops.env` carries all eight CFN outputs including the DLQ pair PR #57 fixed; the install log is clean. Only the cost-vs-documented check is outstanding, and AWS has not billed yet. [#60](https://github.com/teemops/tops/issues/60). | — |
+| ~~**N-10**~~ | ~~One installer, in colour~~ | ✅ **Done** 2026-07-31 — `install.sh` absorbed `install-messaging.sh`, which is deleted. One script, an account-and-caller-ARN confirmation before anything deploys, a warn-and-skip failure mode, colour and a banner. Shipped as v0.3.0; [#56](https://github.com/teemops/tops/issues/56) found the AWS step still failing on a real machine and v0.3.1 fixed it. | — |
+| ~~**N-9**~~ | ~~Generate real database passwords at install time~~ | ✅ **Done** 2026-07-31 — the published defaults are gone; `install.sh` and `prepare-build.sh` generate all three with `openssl rand -base64 32`, and `docker-compose.yml` requires them rather than falling back. | — |
+| ~~**N-8**~~ | ~~Base image for the app container~~ | ✅ **Done** 2026-07-31 — `teem/tops-base:php8.3-1` published for both architectures and verified on Docker Hub; the app build pulls it instead of compiling. 48.5s → 13.8s on a cold clean build. Merged in PR #49; the CI number still gets recorded after the next release. | — |
 | ~~**N-3**~~ | ~~Setup docs a stranger can follow~~ | ✅ **Done** 2026-07-30 — README rebuilt around the one-liner, vendor defaults purged from `.env.example`, nine-symptom troubleshooting section, installer verified end to end. | — |
 | ~~**N-4**~~ | ~~Remediation for every finding~~ | ✅ **Done** 2026-07-30 — all 74 rules carry a remediation, all 28 critical/high rules carry step-by-step guidance, and `scan:validate-rules` now fails rather than warns. | — |
 
-### Next — before the repo goes public
+### Next — queued behind the design-partner milestone
 
 | # | Feature | Why it's here | Size |
 | --- | --- | --- | :---: |
@@ -328,6 +355,14 @@ starts optimising for imagined users again with a month on the clock.
 ~~**X-9** · Verify AWS onboarding end to end~~ — **promoted to N-7 in Now** on 2026-07-31.
 The design partner deadline makes it critical-path rather than queued.
 
+Tracked on GitHub: [X-1 #29](https://github.com/teemops/tops/issues/29) ·
+[X-3 #30](https://github.com/teemops/tops/issues/30) ·
+[X-4 #31](https://github.com/teemops/tops/issues/31) ·
+[X-5 #33](https://github.com/teemops/tops/issues/33) ·
+[X-6 #32](https://github.com/teemops/tops/issues/32) ·
+[X-7 #34](https://github.com/teemops/tops/issues/34) ·
+[X-8 #61](https://github.com/teemops/tops/issues/61).
+
 ### Later — real, but waiting on a trigger
 
 | Feature | Waiting on | Size |
@@ -341,6 +376,16 @@ The design partner deadline makes it critical-path rather than queued.
 | Simplify AWS onboarding | **Trigger fired** — D-3 named public release, which has happened. | M |
 | Contributor experience | **Trigger fired** — repo is public. | M |
 | Multi-cloud (Azure, GCP) | AWS being genuinely good first. | L |
+
+Tracked on GitHub: [#35](https://github.com/teemops/tops/issues/35) ·
+[#36](https://github.com/teemops/tops/issues/36) ·
+[#37](https://github.com/teemops/tops/issues/37) ·
+[#38](https://github.com/teemops/tops/issues/38) ·
+[#39](https://github.com/teemops/tops/issues/39) ·
+[#40](https://github.com/teemops/tops/issues/40) ·
+[#41](https://github.com/teemops/tops/issues/41) ·
+[#42](https://github.com/teemops/tops/issues/42), and the documentation site below as
+[#62](https://github.com/teemops/tops/issues/62).
 
 ### User documentation site
 
@@ -448,7 +493,7 @@ The dead `verifyWithAwsSdk()` shell is gone.
 
 ---
 
-### N-5 · Release pipeline and published images
+### ~~N-5 · Release pipeline and published images~~ ✅ Done 2026-07-31
 
 *Infrastructure with a user-facing outcome. Sequenced before N-3, which depends on it.*
 
@@ -561,7 +606,7 @@ none of the three is likely to bite before a design partner is in the door.
 
 ---
 
-### N-10 · One installer, in colour
+### ~~N-10 · One installer, in colour~~ ✅ Done 2026-07-31
 
 *Added 2026-07-31 as critical, at Ben's call, and sequenced ahead of N-7. This is a
 user-experience defect, not a feature — the four questions in `docs/practices/product.md`
@@ -635,31 +680,97 @@ touch the Dockerfile and entrypoint for no user-visible gain. `install-build.sh`
 it is the contributor path, it needs PHP and Node, and merging it into `install.sh` would
 put four host prerequisites back in front of the people D-8 removed them for.
 
+**What happened next, and why sequencing this ahead of N-7 was right.** N-10 shipped as
+**v0.3.0** on 2026-07-31. Within hours,
+[#56](https://github.com/teemops/tops/issues/56) came in from a real install: the AWS step
+died with `/workspace/.env: line 80: 17: command not found` and the UI then reported
+`AWS messaging not configured (missing AWS_PARENT_ACCOUNT_ID)`. Four compounding bugs, none
+of which the 22 stubbed checks could have caught, fixed in
+[#57](https://github.com/teemops/tops/pull/57):
+
+1. The installer **sourced** `/workspace/.env` as a shell script. Compose env files are not
+   shell — `TOPS_BACKUP_FULL_CRON=0 17 * * *` assigned `0` and then *executed* `17`. Under
+   `set -e` that killed the install before a single stack deployed. `load_dotenv` now parses
+   the file the way Compose reads it, executing nothing.
+2. `main` called `setup_aws` as an `if` condition, and bash disables `errexit` for the whole
+   body of a function invoked that way — so a failed `docker compose run installer` fell
+   through to printing "AWS messaging is deployed". **That is why #56 arrived as a UI
+   complaint rather than an install failure.** The exit code is checked explicitly now, as
+   is the existence of `generated/teemops.env`.
+3. Every failing `sts get-caller-identity` was reported as "credentials not configured,
+   mount `~/.aws`", with AWS's real error going only to the log. An opt-in region the account
+   has not enabled returns `InvalidClientTokenId` for perfectly good credentials, which sent
+   the reporter looking at the wrong thing.
+4. `core-docker/template.yaml` re-exported six of `sqs.cfn.yaml`'s eight outputs, dropping
+   `TopsMainDlqName` and `TopsMainDlqArn` — required by `write_env_file`, which runs last, so
+   the install spent a full two-stack deploy before failing.
+
+`tests/install-messaging.test.sh` is new and derives the required CloudFormation outputs from
+`install-messaging.sh` itself, so template drift cannot pass unnoticed. 93 checks across the
+three installer suites. **v0.3.1** then dropped the second confirmation
+([#58](https://github.com/teemops/tops/pull/58)) — the step asked three times about one
+decision, which only trains people to hit `y` without reading.
+
+**The lesson for N-7:** every one of these needed a real machine and a real account. Verify
+against **v0.3.1 or later**, and treat the stubbed installer suites as a regression net, not
+as evidence the path works.
+
 ---
 
-### N-7 · Verify AWS onboarding end to end
+### ~~N-7 · Verify AWS onboarding end to end~~ ✅ Done 2026-08-01
 
 *Promoted from X-9 on 2026-07-31, when the 5-partner-by-2026-08-31 target made it
-critical-path rather than something to get to eventually.*
+critical-path rather than something to get to eventually. Closed the next day.*
 
-**Problem:** nobody has connected a real AWS account and run a scan through the documented
-path (`install.sh`'s messaging step, CloudFormation quick-create, SNS/SQS account linking).
+**Problem:** nobody had connected a real AWS account and run a scan through the documented
+path (`install.sh`'s AWS step, CloudFormation quick-create, SNS/SQS account linking).
 N-3 documented that path and D-3 chose to keep it as-is rather than simplify it, but neither
-closed the loop with a real account and real spend. This is the one item in the milestone's
-own "done when" that has not been demonstrated at all, on any account.
+closed the loop with a real account and real spend. This was the one item in the milestone's
+own "done when" that had not been demonstrated at all, on any account.
+
+**It has now been demonstrated.** Ben ran install → add AWS account → scan on a clean copy
+at `~/my/sandbox/testops/tops`, and reached Insights and Findings. **The documented path
+works end to end on a real account.**
 
 **Acceptance criteria**
-- [ ] Given a real AWS account, when I follow the documented onboarding path, then the
+- [x] Given a real AWS account, when I follow the documented onboarding path, then the
       CloudFormation stack deploys and SNS confirms the subscription
-- [ ] Given the account is linked, when I run a scan, then it completes and returns findings
-      from real resources
+- [x] Given the account is linked, when I run a scan, then it completes and returns findings
+      from real resources — Insights and Findings both populated
 - [ ] Given the setup guide's cost description, when I check the actual AWS bill, then it
-      matches what was documented
-- [ ] Given something goes wrong, when I hit it, then either the troubleshooting section
-      already covers it, or it gets added
+      matches what was documented — **not yet checkable**; AWS billing lags by a day or more.
+      See below.
+- [x] Given something goes wrong, when I hit it, then either the troubleshooting section
+      already covers it, or it gets added — **nothing went wrong**, which satisfies this
+      vacuously rather than by exercise. The troubleshooting section remains untested by a
+      failure on this run.
 
-**Depends on:** N-5 closing first — verifying onboarding against a build that isn't
-confirmed clean is verifying the wrong thing.
+**What was verified, against the install itself rather than a recollection**
+- `VERSION` and `TOPS_IMAGE_TAG` both read **`v0.3.1`** — the fixed installer, not v0.3.0.
+- `generated/teemops.env` written `2026-08-01T02:44:15Z`, carrying all eight CloudFormation
+  outputs — **including `TOPS_SQS_DLQ_NAME` and `TOPS_SQS_DLQ_ARN`**, the two that
+  `core-docker/template.yaml` was dropping before PR #57. That is the bug that made the
+  install spend a full two-stack deploy before failing, and it is gone.
+- `AWS_PARENT_ACCOUNT_ID` and `TOPS_CFN_TEMPLATE_URL` are both present — the two variables
+  [#56](https://github.com/teemops/tops/issues/56) reported missing from the UI.
+- `generated/install.log` has no warning or error, and ends on
+  `[installer] Messaging install complete.` `sts-error.log` is zero bytes.
+
+**What this closes, and what it does not.** The *technical* half of the milestone's "done
+when" is now demonstrated: the path from a clean copy to findings works, on a real account,
+on a released build. The rest of that sentence — "**a design partner** can install TOPS from
+the documentation alone … **without a call**" — is not demonstrated by the maintainer doing
+it. Ben knows where the bodies are buried; a stranger does not. The remaining risk in the
+milestone is now a recruitment and observation problem, not a code problem.
+
+**Still open, deliberately not blocking:** the cost criterion. Billing data does not exist
+yet for a stack deployed this morning, and the honest way to close it is to look at the bill
+in a few days and compare it against what the setup guide claims. Small, dateable, and worth
+doing before a design partner is surprised by a charge — but not worth holding N-7 open for.
+
+**Depended on:** N-5 (a build confirmed clean) and N-10 (an installer that was about to
+change). Both closed first, which was the right sequencing — N-10's follow-up fixes in
+v0.3.1 are precisely what made this run succeed.
 
 ---
 
@@ -1084,6 +1195,40 @@ Blocking nothing today, but each one shapes the plan:
 
 ## Changelog
 
+- **2026-08-01** — **N-7 closed, and with it the whole of Now.** Ben ran the documented path
+  on a real AWS account against v0.3.1 — install, add AWS account, scan — and reached
+  Insights and Findings. Verified against the install rather than a recollection:
+  `generated/teemops.env` written `02:44:15Z` with all eight CloudFormation outputs, the
+  `TOPS_SQS_DLQ_*` pair that PR #57 restored among them, `AWS_PARENT_ACCOUNT_ID` and
+  `TOPS_CFN_TEMPLATE_URL` both present (the two [#56](https://github.com/teemops/tops/issues/56)
+  reported missing), and an install log with no warnings. **The milestone's code half is
+  demonstrated; its "a design partner, without a call" half is not, and cannot be by the
+  maintainer.** The constraint on 5-by-2026-08-31 is now recruitment, not engineering. One
+  criterion stays open — the AWS bill against the documented cost — because billing data for
+  a stack deployed this morning does not exist yet; it was not worth holding N-7 for. With
+  Now empty, the next pull is X-6 (DCO in CI), on the grounds that the repo is public and
+  D-7's guarantee rests on provenance nothing currently checks.
+- **2026-08-01** — **Roadmap and GitHub issues reconciled.** The issue tracker had drifted:
+  N-7 — the only open item in Now — had no issue at all, and neither did X-8 or the
+  documentation site. Created [#60](https://github.com/teemops/tops/issues/60) (N-7, with the
+  N-5 and N-10 criteria that fold into it), [#61](https://github.com/teemops/tops/issues/61)
+  (X-8) and [#62](https://github.com/teemops/tops/issues/62) (user documentation site, per
+  D-10). Updated [#30](https://github.com/teemops/tops/issues/30) — X-3's claim that
+  `EnsureFirebaseAuthEnabledTest` is the only flag coverage is stale, `FirebaseFeatureFlagTest`
+  and a `false` default in `.env.example` narrowed the gap — plus
+  [#40](https://github.com/teemops/tops/issues/40) and
+  [#41](https://github.com/teemops/tops/issues/41) for what N-5, N-3 and N-10 closed under
+  them. This document was the stale half too: N-9, N-10 and N-5 were done in their own
+  sections while At a Glance still listed them as open work.
+- **2026-08-01** — **N-10 closed 2026-07-31, and immediately earned its keep.** One `install.sh`, one
+  confirmation, colour, and a banner; `install-messaging.sh` deleted. Shipped as v0.3.0, and
+  [#56](https://github.com/teemops/tops/issues/56) arrived from a real install within hours —
+  four compounding bugs, the worst of which printed "AWS messaging is deployed" after the
+  installer had failed, because `main` calls `setup_aws` inside an `if` and bash drops
+  `errexit` there. Fixed in v0.3.1. Every one of the four needed a real machine to find, which
+  is the case for **N-7** restated: the installer test suites are a regression net, not
+  evidence the path works. Sequencing N-10 ahead of N-7 was the right call — N-7 would have
+  verified an installer that was about to change, on a build that did not work.
 - **2026-07-31** — **N-9 closed, same day it was found.** `.env.docker.example` ships no
   password values; `install.sh` and `docker/scripts/prepare-build.sh` generate all three
   with `openssl rand -base64 32` on first run and leave them alone afterwards;

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, computed, onMounted } from 'vue';
-import { useScans } from '@/composables/useScans';
+import { useScans, type ScanProfile } from '@/composables/useScans';
 import { useAwsAccounts } from '@/composables/useAwsAccounts';
 import { useOrganizations } from '@/composables/useOrganizations';
 import { useNotifications } from '@/composables/useNotifications';
@@ -25,8 +25,107 @@ const { showSuccess, showError } = useNotifications();
 
 const selectedAwsAccountId = ref('');
 const selectedScanProfiles = ref<string[]>([]);
+// Services explicitly ticked, per profile. A profile absent from this map — the default —
+// means "everything this profile covers", which is the behaviour that existed before
+// per-service selection and must stay the zero-click path.
+const selectedServices = ref<Record<string, string[]>>({});
+const expandedProfiles = ref<string[]>([]);
 const creating = ref(false);
-const errors = ref<{ aws_account_id?: string[]; scan_profiles?: string[] }>({});
+const errors = ref<{ aws_account_id?: string[]; scan_profiles?: string[]; scan_types?: string[] }>({});
+
+const isExpanded = (profile: string) => expandedProfiles.value.includes(profile);
+
+const toggleExpanded = (profile: string) => {
+    expandedProfiles.value = isExpanded(profile)
+        ? expandedProfiles.value.filter(p => p !== profile)
+        : [...expandedProfiles.value, profile];
+};
+
+const isProfileSelected = (profile: string) => selectedScanProfiles.value.includes(profile);
+
+/** Services ticked for a profile — all of them unless the user narrowed it. */
+const servicesFor = (profile: ScanProfile): string[] =>
+    selectedServices.value[profile.value] ?? profile.services;
+
+const isServiceSelected = (profile: ScanProfile, service: string) =>
+    isProfileSelected(profile.value) && servicesFor(profile).includes(service);
+
+/** Ticked some but not all of a profile's services. */
+const isPartial = (profile: ScanProfile) =>
+    isProfileSelected(profile.value) &&
+    servicesFor(profile).length > 0 &&
+    servicesFor(profile).length < profile.services.length;
+
+const toggleProfile = (profile: ScanProfile) => {
+    if (isProfileSelected(profile.value)) {
+        selectedScanProfiles.value = selectedScanProfiles.value.filter(p => p !== profile.value);
+        delete selectedServices.value[profile.value];
+    } else {
+        selectedScanProfiles.value = [...selectedScanProfiles.value, profile.value];
+    }
+};
+
+const toggleService = (profile: ScanProfile, service: string) => {
+    // Ticking a service implies the profile is selected.
+    if (!isProfileSelected(profile.value)) {
+        selectedScanProfiles.value = [...selectedScanProfiles.value, profile.value];
+        selectedServices.value = { ...selectedServices.value, [profile.value]: [service] };
+        return;
+    }
+
+    const current = servicesFor(profile);
+    const next = current.includes(service)
+        ? current.filter(s => s !== service)
+        : [...current, service];
+
+    if (next.length === 0) {
+        // Unticking the last service deselects the profile rather than submitting a
+        // selection that cannot scan anything.
+        selectedScanProfiles.value = selectedScanProfiles.value.filter(p => p !== profile.value);
+        delete selectedServices.value[profile.value];
+        return;
+    }
+
+    selectedServices.value = { ...selectedServices.value, [profile.value]: next };
+};
+
+/** The services to send, or undefined when nothing was narrowed. */
+const narrowedServices = computed<string[] | undefined>(() => {
+    const selected = scanProfiles.value.filter(p => isProfileSelected(p.value));
+    const narrowed = selected.some(p => selectedServices.value[p.value] !== undefined);
+    if (!narrowed) {
+        return undefined;
+    }
+
+    return [...new Set(selected.flatMap(p => servicesFor(p)))];
+});
+
+/** "2 of 11 services · 12 rules" — what will actually run. */
+const selectionSummary = computed(() => {
+    const selected = scanProfiles.value.filter(p => isProfileSelected(p.value));
+    if (selected.length === 0) {
+        return null;
+    }
+
+    const services = new Set<string>();
+    const available = new Set<string>();
+    let rules = 0;
+
+    for (const profile of selected) {
+        profile.services.forEach(s => available.add(s));
+        for (const service of servicesFor(profile)) {
+            services.add(service);
+            rules += profile.serviceRuleCounts?.[service] ?? 0;
+        }
+    }
+
+    return {
+        services: services.size,
+        available: available.size,
+        rules,
+        groups: selected.map(p => p.label).join(' + '),
+    };
+});
 
 const availableAccounts = computed(() => {
     return accounts.value.filter(acc => acc.status === 'completed');
@@ -41,6 +140,8 @@ watch(() => props.modelValue, (newValue) => {
     if (newValue) {
         selectedAwsAccountId.value = '';
         selectedScanProfiles.value = [];
+        selectedServices.value = {};
+        expandedProfiles.value = [];
         errors.value = {};
     }
 });
@@ -68,7 +169,8 @@ const handleSubmit = async () => {
         await createScanFromProfiles(
             currentOrganization.value.org_id,
             selectedAwsAccountId.value,
-            selectedScanProfiles.value
+            selectedScanProfiles.value,
+            narrowedServices.value
         );
         
         showSuccess('Scan started successfully');
@@ -135,28 +237,70 @@ const handleCancel = () => {
                                     </div>
 
                                     <div>
-                                        <InputLabel value="Scan Groups" />
-                                        <div class="mt-2 space-y-2">
-                                            <label
-                                                v-for="profile in scanProfiles"
-                                                :key="profile.value"
-                                                class="flex items-start"
-                                            >
-                                                <input
-                                                    type="checkbox"
-                                                    v-model="selectedScanProfiles"
-                                                    :value="profile.value"
-                                                    class="mt-0.5 rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
-                                                />
-                                                <span class="ml-2">
-                                                    <span class="block text-sm text-gray-700 dark:text-gray-300">{{ profile.label }}</span>
-                                                    <span class="block text-xs text-gray-500 dark:text-gray-400">{{ profile.description }}</span>
-                                                </span>
-                                            </label>
+                                        <InputLabel value="What to scan" />
+                                        <div class="mt-2 rounded-md border border-gray-200 dark:border-gray-700 divide-y divide-gray-200 dark:divide-gray-700">
+                                            <div v-for="profile in scanProfiles" :key="profile.value">
+                                                <div class="flex items-center px-3 py-2.5">
+                                                    <button
+                                                        v-if="profile.services.length"
+                                                        type="button"
+                                                        @click="toggleExpanded(profile.value)"
+                                                        :aria-expanded="isExpanded(profile.value)"
+                                                        :aria-label="`${isExpanded(profile.value) ? 'Collapse' : 'Expand'} ${profile.label} services`"
+                                                        class="mr-1.5 flex h-5 w-5 items-center justify-center rounded text-gray-400 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:hover:text-gray-200"
+                                                    >
+                                                        <span class="text-[10px]">{{ isExpanded(profile.value) ? '▼' : '▶' }}</span>
+                                                    </button>
+                                                    <span v-else class="mr-1.5 w-5"></span>
+
+                                                    <input
+                                                        type="checkbox"
+                                                        :id="`profile-${profile.value}`"
+                                                        :checked="isProfileSelected(profile.value)"
+                                                        :indeterminate.prop="isPartial(profile)"
+                                                        @change="toggleProfile(profile)"
+                                                        class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                                                    />
+                                                    <label :for="`profile-${profile.value}`" class="ml-2 flex-1 cursor-pointer">
+                                                        <span class="block text-sm text-gray-700 dark:text-gray-300">{{ profile.label }}</span>
+                                                        <span class="block text-xs text-gray-500 dark:text-gray-400">{{ profile.description }}</span>
+                                                    </label>
+                                                    <span class="ml-2 whitespace-nowrap text-xs text-gray-400 dark:text-gray-500">
+                                                        {{ profile.services.length }} services · {{ profile.ruleCount }} rules
+                                                    </span>
+                                                </div>
+
+                                                <div v-if="isExpanded(profile.value)" class="bg-gray-50 dark:bg-gray-900/40 px-3 pb-2.5 pt-0.5">
+                                                    <label
+                                                        v-for="service in profile.services"
+                                                        :key="service"
+                                                        class="flex items-center py-1 pl-8 cursor-pointer"
+                                                    >
+                                                        <input
+                                                            type="checkbox"
+                                                            :checked="isServiceSelected(profile, service)"
+                                                            @change="toggleService(profile, service)"
+                                                            class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                                                        />
+                                                        <span class="ml-2 flex-1 text-sm text-gray-700 dark:text-gray-300 uppercase">{{ service }}</span>
+                                                        <span class="text-xs text-gray-400 dark:text-gray-500">{{ profile.serviceRuleCounts?.[service] ?? 0 }}</span>
+                                                    </label>
+                                                </div>
+                                            </div>
                                         </div>
+
                                         <InputError :message="errors.scan_profiles?.[0]" class="mt-2" />
+                                        <InputError :message="errors.scan_types?.[0]" class="mt-2" />
+
+                                        <p v-if="selectionSummary" class="mt-2 rounded-md bg-gray-50 dark:bg-gray-900/40 px-3 py-2 text-xs text-gray-600 dark:text-gray-400">
+                                            Scanning
+                                            <span class="font-medium text-gray-900 dark:text-gray-200">{{ selectionSummary.services }} of {{ selectionSummary.available }} services</span>
+                                            against
+                                            <span class="font-medium text-gray-900 dark:text-gray-200">{{ selectionSummary.groups }}</span>
+                                            — {{ selectionSummary.rules }} rules.
+                                        </p>
                                         <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                            Select one or more scan groups. EC2 and RDS checks are processed per region.
+                                            Pick a scan group, or expand it to scan only certain services. EC2 and RDS checks are processed per region.
                                         </p>
                                     </div>
                                 </div>

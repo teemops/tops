@@ -260,16 +260,29 @@ class ScansController extends Controller
             ->where('status', 'completed')
             ->firstOrFail();
 
-        // A scan can be requested either by profile (group) or by explicit
-        // services. Profiles expand to the same scan_types the rest of the app
-        // already understands, plus the ruleset(s) to evaluate. Direct scan_types
-        // (API back-compat) default to the basic ruleset.
+        // A scan is described by which ruleset(s) to evaluate and which services to
+        // collect data for.
+        //
+        //  - profiles alone           → every service the profile covers (the default)
+        //  - profiles + scan_types    → the profile's rulesets, narrowed to those services
+        //  - scan_types alone         → the basic ruleset (API back-compat)
+        //
+        // The narrowing case is what lets someone scan just S3 against CIS. The subset is
+        // validated in StoreScanRequest, so by here the services are known to be ones the
+        // chosen profiles actually have rules for.
         $profiles = $validated['scan_profiles'] ?? [];
+        $requestedServices = $validated['scan_types'] ?? [];
+
         if (!empty($profiles)) {
-            $scanTypes = ScanProfilesService::servicesFor($profiles);
             $rulesets = ScanProfilesService::rulesetsFor($profiles);
+            $scanTypes = empty($requestedServices)
+                ? ScanProfilesService::servicesFor($profiles)
+                : array_values(array_intersect(
+                    ScanProfilesService::selectableServicesForAll($profiles),
+                    $requestedServices
+                ));
         } else {
-            $scanTypes = $validated['scan_types'] ?? [];
+            $scanTypes = $requestedServices;
             $rulesets = ['basic'];
         }
 

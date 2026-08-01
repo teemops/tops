@@ -54,7 +54,12 @@ export interface ScanProfile {
     value: string;
     label: string;
     description: string;
+    /** Services this profile has rules for, and can therefore be narrowed to. */
     services: string[];
+    /** Rule count per service, so the modal can say what a selection will run. */
+    serviceRuleCounts: Record<string, number>;
+    /** Total rules across the profile's selectable services. */
+    ruleCount: number;
 }
 
 const scans = ref<Scan[]>([]);
@@ -105,6 +110,8 @@ export function useScans() {
                     label: 'Basic',
                     description: 'Core security checks across all supported services',
                     services: [],
+                    serviceRuleCounts: {},
+                    ruleCount: 0,
                 },
             ];
         }
@@ -184,10 +191,16 @@ export function useScans() {
         }
     };
 
+    /**
+     * Start a scan from one or more profiles. `services`, when given, narrows the scan to
+     * that subset of the profiles' services — the server rejects any that the chosen
+     * profiles have no rules for. Omit it to scan everything the profiles cover.
+     */
     const createScanFromProfiles = async (
         orgId: string,
         awsAccountId: string,
-        profiles: string[]
+        profiles: string[],
+        services?: string[]
     ): Promise<Scan> => {
         loading.value = true;
         error.value = null;
@@ -196,6 +209,7 @@ export function useScans() {
             const response = await axios.post(`/api/organizations/${orgId}/scans`, {
                 aws_account_id: awsAccountId,
                 scan_profiles: profiles,
+                ...(services && services.length ? { scan_types: services } : {}),
             });
 
             const newScan = response.data;
