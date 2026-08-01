@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import { route as ziggyRoute } from '../../../vendor/tightenco/ziggy';
 import type { User } from '@/types';
+import ApplicationLogo from '@/Components/ApplicationLogo.vue';
 import Dropdown from '@/Components/Dropdown.vue';
 import DropdownLink from '@/Components/DropdownLink.vue';
 import MfaAlertBanner from '@/Components/MfaAlertBanner.vue';
@@ -65,11 +66,7 @@ const userInitials = computed(() => {
             <div class="flex-1 flex flex-col pt-5 pb-4 overflow-y-auto bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700">
                 <div class="flex items-center flex-shrink-0 px-4 mb-8">
                     <Link :href="route('dashboard')" class="flex items-center">
-                        <img
-                            src="/images/brand/teemops-logo.png"
-                            alt="Teemops"
-                            class="h-8 w-auto"
-                        />
+                        <ApplicationLogo class="h-8 w-auto" />
                     </Link>
                 </div>
                 <nav class="flex-1 px-3 space-y-1">

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
+import ApplicationLogo from '@/Components/ApplicationLogo.vue';
 import NotificationContainer from '@/Components/NotificationContainer.vue';
 </script>
 
@@ -10,11 +11,9 @@ import NotificationContainer from '@/Components/NotificationContainer.vue';
             <div class="max-w-md">
                 <div class="mb-8">
                     <Link href="/">
-                        <img
-                            src="/images/brand/teemops-logo.png"
-                            alt="Teemops"
-                            class="h-12 w-auto mb-6"
-                        />
+                        <!-- This panel is dark in both themes, so the logo is
+                             pinned to the reversed variant rather than auto. -->
+                        <ApplicationLogo variant="reversed" class="h-12 w-auto mb-6" />
                     </Link>
                     <h1 class="text-4xl font-bold text-white mb-4">Simplify Cloud</h1>
                     <p class="text-xl text-gray-300">Cloud security made simple for busy CTOs</p>
@@ -57,11 +56,7 @@ import NotificationContainer from '@/Components/NotificationContainer.vue';
                 <!-- Mobile Logo -->
                 <div class="lg:hidden mb-8 text-center">
                     <Link href="/">
-                        <img
-                            src="/images/brand/teemops-logo.png"
-                            alt="Teemops"
-                            class="h-10 w-auto mx-auto mb-4"
-                        />
+                        <ApplicationLogo class="h-10 w-auto mx-auto mb-4" />
                     </Link>
                     <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
                         <slot name="mobile-title">Welcome</slot>
