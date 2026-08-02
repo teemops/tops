@@ -3,7 +3,9 @@
 namespace App\Console\Commands;
 
 use App\Models\AwsAccount;
+use App\Services\SnsSignatureVerifier;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Http;
 use Aws\Sqs\SqsClient;
@@ -11,6 +13,24 @@ use Aws\Exception\AwsException;
 
 class ProcessSqsMessages extends Command
 {
+    /**
+     * Stable log field so rejections can be picked out of the stream by name
+     * rather than by matching on message text that is free to change.
+     */
+    public const REJECTION_EVENT = 'aws_account_link_rejected';
+
+    /** Cache key prefix for the rejection counters. Read by `aws:link-rejections`. */
+    public const REJECTION_CACHE_PREFIX = 'tops:aws:link-rejections:';
+
+    /**
+     * Counters live for 30 days from the *first* rejection, not the last — the TTL
+     * is set by the Cache::add that seeds the key and is not refreshed by the
+     * increments that follow. So each key is a rolling 30-day window that then
+     * starts over, which is what an operator wants from an alarm signal: a problem
+     * fixed two months ago stops showing up as a live number on its own.
+     */
+    public const REJECTION_CACHE_TTL = 60 * 60 * 24 * 30;
+
     /**
      * The name and signature of the console command.
      *
@@ -136,16 +156,41 @@ class ProcessSqsMessages extends Command
             return;
         }
 
-        // Handle SNS message format (SNS forwards to SQS)
-        // The Message field contains the CloudFormation custom resource request (JSON-encoded string)
-        $cloudFormationMessage = null;
-        if (isset($body['Type']) && $body['Type'] === 'Notification') {
-            // SNS notification wrapper - extract the Message field which is JSON-encoded
-            $cloudFormationMessage = json_decode($body['Message'], true);
-        } else {
-            // Direct message (shouldn't happen but handle it)
-            $cloudFormationMessage = $body;
+        // N-11: verify the envelope before anything inside it is trusted.
+        //
+        // The queue policy already restricts SendMessage to our topic ARN, so this
+        // is defence in depth rather than the only control — but the HTTP callback
+        // has verified since N-6 and this path had nothing at all, which made the
+        // queue the weaker of the two ways into the same account-linking code.
+        //
+        // The previous "direct message (shouldn't happen but handle it)" fallback is
+        // gone deliberately. Nothing legitimate reaches this queue except through the
+        // SNS subscription, and a body with no envelope has no signature to check —
+        // keeping it would have left an unsigned path straight past the check below.
+        if (($body['Type'] ?? null) !== 'Notification') {
+            $this->recordRejection('not_an_sns_notification', [
+                'type' => $body['Type'] ?? null,
+            ]);
+            $this->deleteMessage($sqsClient, $queueUrl, $receiptHandle);
+            return;
         }
+
+        // Resolved from the container so tests can substitute the validator, the
+        // same way the HTTP callback in AwsAccountsController does.
+        if (!app(SnsSignatureVerifier::class)->verifyPayload($body)) {
+            // The verifier logs why. Leave the message on the queue: a verification
+            // failure can be a transient inability to fetch the signing certificate,
+            // and redelivery (then the DLQ after maxReceiveCount) is the right shape
+            // for that. A genuinely forged message simply fails again.
+            $this->recordRejection('signature_verification_failed', [
+                'topic_arn' => $body['TopicArn'] ?? null,
+            ]);
+            return;
+        }
+
+        // The Message field contains the CloudFormation custom resource request
+        // (a JSON-encoded string).
+        $cloudFormationMessage = json_decode($body['Message'] ?? '', true);
 
         if (!$cloudFormationMessage) {
             $this->warn('Invalid CloudFormation message format, deleting from queue');
@@ -263,10 +308,67 @@ class ProcessSqsMessages extends Command
     {
         if (!$roleArn || !$externalId || !$uniqueId) {
             $this->warn('Create message missing required fields (TopsRoleArn, TopsExternalId, TopsUniqueId)');
+            $this->recordRejection('missing_required_fields', [
+                'has_role_arn' => !empty($roleArn),
+                'has_unique_id' => !empty($uniqueId),
+                'has_external_id' => !empty($externalId),
+            ]);
             $response = $this->sendCloudFormationResponse($responseUrl, 'FAILED', 'Missing required fields in ResourceProperties', $stackId, $requestId, $logicalResourceId, $physicalResourceId);
 
             if (app()->environment(['local', 'dev'])) {
                 Log::info('Create request rejected (missing required fields)', [
+                    'unique_id' => $uniqueId,
+                    'external_id' => $externalId,
+                    'role_arn' => $roleArn,
+                    'response_url' => $responseUrl,
+                    'response' => $response,
+                ]);
+            }
+            return;
+        }
+
+        $awsAccountId = $this->extractAwsAccountIdFromRoleArn($roleArn);
+
+        if (!$awsAccountId) {
+            $this->error("Could not extract AWS Account ID from Role ARN: {$roleArn}");
+            $this->recordRejection('invalid_role_arn', [
+                'unique_id' => $uniqueId,
+                'role_arn' => $roleArn,
+            ]);
+            $response = $this->sendCloudFormationResponse($responseUrl, 'FAILED', "Invalid Role ARN format: {$roleArn}", $stackId, $requestId, $logicalResourceId, $physicalResourceId);
+
+            if (app()->environment('local')) {
+                Log::info('AWS account activated via SQS message (dev verbose)', [
+                    'unique_id' => $uniqueId,
+                    'external_id' => $externalId,
+                    'role_arn' => $roleArn,
+                    'request_type' => 'Create',
+                    'response_url' => $responseUrl,
+                    'response' => $response,
+                ]);
+            }
+            return;
+        }
+
+        // N-11 gap 1: the message names the child account twice — once in StackId,
+        // which CloudFormation itself sets, and once inside TopsRoleArn, which is
+        // whatever the publisher chose to write. Only the first is authoritative.
+        // Without comparing them, a role ARN pointing at an account the stack-runner
+        // does not own is accepted and scanned.
+        $stackAccountId = $this->extractAwsAccountIdFromStackId($stackId);
+
+        if (!$stackAccountId || !hash_equals($stackAccountId, $awsAccountId)) {
+            $this->error("Role ARN account {$awsAccountId} does not match stack account " . ($stackAccountId ?? 'unknown'));
+            $this->recordRejection('stack_account_mismatch', [
+                'unique_id' => $uniqueId,
+                'role_arn_account_id' => $awsAccountId,
+                'stack_account_id' => $stackAccountId,
+                'stack_id' => $stackId,
+            ]);
+            $response = $this->sendCloudFormationResponse($responseUrl, 'FAILED', 'Role ARN account does not match the account that created the stack', $stackId, $requestId, $logicalResourceId, $physicalResourceId);
+
+            if (app()->environment(['local', 'dev'])) {
+                Log::info('Create request rejected (stack account mismatch, dev verbose)', [
                     'unique_id' => $uniqueId,
                     'external_id' => $externalId,
                     'role_arn' => $roleArn,
@@ -289,10 +391,13 @@ class ProcessSqsMessages extends Command
                 'external_id' => $externalId,
                 'request_type' => 'Create',
             ]);
+            $this->recordRejection('account_not_found', [
+                'unique_id' => $uniqueId,
+            ]);
             $this->warn("Account not found for unique_id: {$uniqueId}, external_id: {$externalId}");
             // Send FAILED response to CloudFormation
             $response = $this->sendCloudFormationResponse($responseUrl, 'FAILED', "Account not found for unique_id: {$uniqueId}", $stackId, $requestId, $logicalResourceId, $physicalResourceId);
-            
+
             if (app()->environment(['local', 'dev'])) {
                 Log::info('AWS account activated via SQS message (dev verbose)', [
                     'unique_id' => $uniqueId,
@@ -306,23 +411,38 @@ class ProcessSqsMessages extends Command
             return;
         }
 
-        $awsAccountId = $this->extractAwsAccountIdFromRoleArn($roleArn);
+        // N-11 gap 2: only a record still waiting to be linked may be linked. Without
+        // this, a replayed or forged Create repoints an account that is already live
+        // at a different role — the credentials the scanner uses are swapped under it.
+        if ($account->status !== 'pending') {
+            $this->warn("Account {$account->id} is not pending (status: {$account->status}), refusing to relink");
+            $this->recordRejection('account_not_pending', [
+                'account_id' => $account->id,
+                'unique_id' => $uniqueId,
+                'status' => $account->status,
+            ]);
+            $this->sendCloudFormationResponse($responseUrl, 'FAILED', 'Account is not awaiting linking', $stackId, $requestId, $logicalResourceId, $physicalResourceId);
+            return;
+        }
 
-        if (!$awsAccountId) {
-            $this->error("Could not extract AWS Account ID from Role ARN: {$roleArn}");
-            $response = $this->sendCloudFormationResponse($responseUrl, 'FAILED', "Invalid Role ARN format: {$roleArn}", $stackId, $requestId, $logicalResourceId, $physicalResourceId);
-            
-            if (app()->environment('local')) {
-                Log::info('AWS account activated via SQS message (dev verbose)', [
-                    'account_id' => $account->id,
-                    'unique_id' => $uniqueId,
-                    'external_id' => $externalId,
-                    'role_arn' => $roleArn,
-                    'request_type' => 'Create',
-                    'response_url' => $responseUrl,
-                    'response' => $response,
-                ]);
-            }
+        // N-11 gap 3: a pending record stays linkable forever, so an onboarding link
+        // that was created and abandoned months ago is still a live target. Bound it.
+        //
+        // Measured from updated_at, not created_at: the controller reuses one pending
+        // row per organization and touches it each time it hands out a link, so
+        // updated_at is when the link the user is holding was actually issued.
+        // Using created_at would expire links the user had only just been given.
+        $windowHours = (int) config('services.aws.account_link_window_hours');
+
+        if ($windowHours > 0 && $account->updated_at->addHours($windowHours)->isPast()) {
+            $this->warn("Account {$account->id} pending link window expired");
+            $this->recordRejection('link_window_expired', [
+                'account_id' => $account->id,
+                'unique_id' => $uniqueId,
+                'link_issued_at' => $account->updated_at->toIso8601String(),
+                'window_hours' => $windowHours,
+            ]);
+            $this->sendCloudFormationResponse($responseUrl, 'FAILED', "Linking window of {$windowHours}h has expired — start the connection again from TOPS", $stackId, $requestId, $logicalResourceId, $physicalResourceId);
             return;
         }
 
@@ -405,8 +525,29 @@ class ProcessSqsMessages extends Command
                 
                 if ($currentRoleArn !== $roleArn) {
                     $awsAccountId = $this->extractAwsAccountIdFromRoleArn($roleArn);
+                    $stackAccountId = $this->extractAwsAccountIdFromStackId($stackId);
 
-                    if ($awsAccountId) {
+                    if (!$awsAccountId) {
+                        $this->warn("Could not extract AWS Account ID from Role ARN: {$roleArn}");
+                        $this->recordRejection('invalid_role_arn', [
+                            'account_id' => $account->id,
+                            'unique_id' => $uniqueId,
+                            'role_arn' => $roleArn,
+                            'request_type' => 'Update',
+                        ]);
+                    } elseif (!$stackAccountId || !hash_equals($stackAccountId, $awsAccountId)) {
+                        // Update repoints a live account at a new role, so it needs the
+                        // same StackId cross-check as Create — otherwise closing the gap
+                        // on Create only moves the forged-ARN path one RequestType over.
+                        $this->warn("Update rejected: role ARN account {$awsAccountId} does not match stack account " . ($stackAccountId ?? 'unknown'));
+                        $this->recordRejection('stack_account_mismatch', [
+                            'account_id' => $account->id,
+                            'unique_id' => $uniqueId,
+                            'role_arn_account_id' => $awsAccountId,
+                            'stack_account_id' => $stackAccountId,
+                            'request_type' => 'Update',
+                        ]);
+                    } else {
                         // Update the account with new IAM Role ARN and AWS Account ID
                         $account->fill([
                             'iam_role_arn' => $roleArn,
@@ -421,13 +562,6 @@ class ProcessSqsMessages extends Command
                             'unique_id' => $uniqueId,
                             'external_id' => $externalId,
                             'request_type' => 'Update',
-                        ]);
-                    } else {
-                        $this->warn("Could not extract AWS Account ID from Role ARN: {$roleArn}");
-                        Log::warning('Update request: Invalid Role ARN format', [
-                            'role_arn' => $roleArn,
-                            'unique_id' => $uniqueId,
-                            'external_id' => $externalId,
                         ]);
                     }
                 } else {
@@ -542,6 +676,57 @@ class ProcessSqsMessages extends Command
             return $matches[1];
         }
         return null;
+    }
+
+    /**
+     * Pull the account that owns the CloudFormation stack out of its StackId.
+     *
+     * StackId is set by CloudFormation, not by the template, so this is the one
+     * account identifier in the message the publisher did not choose. Everything
+     * under ResourceProperties is caller-supplied and has to agree with it.
+     *
+     * Shape: arn:aws:cloudformation:<region>:<account>:stack/<name>/<guid>
+     * The partition varies (aws, aws-cn, aws-us-gov), so it is matched loosely.
+     */
+    private function extractAwsAccountIdFromStackId(string $stackId): ?string
+    {
+        if (preg_match('#^arn:[a-z0-9-]+:cloudformation:[a-z0-9-]+:(\d{12}):stack/#', $stackId, $matches) === 1) {
+            return $matches[1];
+        }
+        return null;
+    }
+
+    /**
+     * Count a rejected account-linking message under a stable, readable key.
+     *
+     * A `Log::warning` alone is not something an operator can alarm on without a
+     * log pipeline, and a self-hosted install may have none. These counters live in
+     * the cache store (`database` by default, so they survive a restart) and are
+     * read back with `php artisan aws:link-rejections`.
+     *
+     * Counting is best-effort by design: failing to record a metric must never stop
+     * a message being rejected, which is the part that actually matters.
+     */
+    private function recordRejection(string $reason, array $context = []): void
+    {
+        Log::warning('Account-linking message rejected', [
+            'event' => self::REJECTION_EVENT,
+            'reason' => $reason,
+        ] + $context);
+
+        try {
+            foreach ([self::REJECTION_CACHE_PREFIX . 'total', self::REJECTION_CACHE_PREFIX . $reason] as $key) {
+                // The database cache store cannot increment a key that does not
+                // exist yet, so seed it first. add() is a no-op once it does.
+                Cache::add($key, 0, self::REJECTION_CACHE_TTL);
+                Cache::increment($key);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Could not record link-rejection counter', [
+                'reason' => $reason,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**

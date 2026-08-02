@@ -304,5 +304,122 @@ for stack in CORE:"$CORE_TEMPLATE" SNS:"$SNS_TEMPLATE"; do
 done
 
 # ---------------------------------------------------------------------------
+step "The install id is minted once and never regenerated"
+
+# N-11 phase 2. Regenerating this on a re-run of `install.sh --aws-only` would
+# invalidate every onboarding link already issued *and* silently filter out the
+# Delete ping from every account already linked — unlinking would stop working
+# with no error anywhere. There is no AWS-side record to recover it from, so the
+# reuse path is the only thing standing between a routine re-run and that.
+
+# Runs resolve_install_id in a throwaway root and prints one variable.
+resolve_and_get() {
+  local root="$1" var="$2"
+  (
+    ROOT="$root"
+    TEEMOPS_ROOT="$root"
+    # shellcheck source=/dev/null
+    source "$INSTALLER"
+    load_dotenv
+    resolve_install_id >/dev/null 2>&1
+    printf '%s' "${!var-}"
+  )
+}
+
+FRESH="$WORK/install-id-fresh"
+mkdir -p "$FRESH/generated"
+
+first="$(resolve_and_get "$FRESH" TOPS_INSTALL_ID)"
+if [[ "$first" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$ ]]; then
+  pass "a fresh install mints a v4 UUID ($first)"
+else
+  fail "a fresh install produced '$first', which is not a v4 UUID"
+fi
+
+# Simulate what write_env_file leaves behind, then re-run as `--aws-only` would.
+printf 'TOPS_SNS_ARN=arn:aws:sns:us-west-2:1234:teemops-sns\nTOPS_INSTALL_ID=%s\n' "$first" \
+  > "$FRESH/generated/teemops.env"
+
+second="$(resolve_and_get "$FRESH" TOPS_INSTALL_ID)"
+if [[ "$second" == "$first" ]]; then
+  pass "a re-run reuses the id from generated/teemops.env"
+else
+  fail "a re-run changed the install id from '$first' to '$second' — every onboarding link would break"
+fi
+
+# An explicit value in .env is the rotation path and has to win.
+ROTATE="$WORK/install-id-rotate"
+mkdir -p "$ROTATE/generated"
+printf 'TOPS_INSTALL_ID=%s\n' "$first" > "$ROTATE/generated/teemops.env"
+printf 'TOPS_INSTALL_ID=%s\nTOPS_INSTALL_ID_PREVIOUS=%s\n' "new-id-0000" "$first" > "$ROTATE/.env"
+
+rotated="$(resolve_and_get "$ROTATE" TOPS_INSTALL_ID)"
+if [[ "$rotated" == "new-id-0000" ]]; then
+  pass "TOPS_INSTALL_ID in .env overrides the stored value"
+else
+  fail "rotation ignored: got '$rotated', expected 'new-id-0000'"
+fi
+
+# Both ids reach the filter policy during a rotation, so onboarding already in
+# flight against the old id still completes.
+rotated_list="$(resolve_and_get "$ROTATE" TOPS_INSTALL_IDS)"
+if [[ "$rotated_list" == "new-id-0000,${first}" ]]; then
+  pass "the filter policy receives both ids while rotating"
+else
+  fail "filter policy list is '$rotated_list', expected 'new-id-0000,${first}'"
+fi
+
+single_list="$(resolve_and_get "$FRESH" TOPS_INSTALL_IDS)"
+if [[ "$single_list" == "$first" ]]; then
+  pass "without a rotation in progress only the current id is accepted"
+else
+  fail "filter policy list is '$single_list', expected '$first'"
+fi
+
+# ---------------------------------------------------------------------------
+step "The install id reaches the SNS stack and the child templates"
+
+if grep -q 'TopsInstallIds=' "$INSTALLER"; then
+  pass "the installer passes TopsInstallIds to the SNS stack"
+else
+  fail "the installer never passes TopsInstallIds — the filter policy would deploy empty"
+fi
+
+if grep -q 'TOPS_INSTALL_ID=' "$INSTALLER"; then
+  pass "the installer records TOPS_INSTALL_ID in generated/teemops.env"
+else
+  fail "the installer does not persist TOPS_INSTALL_ID — the next re-run would mint a new one"
+fi
+
+for template in "$REPO_ROOT/templates/iam.role.child.account.cfn.yaml" \
+                "$REPO_ROOT/templates/iam.role.audit.account.cfn.yaml"; do
+  name="$(basename "$template")"
+
+  if grep -q 'TopsInstallId: !Ref TopsInstallId' "$template"; then
+    pass "$name passes TopsInstallId into the custom resource"
+  else
+    fail "$name does not put TopsInstallId in the message body — its ping would be filtered out"
+  fi
+
+  # NoEcho does not make it secret (it is readable via DescribeStacks by anyone
+  # with the permission the TOPS role itself grants), but leaving it off would
+  # print the value in console output for no benefit at all.
+  if awk '/^  TopsInstallId:/{found=1} found && /NoEcho: true/{print; exit}' "$template" | grep -q NoEcho; then
+    pass "$name marks TopsInstallId NoEcho"
+  else
+    fail "$name does not mark TopsInstallId NoEcho"
+  fi
+done
+
+# The dead condition this replaces must not come back as live YAML. Comments are
+# stripped first: the template explains at length why sns:MessageAttributes cannot
+# work, and that prose is the point — it is what stops the line being revived.
+if sed 's/#.*//' "$SNS_TEMPLATE" | grep -q 'sns:MessageAttributes'; then
+  fail "sns:MessageAttributes is live in the SNS template — sns:Publish supports no such condition key"
+else
+  pass "the dead sns:MessageAttributes condition is gone"
+fi
+
+# ---------------------------------------------------------------------------
 printf '\n%s%d passed, %d failed%s\n\n' "$c_bold" "$PASS" "$FAIL" "$c_off"
 (( FAIL == 0 )) || exit 1

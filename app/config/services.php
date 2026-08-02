@@ -48,6 +48,11 @@ return [
         'parent_account_id' => env('AWS_PARENT_ACCOUNT_ID'),
         'cloudformation_template_url' => env('TOPS_CFN_TEMPLATE_URL'),
         'deployment_region' => env('TOPS_DEPLOYMENT_REGION', env('AWS_DEFAULT_REGION', 'us-east-1')),
+        // How long a pending AWS account stays linkable after it is created (N-11).
+        // A pending record is a live target for anyone who can publish to the SNS
+        // topic, so the window is bounded; re-connecting from the UI mints a fresh
+        // one. Set to 0 to disable expiry.
+        'account_link_window_hours' => (int) env('TOPS_ACCOUNT_LINK_WINDOW_HOURS', 24),
         'sqs_name' => env('TOPS_SQS_NAME'),
         'sqs_arn' => env('TOPS_SQS_ARN'),
         // Dead-letter queue for teemops_main. Messages land here after
@@ -55,6 +60,10 @@ return [
         'sqs_dlq_name' => env('TOPS_SQS_DLQ_NAME', env('TOPS_SQS_NAME') ? env('TOPS_SQS_NAME').'_dlq' : null),
         'sqs_dlq_arn' => env('TOPS_SQS_DLQ_ARN'),
         'sns_arn' => env('TOPS_SNS_ARN'),
+        // Install-scoped filter secret (N-11). Minted once by the installer and
+        // written to generated/teemops.env; the parent topic's subscription only
+        // forwards child-account pings that carry it.
+        'install_id' => env('TOPS_INSTALL_ID'),
         'audit_sqs_name' => env('TOPS_AUDIT_SQS_NAME', 'teemops_audit'),
         'audit_sqs_arn' => env('TOPS_AUDIT_SQS_ARN'),
         'audit_region_sqs_name' => env('TOPS_AUDIT_REGION_SQS_NAME', 'teemops_audit_region'),

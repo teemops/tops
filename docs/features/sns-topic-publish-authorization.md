@@ -1,20 +1,53 @@
 # Locking down the account-linking SNS topic
 
-> ## 🔴 HIGH PRIORITY — security review, not yet built
+> ## 🟠 BUILT — both phases, awaiting live AWS verification
 >
-> The parent account's `teemops-sns` topic accepts `sns:Publish` from **any AWS principal
+> The parent account's `teemops-sns` topic accepted `sns:Publish` from **any AWS principal
 > on the internet**. This is the one inbound path into a TOPS install, so it is the first
-> thing a security reviewer probes. Nothing here is implemented yet; this document records
-> the research, the options, and the reasoning so the decision is made once.
+> thing a security reviewer probes. Both phases below are now implemented; the research,
+> the options and the reasoning are kept so the decision is not remade.
+>
+> **The topic policy itself is unchanged, and deliberately so** — see
+> [Research findings](#research-findings) for why `sns:Publish` cannot be narrowed there.
+> Narrowing happens on the subscription and in the consumer.
 
-Status: **awaiting agreement.** Raised 2026-08-02 while producing the AWS integration
-architecture diagram for CISO/CTO audiences — the diagram describes SNS as "the one inbound
-path into TOPS", which invites exactly this question.
+Status: **implemented 2026-08-02, one criterion outstanding.** Everything below is covered by
+automated tests except the two criteria that require a real AWS account — payload-based
+filtering has not been proven against a live CloudFormation custom-resource message. That
+matters more than it sounds: **a filter that matches nothing is indistinguishable from a
+working integration**, so this is not "done" until an account links end to end. See
+[Verifying against a real account](#verifying-against-a-real-account).
+
+Raised 2026-08-02 while producing the AWS integration architecture diagram for CISO/CTO
+audiences — the diagram describes SNS as "the one inbound path into TOPS", which invites
+exactly this question.
 
 Tracked as **N-11** in [the roadmap](../roadmap.md#n-11--lock-down-the-account-linking-sns-topic),
 split across two issues:
 [#100 — consumer-side validation](https://github.com/teemops/tops/issues/100) (phase 1) and
 [#101 — install-scoped filter secret](https://github.com/teemops/tops/issues/101) (phase 2).
+
+### What shipped, and where
+
+| Phase | Change | File |
+| --- | --- | --- |
+| 1 | `StackId` account cross-checked against `TopsRoleArn`, on `Create` **and** `Update` | `app/app/Console/Commands/ProcessSqsMessages.php` |
+| 1 | Only `pending` records are linkable; the pending window expires (`TOPS_ACCOUNT_LINK_WINDOW_HOURS`, default 24h, `0` disables) | same |
+| 1 | SNS signature verified on the SQS path; the unsigned "direct message" fallback is deleted | same, plus `SnsSignatureVerifier::verifyPayload()` |
+| 1 | Alarmable rejection counters, readable with `php artisan aws:link-rejections` | `app/app/Console/Commands/ShowLinkRejections.php` |
+| 2 | `TopsInstallId` filter policy on the subscription, plus a quarantine subscription for what it drops | `infra/cloud-stack/stackset/sns.topic.cfn.yaml` |
+| 2 | Install id minted once, never regenerated, persisted to `generated/teemops.env` | `docker/installer/scripts/install-messaging.sh` |
+| 2 | `NoEcho` parameter threaded through both child templates and the quick-create URL | `templates/*.cfn.yaml`, `AwsAccountsController` |
+| 2 | The dead `sns:MessageAttributes.*` condition deleted, with the reasoning left in its place | `sns.topic.cfn.yaml` |
+
+**One trap found while building, worth recording.** `init` keeps a single pending row per
+organization and reuses it, so measuring the link window from `created_at` would have made
+expiry permanent: an organization that abandoned onboarding and came back would get a
+fresh-looking link backed by a week-old row, and every retry would reuse that same row and be
+rejected. The window is therefore measured from `updated_at`, and issuing a link touches the
+record — on a pending row nothing else writes to it, so `updated_at` means exactly "when the
+link the user is holding was handed out". This is the failure mode the feature was most likely
+to ship with, because both halves are individually correct.
 
 ## The exposure
 
@@ -266,33 +299,75 @@ Skip the account allowlist unless cross-org linking becomes a requirement — th
 
 ## User acceptance criteria
 
-**Consumer-side hardening (phase 1)**
+**Consumer-side hardening (phase 1)** — all covered in `app/tests/Unit/ProcessSqsMessagesTest.php`
 
-- [ ] Given a `Create` message whose `TopsRoleArn` account differs from the account in
+- [x] Given a `Create` message whose `TopsRoleArn` account differs from the account in
       `StackId`, when it is processed, then it is rejected and logged — both values are
       already in the message and neither is checked today
-- [ ] Given a `Create` message matching an account whose status is not `pending`, when it is
+- [x] Given a `Create` message matching an account whose status is not `pending`, when it is
       processed, then it is rejected rather than repointing an existing link
-- [ ] Given a pending record older than the configured link window, when a matching `Create`
+- [x] Given a pending record older than the configured link window, when a matching `Create`
       arrives, then it is rejected as expired
-- [ ] Given any message failing to match a record, when it is processed, then a counter is
+- [x] Given any message failing to match a record, when it is processed, then a counter is
       incremented that an operator can alarm on — not only a `Log::warning`
-- [ ] Given an SNS envelope with an invalid signature, when the poller reads it, then it is
+- [x] Given an SNS envelope with an invalid signature, when the poller reads it, then it is
       rejected, for parity with `SnsSignatureVerifier` on the HTTP path
+
+Two beyond the original list, because closing the gaps as written would have left the same
+hole one step away:
+
+- [x] The `StackId` cross-check applies to `Update` as well as `Create` — `Update` repoints a
+      *live* account's role, so leaving it out would have moved the forged-ARN path rather
+      than closed it
+- [x] A queue message with no SNS envelope is rejected rather than processed as a "direct
+      message" — that fallback was an unsigned path straight past the signature check
 
 **Install-scoped filter secret (phase 2)**
 
-- [ ] Given a fresh install, when the AWS step runs, then a `TopsInstallId` GUID is generated,
+- [x] Given a fresh install, when the AWS step runs, then a `TopsInstallId` GUID is generated,
       persisted to `generated/teemops.env`, and used in the subscription filter policy
-- [ ] Given an install that already has a `TopsInstallId`, when `install.sh --aws-only` is
+- [x] Given an install that already has a `TopsInstallId`, when `install.sh --aws-only` is
       re-run, then the existing value is reused and no onboarding link is invalidated
-- [ ] Given a quick-create URL, when an admin opens it, then the install id is present as a
+- [x] Given a quick-create URL, when an admin opens it, then the install id is present as a
       `NoEcho` parameter and reaches TOPS in the message body
-- [ ] Given a message carrying a wrong or absent install id, when it is published, then it is
-      delivered to the quarantine queue and does not reach `teemops_main`
-- [ ] Given a message carrying a *correct* install id, when it is published, then linking
-      completes exactly as it does today — proven end to end against a real AWS account, not
-      a synthetic message
+- [x] Given the filter policy, when it is written, then it accepts a list of ids so the value
+      can be rotated without breaking in-flight onboarding
+- [ ] **Not verified.** Given a message carrying a wrong or absent install id, when it is
+      published, then it is delivered to the quarantine queue and does not reach `teemops_main`
+- [ ] **Not verified.** Given a message carrying a *correct* install id, when it is published,
+      then linking completes exactly as it does today — proven end to end against a real AWS
+      account, not a synthetic message
+
+## Verifying against a real account
+
+The two unticked criteria above cannot be closed from a test suite, because what is unproven
+is AWS's own behaviour: **payload-based filtering has not been run against a real
+CloudFormation custom-resource message.** CloudFormation publishes the request as a JSON
+string, which should parse, but "should" is doing real work in that sentence.
+
+What has been checked without an AWS account:
+
+- All three templates pass `aws cloudformation validate-template`, so `!Ref TopsInstallIds`
+  is accepted inside the `FilterPolicy` and the `NoEcho` parameters resolve.
+- The filter policy is built from the shape of the captured messages in `references/samples/`,
+  which is where `ResourceType` and the nesting of `ResourceProperties` come from.
+
+What to do on one real account, in order:
+
+1. `./install.sh --aws-only`, then confirm `generated/teemops.env` has a `TOPS_INSTALL_ID`.
+2. Re-run `./install.sh --aws-only` and confirm the value is **unchanged**. This is the one
+   that silently destroys an install if it regresses.
+3. Link an account through the UI. It should complete exactly as before.
+4. Check the quarantine queue is empty:
+   `aws sqs get-queue-attributes --queue-url <TOPS_QUARANTINE_SQS_ARN> --attribute-names ApproximateNumberOfMessages`
+5. Deliberately break it: edit the quick-create URL's `param_TopsInstallId` to a wrong GUID
+   and run the stack. The ping should land in **quarantine**, not `teemops_main`, and the
+   child stack should fail rather than hang.
+6. `php artisan aws:link-rejections` to confirm nothing unexpected was rejected along the way.
+
+If step 3 hangs instead of completing, the filter is matching nothing — watch
+`NumberOfNotificationsFilteredOut-InvalidMessageBody` on the topic, which distinguishes "the
+body did not parse" from "the body parsed and did not match".
 
 ## Adjacent findings
 

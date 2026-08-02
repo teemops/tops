@@ -52,6 +52,14 @@ sync_env_from_compose AWS_PARENT_ACCOUNT_ID
 sync_env_from_compose TOPS_CFN_TEMPLATE_URL
 sync_env_from_compose TOPS_SQS_NAME
 sync_env_from_compose TOPS_SQS_ARN
+# The web tier builds the onboarding quick-create URL, and the install id is one of
+# its parameters. Without it here, php-fpm hands out links whose ping the SNS topic
+# filters out — the child stack then hangs for an hour and rolls back, and nothing
+# is logged on our side because the message never arrives (N-11).
+sync_env_from_compose TOPS_INSTALL_ID
+# Read by SnsSignatureVerifier, which fails closed when it cannot tell whose topic
+# a message came from. The legacy HTTP callback route lives in this tier.
+sync_env_from_compose TOPS_SNS_ARN
 # Queue connections come from generated/teemops.env (env_file). Bake them into the
 # container .env too so the web tier (php-fpm) resolves them the same as CLI,
 # regardless of php-fpm's environment handling. Scans use the database queue;

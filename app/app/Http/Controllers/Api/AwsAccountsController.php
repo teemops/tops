@@ -62,6 +62,17 @@ class AwsAccountsController extends Controller
                 'status' => 'pending',
                 'unique_id' => $uniqueId, // Derived from orgId, same for all accounts in this org
             ]);
+        } else {
+            // Re-issuing the link restarts its expiry window (N-11). Without this,
+            // reuse and expiry combine into a trap: the record is reused from the
+            // first click, so an org that abandoned onboarding a week ago would get
+            // a fresh-looking link backed by a week-old row, and every retry would
+            // be rejected as expired with nothing in the UI to explain it.
+            //
+            // updated_at is the timestamp because a pending row is only ever written
+            // by this method and by the callback that completes it — so on a pending
+            // account it means precisely "when the link was last handed out".
+            $account->touch();
         }
 
         $cloudFormationUrl = $this->buildInitCloudFormationUrl(
@@ -96,6 +107,14 @@ class AwsAccountsController extends Controller
             return 'AWS messaging not configured (missing TOPS_DEPLOYMENT_REGION). Set it in .env and run ./install.sh.';
         }
 
+        // Without it the child stack's ping is filtered out at the topic and simply
+        // never arrives — the stack hangs for an hour and rolls back with nothing
+        // logged here. Refusing to hand out a link that cannot work is the only
+        // point at which that is still explainable.
+        if (! config('services.aws.install_id')) {
+            return 'AWS messaging not configured (missing TOPS_INSTALL_ID). Run ./install.sh --aws-only to generate it.';
+        }
+
         return null;
     }
 
@@ -104,15 +123,17 @@ class AwsAccountsController extends Controller
         $deploymentRegion = config('services.aws.deployment_region');
         $parentAccountId = config('services.aws.parent_account_id');
         $templateUrl = config('services.aws.cloudformation_template_url');
+        $installId = config('services.aws.install_id');
 
         return sprintf(
-            'https://console.aws.amazon.com/cloudformation/home?region=%s#/stacks/quickcreate?templateUrl=%s&stackName=tops-vendor-audit&param_ParentAWSAccountId=%s&param_ParentDeploymentRegion=%s&param_ExternalId=%s&param_UniqueId=%s',
+            'https://console.aws.amazon.com/cloudformation/home?region=%s#/stacks/quickcreate?templateUrl=%s&stackName=tops-vendor-audit&param_ParentAWSAccountId=%s&param_ParentDeploymentRegion=%s&param_ExternalId=%s&param_UniqueId=%s&param_TopsInstallId=%s',
             urlencode($deploymentRegion),
             urlencode($templateUrl),
             urlencode($parentAccountId),
             urlencode($deploymentRegion),
             urlencode($externalId),
             urlencode($uniqueId),
+            urlencode($installId),
         );
     }
 

@@ -23,6 +23,7 @@ class AwsAccountsControllerTest extends TestCase
         Config::set('services.aws.parent_account_id', '123456789012');
         Config::set('services.aws.cloudformation_template_url', "https://test-123456789012-tops-deploy.s3.{$region}.amazonaws.com/templates/iam.role.child.account.cfn.yaml");
         Config::set('services.aws.deployment_region', $region);
+        Config::set('services.aws.install_id', 'test-install-id-0000');
     }
 
     public function test_init_returns_503_when_messaging_not_configured(): void
@@ -67,6 +68,31 @@ class AwsAccountsControllerTest extends TestCase
         $this->assertStringContainsString('param_ParentAWSAccountId=123456789012', $url);
         $this->assertStringContainsString('param_ExternalId=' . urlencode($account->external_id), $url);
         $this->assertStringContainsString('param_UniqueId=' . urlencode($account->unique_id), $url);
+        // N-11 phase 2: without it the child stack's ping is filtered out at the
+        // topic and onboarding hangs for an hour before rolling back.
+        $this->assertStringContainsString('param_TopsInstallId=test-install-id-0000', $url);
+    }
+
+    /**
+     * A link built without the install id would be filtered out at the SNS topic
+     * and leave no trace anywhere — the child stack just waits for CloudFormation's
+     * custom-resource timeout and rolls back. Refusing to issue it is the last
+     * point at which the operator can be told what is actually wrong.
+     */
+    public function test_init_returns_503_when_install_id_is_missing(): void
+    {
+        $this->configureMessaging();
+        Config::set('services.aws.install_id', null);
+
+        $user = User::factory()->create();
+        $organization = Organization::factory()->create(['user_id' => $user->id]);
+
+        $response = $this->actingAs($user)
+            ->postJson("/api/organizations/{$organization->org_id}/aws-accounts/init");
+
+        $response->assertStatus(503);
+        $this->assertStringContainsString('TOPS_INSTALL_ID', $response->json('error'));
+        $this->assertDatabaseCount('aws_accounts', 0);
     }
 
     public function test_init_reuses_existing_pending_account_instead_of_creating_duplicates(): void
@@ -88,6 +114,40 @@ class AwsAccountsControllerTest extends TestCase
         $this->assertSame($first->json('accountId'), $second->json('accountId'));
         $this->assertSame($first->json('externalId'), $second->json('externalId'));
         $this->assertSame(1, AwsAccount::where('organization_id', $organization->id)->count());
+    }
+
+    /**
+     * Reuse and the N-11 link window combine into a trap if the timestamp is not
+     * restarted: the row is reused from the first click, so an organization that
+     * abandoned onboarding and comes back later would be handed a fresh-looking
+     * link that the poller then rejects as expired — permanently, since every
+     * retry reuses the same stale row.
+     */
+    public function test_init_restarts_the_link_window_when_it_reuses_a_pending_account(): void
+    {
+        $this->configureMessaging();
+
+        $user = User::factory()->create();
+        $organization = Organization::factory()->create(['user_id' => $user->id]);
+
+        $account = AwsAccount::factory()->pending()->create([
+            'organization_id' => $organization->id,
+            'unique_id' => $organization->org_id,
+        ]);
+        AwsAccount::where('id', $account->id)->update([
+            'created_at' => now()->subDays(7),
+            'updated_at' => now()->subDays(7),
+        ]);
+
+        $this->actingAs($user)
+            ->postJson("/api/organizations/{$organization->org_id}/aws-accounts/init")
+            ->assertStatus(200)
+            ->assertJsonPath('accountId', $account->id);
+
+        $this->assertTrue(
+            $account->refresh()->updated_at->greaterThan(now()->subMinute()),
+            'Handing out the link again must restart its expiry window'
+        );
     }
 
     public function test_init_forbidden_for_member_without_add_permission(): void
