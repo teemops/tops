@@ -127,8 +127,8 @@ somewhere and needs porting and a change of voice, not that a `user-docs/` page 
 | The dashboard | User | ✍️ Write | `Pages/Dashboard.vue` | 3 |
 | Running a scan | User | ✍️ Write | `Pages/Scans/*`, `NewScanModal.vue` | 2 |
 | Scan profiles and scan types | User | ✍️ Write | `ScanProfilesService`, `ScanTypesService`, `config/scan.php` | 2 |
-| Reading a finding | User | ✍️ Write | `Pages/Findings/*`, `docs/features/filter-findings-by-*.md` | **1** |
-| Resolving a finding | User | ⚠️ Partial | Rule remediation text (N-4 gave all 74 rules one) | **1** |
+| Reading a finding | User | ✅ **Written** | `Pages/Findings/*`, `rules/rulesets/*.json` | **1** |
+| Resolving a finding | User | ✅ **Written** | `FindingsEngine`, `ScanResult`, D-11 durable findings | **1** |
 | Insights | User | ✍️ Write | `Pages/Insights/`, `docs/features/insights-by-service.md` | 3 |
 | **AWS accounts** |
 | Adding an account | Operator | ✅ Exists | `docs/features/onboarding-flow.md` (rewrite — it is a spec, not a guide) | 2 |
