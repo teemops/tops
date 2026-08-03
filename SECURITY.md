@@ -85,9 +85,8 @@ These are public, tracked, and being worked on. Reporting them again is not a fi
 
 | | |
 | --- | --- |
-| [#101](https://github.com/teemops/tops/issues/101) | The parent account's `teemops-sns` topic accepts `sns:Publish` from any AWS principal. Publish-only, and acting on a message still requires guessing a 122-bit `external_id`, but it is open and it is being fixed. The issue links the full research and the options considered |
-| [#100](https://github.com/teemops/tops/issues/100) | The account-linking consumer does not cross-check the account in `TopsRoleArn` against the one in `StackId`, nor require a `pending` status |
-| [#102](https://github.com/teemops/tops/issues/102) | `templates/iam.role.audit.account.cfn.yaml` defaults to a vendor AWS account and is not on the onboarding path |
+| [#101](https://github.com/teemops/tops/issues/101) | The parent account's `teemops-sns` topic accepts `sns:Publish` from any AWS principal. The subscription now screens messages on a per-install id and quarantines the rest, so a forged publish does not reach the queue — but the topic itself is still openly publishable, and the issue stays open until that is closed off. Background: [`docs/features/sns-topic-publish-authorization.md`](docs/features/sns-topic-publish-authorization.md) |
+| [#109](https://github.com/teemops/tops/issues/109) | The `teemops_main` queue policy grants `SQS:ReceiveMessage` to `Principal: "*"`. The `aws:SourceArn` condition means it cannot actually authorise a direct caller, so it is dead permission rather than exposure — but it is known, and being removed |
 
 ## Supported versions
 

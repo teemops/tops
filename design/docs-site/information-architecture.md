@@ -150,7 +150,7 @@ somewhere and needs porting and a change of voice, not that a `user-docs/` page 
 | **Security** |
 | The security model | Evaluator | ✅ **Built this session** | The architecture page's boundary table | **1** |
 | Where your data lives | Evaluator | ✍️ Write | Nothing leaves the install — needs stating plainly | 2 |
-| Reporting a vulnerability | Evaluator | ✍️ Write | No `SECURITY.md` exists — **gap** | **1** |
+| Reporting a vulnerability | Evaluator | ✅ **Done** | `SECURITY.md` — link to it rather than restating it | **1** |
 | Licence and trademark | Evaluator | ✅ Exists | `LICENSE`, `TRADEMARK.md`, roadmap D-7 | 3 |
 | **Reference** |
 | Glossary | All | ✅ Exists | `docs/GLOSSARY.md` | 3 |
@@ -164,13 +164,12 @@ job, which is the argument for doing the IA before the writing.
 
 ### Two gaps this inventory exposed
 
-1. ~~**There is no `SECURITY.md`.**~~ **Written 2026-08-02.** A public repo with a `security`
+1. ~~**There is no `SECURITY.md`.**~~ **Closed 2026-08-03.** A public repo with a `security`
    label, three open security issues and a CISO-facing architecture page had nowhere to
    report a vulnerability, and `README.md` said "open an issue" — precisely the wrong advice.
-   Now at the repository root, with the README pointing to it. **Two follow-ups it depends
-   on:** GitHub private vulnerability reporting must be enabled (it is currently off), and
-   `security@teemops.com` must be created and routed. Until both are done the policy names
-   channels that do not answer.
+   `SECURITY.md` is now at the repository root with the README pointing to it, GitHub private
+   vulnerability reporting is enabled, and `security@teemops.com` is routed. Both channels the
+   policy names now answer.
 2. **`docs/quick-start.md` is dead.** It describes a Nuxt 3 + Serverless + Prisma monorepo —
    the pre-pivot stack. It is linked from `docs/README.md` and would mislead anyone who found
    it. Delete it rather than port it.
@@ -246,8 +245,7 @@ against the roadmap — the roadmap describes intent, `PROGRESS.md` describes th
 Priority in the inventory says what matters; this says what unblocks what. Roughly dependency
 order, not importance order.
 
-1. **`SECURITY.md`** — repo hygiene, blocked by nothing, and the one gap with an active
-   reason to exist today.
+1. ~~**`SECURITY.md`**~~ — done 2026-08-03, with both reporting channels live.
 2. **The two evaluator pages** — already written. *How TOPS connects to AWS* is done; *What
    the IAM role can do* is a straight extraction from it and the child template.
 3. **Reading a finding**, then **Resolving a finding.** In that order: resolution is
