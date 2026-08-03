@@ -119,6 +119,62 @@ deploy_core_docker() {
   export CORE_STACK="$stack_name"
 }
 
+# Read one KEY's value back out of a previously written generated/teemops.env.
+#
+# Deliberately not `source` — same reasoning as load_dotenv above.
+env_file_value() {
+  local key="$1" line
+  [[ -f "$ENV_FILE" ]] || return 0
+
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    if [[ "$line" =~ ^[[:space:]]*${key}=(.*)$ ]]; then
+      printf '%s' "${BASH_REMATCH[1]}"
+      return 0
+    fi
+  done < "$ENV_FILE"
+}
+
+# The install-scoped filter secret (N-11).
+#
+# This must NEVER be regenerated once an installation has one. Minting a fresh
+# GUID on a re-run of `install.sh --aws-only` would invalidate every onboarding
+# link already issued *and* silently filter out the Delete ping from every account
+# already linked — so unlinking would stop working with no error anywhere. That is
+# the single worst thing this script could do, hence the explicit precedence:
+#
+#   1. TOPS_INSTALL_ID set in .env or the environment — the manual rotation path.
+#   2. Whatever the last successful install wrote to generated/teemops.env.
+#   3. Only then, a new one.
+#
+# generated/teemops.env is rewritten wholesale by write_env_file, so step 2 has to
+# happen before that — and generated/ must be part of any backup for step 2 to
+# survive a restore.
+resolve_install_id() {
+  if [[ -n "${TOPS_INSTALL_ID:-}" ]]; then
+    log "Using TOPS_INSTALL_ID from the environment."
+  elif TOPS_INSTALL_ID="$(env_file_value TOPS_INSTALL_ID)" && [[ -n "$TOPS_INSTALL_ID" ]]; then
+    log "Reusing the existing install id from ${ENV_FILE} — onboarding links stay valid."
+  else
+    TOPS_INSTALL_ID="$(python3 -c 'import uuid; print(uuid.uuid4())')"
+    log "Minted a new install id for this installation."
+  fi
+
+  export TOPS_INSTALL_ID
+
+  # During a rotation, set TOPS_INSTALL_ID to the new value and
+  # TOPS_INSTALL_ID_PREVIOUS to the old one. Both are accepted by the filter
+  # policy until the next install drops the previous one, so onboarding that is
+  # already in flight is not broken by the rotation.
+  if [[ -n "${TOPS_INSTALL_ID_PREVIOUS:-}" ]]; then
+    TOPS_INSTALL_IDS="${TOPS_INSTALL_ID},${TOPS_INSTALL_ID_PREVIOUS}"
+    log "Rotation in progress: the previous install id is still accepted."
+  else
+    TOPS_INSTALL_IDS="${TOPS_INSTALL_ID}"
+  fi
+
+  export TOPS_INSTALL_IDS
+}
+
 deploy_sns() {
   local environment="${TOPS_ENVIRONMENT:-test}"
   local stack_name="${TOPS_SNS_STACK:-teemops-messaging-${environment}}"
@@ -135,6 +191,7 @@ deploy_sns() {
     --no-fail-on-empty-changeset \
     --parameter-overrides \
       "SQSLabel=teemops_main" \
+      "TopsInstallIds=${TOPS_INSTALL_IDS}" \
     2>&1 | tee -a "$LOG_FILE"
 
   export SNS_STACK="$stack_name"
@@ -160,7 +217,7 @@ upload_child_account_template() {
 
 write_env_file() {
   local environment="${TOPS_ENVIRONMENT:-test}"
-  local main_name main_arn main_dlq_name main_dlq_arn audit_name audit_arn region_name region_arn bucket_name sns_arn
+  local main_name main_arn main_dlq_name main_dlq_arn audit_name audit_arn region_name region_arn bucket_name sns_arn quarantine_name quarantine_arn
 
   main_name="$(cf_output "$CORE_STACK" TopsMainQueueName)"
   main_arn="$(cf_output "$CORE_STACK" TopsMainQueueArn)"
@@ -172,8 +229,10 @@ write_env_file() {
   region_arn="$(cf_output "$CORE_STACK" TopsAuditRegionQueueArn)"
   bucket_name="$(cf_output "$CORE_STACK" DeploymentBucketName)"
   sns_arn="$(cf_output "$SNS_STACK" TopicArn)"
+  quarantine_name="$(cf_output "$SNS_STACK" QuarantineQueueName)"
+  quarantine_arn="$(cf_output "$SNS_STACK" QuarantineQueueArn)"
 
-  for var_name in main_name main_arn main_dlq_name main_dlq_arn audit_name audit_arn region_name region_arn bucket_name sns_arn; do
+  for var_name in main_name main_arn main_dlq_name main_dlq_arn audit_name audit_arn region_name region_arn bucket_name sns_arn quarantine_name quarantine_arn; do
     if [[ -z "${!var_name}" || "${!var_name}" == "None" ]]; then
       die "Missing CloudFormation output: ${var_name}"
     fi
@@ -204,6 +263,24 @@ TOPS_AUDIT_REGION_SQS_ARN=${region_arn}
 TOPS_SNS_ARN=${sns_arn}
 TOPS_CFN_TEMPLATE_URL=${TOPS_CFN_TEMPLATE_URL}
 
+# Install-scoped filter secret (N-11). Minted once, on the first AWS install, and
+# reused on every re-run — see resolve_install_id in install-messaging.sh.
+#
+# BACK THIS UP. It is not recoverable from AWS: if generated/ is lost and this
+# value is regenerated, every onboarding link already issued stops working, and
+# the Delete ping from every account already linked is silently filtered out, so
+# unlinking fails with no error. To rotate deliberately, set TOPS_INSTALL_ID to
+# the new value and TOPS_INSTALL_ID_PREVIOUS to this one in .env, then re-run
+# ./install.sh --aws-only.
+TOPS_INSTALL_ID=${TOPS_INSTALL_ID}
+
+# Holds account-link pings the install-id filter rejected, so a wrong or missing
+# id is visible instead of vanishing. Should normally be empty:
+#   aws sqs get-queue-attributes --queue-name ${quarantine_name} \\
+#     --attribute-names ApproximateNumberOfMessages
+TOPS_QUARANTINE_SQS_NAME=${quarantine_name}
+TOPS_QUARANTINE_SQS_ARN=${quarantine_arn}
+
 # Scan processing runs on the local database queue for the single-server Docker
 # deployment: the app (php-fpm) needs no AWS credentials to enqueue a scan, and
 # the worker consumes these queues on the 'database' connection. SQS is used only
@@ -224,6 +301,9 @@ main() {
   load_dotenv
   require_region
   validate_aws_auth
+  # Before deploy_sns (it needs the id) and before write_env_file (which rewrites
+  # the file the previous id is read back from).
+  resolve_install_id
   deploy_core_docker
   deploy_sns
   write_env_file

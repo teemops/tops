@@ -44,8 +44,20 @@ class SnsSignatureVerifier
 
     public function verify(Request $request): bool
     {
-        $payload = $this->payload($request);
+        return $this->verifyPayload($this->payload($request));
+    }
 
+    /**
+     * Verify an SNS envelope that has already been decoded to an array.
+     *
+     * The SQS path (N-11, `aws:process-sqs`) reads the same envelope out of a
+     * queue message body rather than an HTTP request, and needs exactly the two
+     * checks above it — signature, then topic. Keeping one implementation means
+     * the queue path cannot drift into being the weaker of the two, which is how
+     * it came to have no verification at all.
+     */
+    public function verifyPayload(array $payload): bool
+    {
         if ($payload === []) {
             return $this->reject('body was empty or not JSON');
         }

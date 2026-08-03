@@ -25,12 +25,16 @@ Parameters:
     AllowedPattern: "[a-zA-Z0-9-]*"
     MinLength: 10
     MaxLength: 200
-  # RootAccountHash:
-  #   Type: String
-  #   Description: "Root Tops Account Hash DO NOT CHANGE. Used for SNS topic sending to root account."
-  #   AllowedPattern: "[a-zA-Z0-9-]*"
-  #   MinLength: 10
-  #   MaxLength: 200
+  TopsInstallId:
+    Type: String
+    NoEcho: true
+    Description: >-
+      Identifies the TOPS installation you are connecting to DO NOT CHANGE. The
+      parent SNS subscription only accepts pings carrying this value, so a wrong or
+      missing one means this stack will sit waiting and then roll back.
+    AllowedPattern: "[a-zA-Z0-9-]*"
+    MinLength: 10
+    MaxLength: 200
 Resources:
   TopsCustomNotifier:
     Type: Custom::TeemopsPingSNS
@@ -49,7 +53,9 @@ Resources:
       TopsExternalId: !Ref ExternalId
       TopsUniqueId: !Ref UniqueId
       TopsType: "ops"
-      # TopsRootAccountHash: !Ref RootAccountHash
+      # Lands in the custom-resource message body, where the parent topic's
+      # subscription filter matches on it (N-11).
+      TopsInstallId: !Ref TopsInstallId
   TopsCWEventRole:
     Type: "AWS::IAM::Role"
     Properties:

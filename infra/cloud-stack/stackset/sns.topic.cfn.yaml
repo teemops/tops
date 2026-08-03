@@ -5,6 +5,22 @@ Parameters:
     Type: String
     Description: 'Teemops SQS Label'
     Default: 'teemops_main'
+  TopsInstallIds:
+    Type: CommaDelimitedList
+    NoEcho: true
+    Description: >-
+      Install-scoped filter secret (N-11). One GUID minted once per installation,
+      or "current,previous" while rotating — accepting a list from day one is what
+      makes rotation possible without breaking onboarding that is already in flight.
+      Child stacks echo it back in the custom-resource body, and the subscription
+      below only forwards messages that carry a value from this list.
+
+      This is a speed bump, not an authentication boundary. It is shared with every
+      account admin who is onboarded, travels in a URL query string, and lands as a
+      CloudFormation parameter readable by anyone with cloudformation:DescribeStacks
+      in the child account. It raises the bar from "anyone on the internet" to
+      "anyone who has ever been given an onboarding link" — the consumer-side checks
+      in aws:process-sqs (N-11 phase 1) are what actually validate a link request.
 Resources:
   TopsSNS:
     Type: AWS::SNS::Topic
@@ -65,15 +81,29 @@ Resources:
           Condition:
               StringEquals:
                 'AWS:SourceOwner': !Ref "AWS::AccountId"
+        # Any AWS account being onboarded has to be able to publish here — that is
+        # the whole inbound path, and the publisher is a CloudFormation stack in an
+        # account we have never seen before, so there is no principal to name.
+        #
+        # This cannot be narrowed in the topic policy itself. sns:Publish supports
+        # no message-content condition keys (SNS defines only sns:Endpoint and
+        # sns:Protocol, both Subscribe-only), and CloudFormation's custom-resource
+        # publish carries no message attributes at all — every captured sample in
+        # references/samples/ puts the whole request in the body. A condition on
+        # sns:MessageAttributes.* used to sit here commented out; it was dead on
+        # arrival twice over and has been deleted rather than revived.
+        #
+        # Narrowing happens on the subscription instead (TopsSubscriber, below) and
+        # in the consumer (aws:process-sqs). Note what is *not* granted here: the
+        # sibling statement above is scoped by AWS:SourceOwner, so nobody outside
+        # this account can subscribe, delete the topic, or rewrite this policy.
+        # See docs/features/sns-topic-publish-authorization.md.
         - Sid: allow-all-aws-users
           Effect: Allow
           Principal:
             AWS: "*"
           Action: sns:Publish
           Resource: "*"
-          # Condition:
-          #   StringEquals:
-          #     'sns:MessageAttributes.TopsRawTopsRootAccountHash': 'teemops-123'
       Topics:
       - !Ref TopsSNS
   TopsSubscriber:
@@ -81,6 +111,19 @@ Resources:
     Properties:
       TopicArn: !Ref TopsSNS
       Protocol: sqs
+      # Payload-based filtering: CloudFormation publishes the custom-resource
+      # request as a JSON string in the message body, so there is nothing to match
+      # on in message attributes.
+      #
+      # Matching ResourceType alone would be worthless — the child template is
+      # served publicly, so its shape is public. TopsInstallId is what turns this
+      # from a shape check into a shared-secret check.
+      FilterPolicyScope: MessageBody
+      FilterPolicy:
+        ResourceType:
+          - "Custom::TeemopsPingSNS"
+        ResourceProperties:
+          TopsInstallId: !Ref TopsInstallIds
       Endpoint:
         Fn::Join:
           - ''
@@ -92,8 +135,73 @@ Resources:
             - !Ref 'AWS::AccountId'
             - ':'
             - !Ref SQSLabel
-  
+
+  # A filter that matches nothing looks exactly like a working integration, and a
+  # filtered-out message leaves no trace at all: the child stack just hangs until
+  # CloudFormation's custom-resource timeout (~1 hour) and rolls back with an
+  # unactionable error, while TOPS logs nothing because nothing arrived.
+  #
+  # That silent-drop failure — a typo, a stale bookmarked onboarding link, a
+  # reinstall, a restore from backup — is a likelier problem than an attacker. So
+  # everything the filter above rejects is kept here instead of vanishing.
+  # Inspect it with: aws sqs receive-message --queue-url <TopsQuarantineQueueUrl>
+  TopsQuarantineSQS:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: teemops_quarantine
+      VisibilityTimeout: 300
+      # Two weeks: long enough that a message dropped on a Friday is still there
+      # when somebody investigates a failed onboarding the following week.
+      MessageRetentionPeriod: 1209600
+
+  TopsQuarantineSQSPolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref TopsQuarantineSQS
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: allow-sns-quarantine
+            Effect: Allow
+            Principal:
+              Service: sns.amazonaws.com
+            Action: SQS:SendMessage
+            Resource: !GetAtt TopsQuarantineSQS.Arn
+            Condition:
+              ArnEquals:
+                "aws:SourceArn": !Ref TopsSNS
+
+  TopsQuarantineSubscriber:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref TopsSNS
+      Protocol: sqs
+      FilterPolicyScope: MessageBody
+      # The inverse of TopsSubscriber: a TOPS ping whose install id is either
+      # absent or not one of ours. The two conditions are a list because SNS
+      # treats multiple conditions on one key as OR — "exists: false" alone would
+      # miss a wrong id, and "anything-but" alone would miss a missing one.
+      #
+      # ResourceType is still required, so unrelated traffic on this topic (the
+      # EC2 state-change events from TopsCWRule) is dropped rather than filling
+      # this queue.
+      FilterPolicy:
+        ResourceType:
+          - "Custom::TeemopsPingSNS"
+        ResourceProperties:
+          TopsInstallId:
+            - exists: false
+            - anything-but: !Ref TopsInstallIds
+      Endpoint: !GetAtt TopsQuarantineSQS.Arn
+
 Outputs:
   TopicArn:
     Description: Teemops SNS Topic
     Value: !Ref TopsSNS
+  QuarantineQueueName:
+    Description: Queue holding account-link pings rejected by the install-id filter (N-11)
+    Value: !GetAtt TopsQuarantineSQS.QueueName
+  QuarantineQueueArn:
+    Description: ARN of teemops_quarantine
+    Value: !GetAtt TopsQuarantineSQS.Arn
