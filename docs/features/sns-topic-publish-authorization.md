@@ -1,6 +1,6 @@
 # Locking down the account-linking SNS topic
 
-> ## 🟠 BUILT — both phases, awaiting live AWS verification
+> ## ✅ DONE — both phases, verified end to end on a real AWS account
 >
 > The parent account's `teemops-sns` topic accepted `sns:Publish` from **any AWS principal
 > on the internet**. This is the one inbound path into a TOPS install, so it is the first
@@ -11,11 +11,11 @@
 > [Research findings](#research-findings) for why `sns:Publish` cannot be narrowed there.
 > Narrowing happens on the subscription and in the consumer.
 
-Status: **implemented 2026-08-02, one criterion outstanding.** Everything below is covered by
-automated tests except the two criteria that require a real AWS account — payload-based
-filtering has not been proven against a live CloudFormation custom-resource message. That
-matters more than it sounds: **a filter that matches nothing is indistinguishable from a
-working integration**, so this is not "done" until an account links end to end. See
+Status: **implemented and verified 2026-08-03.** Payload-based filtering was the one thing a
+test suite could not prove, because what was unknown was AWS's own behaviour — and it works:
+on account `848310106659` / `us-west-2`, a correct `TopsInstallId` linked exactly as before,
+and a deliberately wrong one (`tops-vendor-audit-failtest`) was filtered out of `teemops_main`
+and landed in the quarantine queue. See
 [Verifying against a real account](#verifying-against-a-real-account).
 
 Raised 2026-08-02 while producing the AWS integration architecture diagram for CISO/CTO
@@ -332,11 +332,10 @@ hole one step away:
       `NoEcho` parameter and reaches TOPS in the message body
 - [x] Given the filter policy, when it is written, then it accepts a list of ids so the value
       can be rotated without breaking in-flight onboarding
-- [ ] **Not verified.** Given a message carrying a wrong or absent install id, when it is
-      published, then it is delivered to the quarantine queue and does not reach `teemops_main`
-- [ ] **Not verified.** Given a message carrying a *correct* install id, when it is published,
-      then linking completes exactly as it does today — proven end to end against a real AWS
-      account, not a synthetic message
+- [x] Given a message carrying a wrong or absent install id, when it is published, then it is
+      delivered to the quarantine queue and does not reach `teemops_main` — verified 2026-08-03
+- [x] Given a message carrying a *correct* install id, when it is published, then linking
+      completes exactly as it does today — verified 2026-08-03 against a real AWS account
 
 ## Verifying against a real account
 
@@ -368,6 +367,26 @@ What to do on one real account, in order:
 If step 3 hangs instead of completing, the filter is matching nothing — watch
 `NumberOfNotificationsFilteredOut-InvalidMessageBody` on the topic, which distinguishes "the
 body did not parse" from "the body parsed and did not match".
+
+### What the live run found
+
+Step 5 worked, and then step 6 got it wrong. With a message sitting in quarantine,
+`aws:link-rejections` reported **"No account-linking messages have been rejected."**
+
+Both numbers were individually correct — the cache counters only see messages that reached the
+poller, and a filtered message never does — but the command an operator is told to run gave a
+falsely reassuring answer about the exact failure the quarantine queue exists to make visible.
+The silent failure had simply moved one layer out.
+
+`aws:link-rejections` now reports quarantine depth alongside the counters, and only gives the
+all-clear when **both** are positively known to be empty. A queue it cannot read reports as
+unknown rather than as zero, because those are different things.
+
+**Also worth knowing before deleting a test stack:** a stack created with a wrong install id
+has its `Delete` ping filtered out too, so it will hang until CloudFormation's custom-resource
+timeout. Delete such stacks with `--retain-resources` on the custom resource, or expect to
+wait. This is the migration hazard in reverse, and it applies to any stack created before the
+filter existed.
 
 ## Adjacent findings
 

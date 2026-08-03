@@ -409,7 +409,7 @@ fixes are what made that run succeed, which is the sequencing argument justifyin
 
 | # | Feature | Why it's here | Size |
 | --- | --- | --- | :---: |
-| **N-11** | **Lock down the account-linking SNS topic** | 🟠 **Built 2026-08-02, awaiting live verification.** Both phases implemented: consumer-side validation ([#100](https://github.com/teemops/tops/issues/100)) and an install-scoped filter secret ([#101](https://github.com/teemops/tops/issues/101)). Everything is covered by tests except the one thing a test cannot cover — that SNS payload filtering matches a real CloudFormation message. Until an account links end to end, a filter matching nothing looks exactly like a working integration. [Feature doc](features/sns-topic-publish-authorization.md#verifying-against-a-real-account). | S + M |
+| ~~**N-11**~~ | ~~Lock down the account-linking SNS topic~~ | ✅ **Done** 2026-08-03 — consumer-side validation ([#100](https://github.com/teemops/tops/issues/100)) and an install-scoped filter secret ([#101](https://github.com/teemops/tops/issues/101)), verified end to end on a real account: a correct install id links as before, a wrong one is filtered to quarantine and never reaches `teemops_main`. The live run also caught `aws:link-rejections` reporting "nothing rejected" while a message sat in quarantine — the silent failure moved one layer out, and is now fixed. [Feature doc](features/sns-topic-publish-authorization.md). | S + M |
 | ~~**N-1**~~ | ~~Fix the clean-checkout build~~ | ✅ **Done** 2026-07-29 — `@vitejs/plugin-vue` on `^6`, `npm ci` clean, frontend CI job added. | — |
 | ~~**N-2**~~ | ~~Choose and add a licence~~ | ✅ **Done** 2026-07-29 — Apache-2.0, trademark held separately, DCO for contributions. See D-7. | — |
 | ~~**N-6**~~ | ~~SNS signature verification~~ | ✅ **Done** 2026-07-30 — real signature verification via AWS's validator package, plus a topic allowlist that fails closed. Promoted from X-2 that morning when going public expired its deferral. | — |
@@ -636,12 +636,18 @@ acceptance criteria — the `StackId` cross-check on `Update` as well as `Create
 removal of the unsigned "direct message" fallback — because closing the gaps exactly as
 specified would have left the same hole one step to the side.
 
-**What is still open is a verification, not a build.** SNS payload filtering has not been run
-against a real CloudFormation custom-resource message, and a filter that matches nothing is
-indistinguishable from a working integration. The steps are written down in
-[the feature doc](features/sns-topic-publish-authorization.md#verifying-against-a-real-account);
-the riskiest one is re-running `install.sh --aws-only` and confirming the install id does
-*not* change, because regenerating it silently breaks every existing link.
+**Verified on a real account 2026-08-03.** SNS payload filtering does match a live
+CloudFormation custom-resource message: a correct install id linked as before, and a
+deliberately wrong one was filtered to the quarantine queue without reaching `teemops_main`.
+
+**The live run earned its keep.** It found `aws:link-rejections` answering "No account-linking
+messages have been rejected" while a rejected message sat in quarantine — both numbers
+individually correct, since the cache counters only see what reached the poller, but the
+command an operator is told to run was reassuring them about the exact failure the quarantine
+queue exists to expose. The silent failure had moved one layer out rather than being closed.
+Fixed by reporting quarantine depth alongside the counters, and giving the all-clear only when
+both are positively known to be empty — a queue that cannot be read now reports as unknown,
+not as zero.
 
 Full research, the four options considered and why three were rejected, the open issues on
 the proposed design, and acceptance criteria for both phases:

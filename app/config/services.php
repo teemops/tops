@@ -64,6 +64,11 @@ return [
         // written to generated/teemops.env; the parent topic's subscription only
         // forwards child-account pings that carry it.
         'install_id' => env('TOPS_INSTALL_ID'),
+        // Holds account-link pings the install-id filter rejected. Read by
+        // aws:link-rejections — these messages never reach the poller, so this queue
+        // is the only place they are visible.
+        'quarantine_sqs_name' => env('TOPS_QUARANTINE_SQS_NAME'),
+        'quarantine_sqs_arn' => env('TOPS_QUARANTINE_SQS_ARN'),
         'audit_sqs_name' => env('TOPS_AUDIT_SQS_NAME', 'teemops_audit'),
         'audit_sqs_arn' => env('TOPS_AUDIT_SQS_ARN'),
         'audit_region_sqs_name' => env('TOPS_AUDIT_REGION_SQS_NAME', 'teemops_audit_region'),

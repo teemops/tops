@@ -60,6 +60,7 @@ sync_env_from_compose TOPS_INSTALL_ID
 # Read by SnsSignatureVerifier, which fails closed when it cannot tell whose topic
 # a message came from. The legacy HTTP callback route lives in this tier.
 sync_env_from_compose TOPS_SNS_ARN
+sync_env_from_compose TOPS_QUARANTINE_SQS_NAME
 # Queue connections come from generated/teemops.env (env_file). Bake them into the
 # container .env too so the web tier (php-fpm) resolves them the same as CLI,
 # regardless of php-fpm's environment handling. Scans use the database queue;
