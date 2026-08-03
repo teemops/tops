@@ -56,12 +56,15 @@ alone. The administrator creates the stack in their own console, under their own
 
 [![Diagram: TOPS generates a CloudFormation quick-create URL; the child account admin creates a stack that makes a cross-account IAM role plus a custom resource; the custom resource publishes the role ARN to the parent SNS topic; the TOPS worker long-polls SQS, matches it and stores it, then replies to CloudFormation.](../assets/diagrams/aws-child-account-linking.svg)](../assets/diagrams/aws-child-account-linking.svg)
 
-1. **Hand over a link.** A console quick-create URL carrying four parameters: your parent
-   account id, the region, the account's `ExternalId` and its `UniqueId`.
+1. **Hand over a link.** A console quick-create URL carrying five parameters: your parent
+   account id, the region, the account's `ExternalId`, its `UniqueId`, and a `TopsInstallId`
+   that identifies your installation.
 2. **The admin creates the stack.** In their account, with their permissions. TOPS has no
    session there and cannot create it for them.
-3. **The stack calls home.** A custom resource publishes the new role ARN, external id and
-   unique id to your SNS topic, which fans into `teemops_main`.
+3. **The stack calls home.** A custom resource publishes the new role ARN, external id,
+   unique id and install id to your SNS topic. The topic's subscription only forwards
+   messages carrying *your* install id into `teemops_main`; anything else goes to a
+   quarantine queue you can inspect, so a mismatched link fails visibly instead of silently.
 4. **Your worker picks it up.** Outbound long-poll from inside your network. The message is
    accepted only if both ids match a record you already created.
 5. **The stack completes.** TOPS replies to the CloudFormation `ResponseURL`; the admin sees
