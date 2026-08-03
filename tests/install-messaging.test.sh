@@ -391,8 +391,11 @@ else
   fail "the installer does not persist TOPS_INSTALL_ID — the next re-run would mint a new one"
 fi
 
-for template in "$REPO_ROOT/templates/iam.role.child.account.cfn.yaml" \
-                "$REPO_ROOT/templates/iam.role.audit.account.cfn.yaml"; do
+# One template, and it should stay that way. The audit variant was deleted in #102:
+# it defaulted ParentAWSAccountId to the vendor's own AWS account, so deploying it
+# unmodified created a cross-account role trusting an account the operator did not
+# control. Nothing referenced it.
+for template in "$REPO_ROOT/templates/iam.role.child.account.cfn.yaml"; do
   name="$(basename "$template")"
 
   if grep -q 'TopsInstallId: !Ref TopsInstallId' "$template"; then
@@ -408,6 +411,19 @@ for template in "$REPO_ROOT/templates/iam.role.child.account.cfn.yaml" \
     pass "$name marks TopsInstallId NoEcho"
   else
     fail "$name does not mark TopsInstallId NoEcho"
+  fi
+done
+
+# A template with a Default on the parent account is deployable by a stranger against
+# an account they do not own — the defect #102 was filed for. Guard the whole
+# directory rather than the one file, so a future template cannot reintroduce it.
+for template in "$REPO_ROOT"/templates/*.cfn.yaml; do
+  name="$(basename "$template")"
+
+  if awk '/^  ParentAWSAccountId:/{f=1; next} f && /^  [A-Za-z]/{exit} f && /Default:/{print; exit}' "$template" | grep -q Default; then
+    fail "$name gives ParentAWSAccountId a Default — it would deploy against whatever account is baked in"
+  else
+    pass "$name makes ParentAWSAccountId explicit"
   fi
 done
 

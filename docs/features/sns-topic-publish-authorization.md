@@ -280,6 +280,9 @@ worthwhile reduction. It is not "the topic is now private".
 
 4. **Both child templates need the parameter**, not just one:
    `iam.role.child.account.cfn.yaml` and `iam.role.audit.account.cfn.yaml`.
+   *(Resolved differently in the end: the audit template was deleted under
+   [#102](https://github.com/teemops/tops/issues/102) rather than maintained. There is now one
+   child template.)*
 
 5. **Verify payload filtering works against a real CloudFormation message** before this is
    relied on (see the warning under [Research findings](#research-findings)).
@@ -392,12 +395,30 @@ filter existed.
 
 Noticed while researching; not part of this work, but they touch the same files.
 
-- **`iam.role.audit.account.cfn.yaml` hardcodes a parent account** — [#102](https://github.com/teemops/tops/issues/102).
-  `ParentAWSAccountId` defaults to `660228977852` (Teem's SaaS account) and the notifier's
-  `ServiceToken` is built from `AWS::Region` rather than a parent-region parameter — unlike
-  the child template, which was fixed to take `ParentDeploymentRegion`. As shipped, a
-  self-hosted user deploying the audit template with defaults points their stack at someone
-  else's account. Worth its own issue.
+- ~~**`iam.role.audit.account.cfn.yaml` hardcodes a parent account**~~ — [#102](https://github.com/teemops/tops/issues/102),
+  **resolved 2026-08-03 by deleting the template.** `ParentAWSAccountId` defaulted to
+  `660228977852` (Teem's SaaS account) and the notifier's `ServiceToken` was built from
+  `AWS::Region` rather than a parent-region parameter — unlike the child template, which was
+  fixed to take `ParentDeploymentRegion`. A self-hosted operator deploying it with defaults
+  created a cross-account IAM role in their own account trusting an account they did not
+  control, carrying `ReadOnlyAccess` plus `securityhub:*`, `guardduty:*`, `macie:*`,
+  `inspector:*`, CloudTrail and CloudWatch writes, and `iam:PassRole` on `role/tops*`.
+
+  Nothing in the product referenced it — the installer uploads only
+  `iam.role.child.account.cfn.yaml`, and `TOPS_CFN_TEMPLATE_URL` points at that same file — so
+  it was deleted rather than repaired. Keeping a second, unexercised copy of the onboarding
+  template was itself the defect: it drifted for a whole SaaS-to-self-hosted pivot without
+  anyone noticing, because nothing ran it.
+
+  `templates/sync.sh` went with it. It ran
+  `aws s3api put-bucket-acl --bucket storage.teemops.com --acl public-read` and synced the
+  whole directory with `--acl public-read` — vendor-era publishing that has no meaning in a
+  self-hosted install, where the installer uploads the template to the operator's *own*
+  deployment bucket. That answers the third acceptance criterion on #102: `storage.teemops.com`
+  should not be publicly readable on this project's behalf, because this project no longer
+  publishes anything to it. **Deleting the script does not un-publish what is already in that
+  bucket** — objects previously synced there stay public until removed by hand, which only the
+  bucket's owner can do.
 - **`TopsMainSQSPolicy` grants `SQS:ReceiveMessage` to `Principal: "*"`.** Harmless in
   practice — the `aws:SourceArn` condition can never match a direct caller, so it is dead
   permission — but it reads alarmingly in a review. Drop `ReceiveMessage` from the statement.

@@ -211,7 +211,9 @@ class ProcessSqsMessages extends Command
         $roleArn = $resourceProperties['TopsRoleArn'] ?? null;
         $externalId = $resourceProperties['TopsExternalId'] ?? null;
         $uniqueId = $resourceProperties['TopsUniqueId'] ?? null;
-        $topsType = $resourceProperties['TopsType'] ?? null;
+        // TopsType is deliberately not read. It distinguished "ops" from "audit", and
+        // the audit template that sent "audit" was deleted in #102; nothing branched
+        // on it even while that template existed. Messages still carry the field.
 
         if (!$requestType || !$responseUrl || !$stackId || !$requestId) {
             $this->warn('Message missing required CloudFormation fields, deleting from queue');
