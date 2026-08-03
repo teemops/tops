@@ -1,0 +1,64 @@
+site_name: TOPS Documentation
+site_url: https://docs.teemops.com
+site_description: >-
+  Documentation for running TOPS — connecting an AWS account, reading a finding,
+  and everyday use.
+repo_url: https://github.com/teemops/tops
+repo_name: teemops/tops
+edit_uri: edit/develop/user-docs/
+
+docs_dir: user-docs
+site_dir: site
+
+# README.md in user-docs/ is contributor-facing (conventions, archetypes, status)
+# — see D-10. It documents how to write the site, it isn't a page of it.
+exclude_docs: |
+  README.md
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.sections
+    - navigation.top
+    - navigation.indexes
+    - toc.follow
+    - search.suggest
+    - content.action.edit
+
+markdown_extensions:
+  - tables
+  - toc:
+      permalink: true
+
+extra_css:
+  - assets/extra.css
+
+# Only pages that exist. Per user-docs/README.md's own rule ("no links to pages
+# that do not exist yet"), the nav grows one entry per page as it's written —
+# see design/docs-site/information-architecture.md for the full 34-page map.
+nav:
+  - Start here:
+      - What TOPS is: start-here/what-tops-is.md
+      - How TOPS connects to AWS: start-here/how-tops-connects-to-aws.md
+      - Install: start-here/install.md
+      - Connect your first AWS account: start-here/connect-your-first-aws-account.md
+      - Run your first scan: start-here/run-your-first-scan.md
+  - Using TOPS:
+      - Reading a finding: using-tops/reading-a-finding.md
+      - Resolving a finding: using-tops/resolving-a-finding.md
+  - AWS accounts:
+      - What the IAM role can do: aws-accounts/what-the-iam-role-can-do.md
+  - Security:
+      - The security model: security/the-security-model.md
+      - Reporting a vulnerability: security/reporting-a-vulnerability.md

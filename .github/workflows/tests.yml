@@ -167,3 +167,58 @@ jobs:
       # is what keeps them there.
       - name: Audit dependencies
         run: npm audit --audit-level=critical
+
+  docs:
+    name: Docs site build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Repo root, not app/ — mkdocs.yml and user-docs/ both live there.
+    defaults:
+      run:
+        working-directory: .
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install MkDocs Material
+        run: pip install -r requirements.txt
+
+      # --strict turns a broken nav entry, a dead cross-reference mkdocs itself
+      # can see, or a missing page into a failed build instead of a silently
+      # broken link on docs.teemops.com.
+      - name: Build docs.teemops.com
+        run: mkdocs build --strict
+
+      # user-docs/README.md's own link-checker, for the relative links mkdocs
+      # doesn't validate because they point at pages not yet in the nav.
+      - name: Check user-docs cross-references
+        run: |
+          python3 - <<'EOF'
+          import pathlib, re, sys
+          bad = []
+          for md in pathlib.Path("user-docs").rglob("*.md"):
+              text = re.sub(r"```.*?```", "", md.read_text(), flags=re.S)
+              for m in re.finditer(r"\]\((?!https?:|#)([^)#]+)(#[^)]*)?\)", text):
+                  if not (md.parent / m.group(1)).resolve().exists():
+                      bad.append(f"{md}: -> {m.group(1)}")
+          if bad:
+              print("\n".join(bad))
+              sys.exit(1)
+          print("all relative links resolve")
+          EOF
+
+      # SVGs fail as a silent broken image, not a build error — see
+      # user-docs/README.md's Diagrams section.
+      - name: Validate diagram SVGs
+        run: |
+          python3 -c "
+          import xml.etree.ElementTree as ET, glob
+          [ET.parse(f) for f in glob.glob('user-docs/assets/diagrams/*.svg')]
+          print('all diagrams parse as valid XML')
+          "
