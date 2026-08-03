@@ -5,7 +5,8 @@ to `docs/`, which is the contributor and maintainer knowledge base. See
 [D-10](../docs/roadmap.md#d-10-in-full-where-user-documentation-lives) for why the two are
 kept apart.
 
-**Status: first slice.** Four pages so far. The structure it will grow into is designed in
+**Status: priority-1 set complete.** 10 of the IA's 34 pages so far — every page the
+inventory marks priority 1. The structure it will grow into is designed in
 [`design/docs-site/information-architecture.md`](../design/docs-site/information-architecture.md)
 — 34 pages across 8 sections, with a content map showing what already exists elsewhere in
 the repo and needs porting rather than writing.
@@ -14,17 +15,27 @@ the repo and needs porting rather than writing.
 
 | Page | For |
 | --- | --- |
+| [What TOPS is — and what it isn't](start-here/what-tops-is.md) | Anyone arriving at the site for the first time |
 | [How TOPS connects to AWS](start-here/how-tops-connects-to-aws.md) | Security reviewers approving TOPS for an AWS organisation |
-| [What the IAM role can do](aws-accounts/what-the-iam-role-can-do.md) | The same reviewers, once they ask what the permissions actually grant |
+| [Install](start-here/install.md) | Whoever is about to run it |
+| [Connect your first AWS account](start-here/connect-your-first-aws-account.md) | The same person, once TOPS is up |
+| [Run your first scan](start-here/run-your-first-scan.md) | The same person, once an account is connected |
 | [Reading a finding](using-tops/reading-a-finding.md) | Whoever has just run their first scan and is looking at the results |
 | [Resolving a finding](using-tops/resolving-a-finding.md) | The same person, once they have fixed something and want it off the list |
+| [What the IAM role can do](aws-accounts/what-the-iam-role-can-do.md) | Reviewers, once they ask what the permissions actually grant |
+| [The security model](security/the-security-model.md) | Reviewers asking about the product itself, not just the AWS boundary |
+| [Reporting a vulnerability](security/reporting-a-vulnerability.md) | Anyone who found one |
 
 ## Conventions
 
-**Plain Markdown, no framework.** The renderer is deliberately undecided until there is
-enough content to need navigation and search. Nothing here may depend on renderer-specific
-syntax — no MDX, no components, no shortcodes. If a page cannot be written in CommonMark plus
-tables, that is a signal about the page, not about the tooling.
+**Plain Markdown, minimal renderer.** Deployed via [MkDocs](https://www.mkdocs.org/) with
+the [Material](https://squidfunk.github.io/mkdocs-material/) theme — see **D-13** in the
+roadmap and [Tooling](../design/docs-site/information-architecture.md#tooling-mkdocs--material--decided-2026-08-03-recorded-as-d-13)
+in the IA doc for why. Config is `mkdocs.yml` and `requirements.txt` at the repository
+root; build locally with `pip install -r requirements.txt && mkdocs serve`. Nothing here
+may depend on renderer-specific syntax regardless — no MDX, no components, no shortcodes.
+If a page cannot be written in CommonMark plus tables, that is a signal about the page, not
+about the tooling.
 
 **Install instructions live in `README.md`, not here.** Linking beats copying; two canonical
 copies drift. Pages reference it rather than restating commands.

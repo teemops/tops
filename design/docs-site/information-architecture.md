@@ -117,12 +117,12 @@ somewhere and needs porting and a change of voice, not that a `user-docs/` page 
 | Page | For | Status | Source | Priority |
 | --- | --- | --- | --- | :---: |
 | **Start here** |
-| What TOPS is — and what it is not | All | ✍️ Write | `README.md` intro, roadmap Direction | 1 |
+| What TOPS is — and what it is not | All | ✅ **Written** | `README.md` intro, `docs/PROGRESS.md` | **1** |
 | How TOPS connects to AWS | Evaluator | ✅ **Built this session** | `design/architecture/aws-integration.html` | 1 |
 | What it costs to run | Evaluator, Operator | ⚠️ Partial | `install.sh` `aws_intro()`, `docker-compose.README.md` | 2 |
-| Install | Operator | ✅ Exists | `README.md` § Install — link, don't copy | 1 |
-| Connect your first AWS account | Operator | ✅ Exists | `README.md` § Scanning a real AWS account | 1 |
-| Run your first scan | Operator, User | ⚠️ Thin | `README.md`, `docs/features/scan-*.md` | 1 |
+| Install | Operator | ✅ **Written** | `README.md` § Install — links, doesn't copy | **1** |
+| Connect your first AWS account | Operator | ✅ **Written** | `README.md` § Scanning a real AWS account, the architecture page | **1** |
+| Run your first scan | Operator, User | ✅ **Written** | `Pages/Scans/Index.vue`, `Pages/Scans/NewScanModal.vue` | **1** |
 | **Using TOPS** |
 | The dashboard | User | ✍️ Write | `Pages/Dashboard.vue` | 3 |
 | Running a scan | User | ✍️ Write | `Pages/Scans/*`, `NewScanModal.vue` | 2 |
@@ -148,9 +148,9 @@ somewhere and needs porting and a change of voice, not that a `user-docs/` page 
 | Troubleshooting | Operator | ✅ Exists | `DEBUG.md`, `README.md` § If something goes wrong | 2 |
 | Uninstalling | Operator, Evaluator | ⚠️ Partial | `docker-compose.README.md`; the two CFN stacks | 3 |
 | **Security** |
-| The security model | Evaluator | ✅ **Built this session** | The architecture page's boundary table | **1** |
+| The security model | Evaluator | ✅ **Written** | Roadmap D-1/D-2/D-9, `docs/PROGRESS.md`, `SECURITY.md` | **1** |
 | Where your data lives | Evaluator | ✍️ Write | Nothing leaves the install — needs stating plainly | 2 |
-| Reporting a vulnerability | Evaluator | ✅ **Done** | `SECURITY.md` — link to it rather than restating it | **1** |
+| Reporting a vulnerability | Evaluator | ✅ **Written** | `SECURITY.md` — links to it rather than restating it | **1** |
 | Licence and trademark | Evaluator | ✅ Exists | `LICENSE`, `TRADEMARK.md`, roadmap D-7 | 3 |
 | **Reference** |
 | Glossary | All | ✅ Exists | `docs/GLOSSARY.md` | 3 |
@@ -158,9 +158,13 @@ somewhere and needs porting and a change of voice, not that a `user-docs/` page 
 | Command reference | Operator | ✍️ Write | `artisan` commands, `backup.sh`, `install.sh` flags | 4 |
 | Release notes | All | ✅ Exists | `CHANGELOG.md` | 4 |
 
-**Totals:** 34 pages — 12 exist in substance, 5 partial or scattered, 17 to write from
-scratch. Roughly a third of the site is a porting-and-rewriting job rather than an authoring
-job, which is the argument for doing the IA before the writing.
+**Totals, original:** 34 pages — 12 exist in substance, 5 partial or scattered, 17 to write
+from scratch. Roughly a third of the site was a porting-and-rewriting job rather than an
+authoring job, which is the argument for doing the IA before the writing.
+
+**Updated 2026-08-04:** 10 of 34 pages are now written and live in `user-docs/` — the
+whole priority-1 set (all six Start here and Security pages, plus the two Using TOPS pages
+from the first slice). 24 remain, all priority 2 or lower.
 
 ### Two gaps this inventory exposed
 
@@ -352,19 +356,33 @@ selection, and a theme whose image CSS is one rule away from correct. That is th
 requirement list, and every MkDocs- or Docsify-class renderer meets it. **Nothing found here
 argues for a framework.**
 
-## Tooling stays deferred, on purpose
+## Tooling: MkDocs + Material — decided 2026-08-03, recorded as D-13
 
-D-10 said plain Markdown, renderer chosen once there is content. **This design does not
-change that**, and the wireframes should not be read as a vote for a framework.
+D-10 said plain Markdown, renderer chosen once there is content. That trigger fired once
+the first slice's four pages existed against an eight-section, 34-page map — section count
+and search both actually bite now, not hypothetically.
 
-What the wireframes commit to is only what any renderer in the MkDocs/Docsify class gives
-you free: a left sidebar of sections, a content column at a readable measure, an on-page
-table of contents, and search. Nothing in the IA needs MDX, React components, or a build
-step. The one page with real layout demands — the architecture explainer — is already a
-self-contained HTML page with inline SVG, which every candidate renderer can embed.
+**MkDocs with the Material theme**, deployed to `docs.teemops.com` via Cloudflare Pages
+(build command `mkdocs build`, output directory `site`). It's the choice this document
+already argued for without naming it: only what any renderer in the MkDocs/Docsify class
+gives free — a left sidebar of sections, a content column at a readable measure, an
+on-page table of contents, and search — nothing here ever needed MDX, React components, or
+a hand-rolled build step. Chosen over Docsify specifically because it renders real static
+HTML per page rather than client-side; the evaluator audience this document identifies
+above arrives via a vendor-review request or a search result, not already inside the app,
+and static HTML is what a crawler and a skimmed link both want. It adds no new language to
+the repo — `python3` already backs the link-checker and SVG-validator scripts sitting next
+to it in `user-docs/README.md`.
 
-**Revisit when:** the first slice is written and the section count or search need actually
-bites. Not before.
+The one page with real layout demands — the architecture explainer — is already a
+self-contained Markdown page with linked SVGs, which the theme embeds with one CSS rule
+(`p:has(img) { max-width: none }`, the fix this document's sample test below found
+necessary). Config lives in `mkdocs.yml` and `requirements.txt` at the repository root, and
+`.github/workflows/tests.yml` gained a `docs` job so a broken nav entry or a dead diagram
+fails CI instead of shipping to `docs.teemops.com`.
+
+**Revisit when:** content needs something outside MkDocs' plugin ecosystem, or the Python
+build step becomes a maintenance burden of its own.
 
 ## First slice
 

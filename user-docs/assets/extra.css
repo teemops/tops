@@ -1,0 +1,8 @@
+/* The one rule the sample test (design/docs-site/information-architecture.md)
+   found necessary: Markdown wraps an image in a <p>, and Material caps prose at
+   a readable measure, which silently caps every diagram at that same width.
+   Diagrams are authored at a 900px viewBox specifically to read at ~1:1 without
+   that cap — see user-docs/README.md's Diagrams section. */
+.md-content__inner p:has(img) {
+  max-width: none;
+}

@@ -100,6 +100,7 @@ Decisions already made, so we don't relitigate them. Each has a trigger for revi
 | **D-10** | **User documentation lives in a top-level `user-docs/` directory, not under `docs/`, and deploys to `docs.teemops.com`.** One site for technical and non-technical readers — no separate tracks. | 2026-07-31 | See below. | The content outgrows plain Markdown, or a contributor proposes a better home. |
 | **D-12** | **No security score.** Removed rather than recalibrated. Severity counts and the breakdown are what we show; a score can come back later if a design partner asks for one and we know what it should mean. | 2026-08-02 | See below. Closes [#91](https://github.com/teemops/tops/issues/91). | A design partner asks for a single headline number — and then design it so it can *move*. |
 | **D-11** | **A finding is a durable record keyed by AWS account + resource + rule, and findings are current state. No per-scan history, no observations table.** The most recent scan that examined a resource is authoritative for its content; status belongs to the user. | 2026-08-01 | See below. Shipped as [#81](https://github.com/teemops/tops/issues/81). | A design partner asks for trends over time — and then treat it as a new data model, not an addition to this one. |
+| **D-13** | **Docs renderer: MkDocs + Material theme**, deployed to `docs.teemops.com` via Cloudflare Pages (`mkdocs build`, output `site/`). Fills in the choice D-10 deliberately deferred. | 2026-08-03 | Clears the "MkDocs- or Docsify-class" bar D-10 set, now that section count and search actually bite (four pages against an eight-section, 34-page IA). Material gives sidebar nav, on-page TOC and client-side search for free — nothing here needed building by hand. Chosen over Docsify because it renders real static HTML per page rather than client-side, which matters for the evaluator audience D-10's own design work identified as arriving via search or a vendor-review link rather than already inside the app. Adds no new language to the repo: `python3` already backs the link-checker and SVG-validator scripts next to it in `user-docs/README.md`. | Content needs something outside MkDocs' plugin ecosystem, or the Python build step becomes a maintenance burden of its own. |
 
 > **Naming collision, flagged 2026-08-01.** [`durable-findings.md`](./features/durable-findings.md)
 > and the wireframes label the durable-findings decision **D-1**, which in *this* document is
@@ -585,9 +586,15 @@ Unlike the scanner-coverage backlog this doesn't have a natural per-item unit, s
 as a first slice plus continuous growth rather than a checklist.
 
 **First slice**
-- [ ] `user-docs/` exists with a handful of pages covering what N-3 doesn't: reading and
-      resolving a finding, switching scan profiles, managing organization members
-- [ ] Cloudflare Pages is connected and `docs.teemops.com` resolves to it
+- [x] `user-docs/` exists — 10 of the IA's 34 pages written, closing the entire
+      priority-1 set: what TOPS is, how TOPS connects to AWS, install, connect your first
+      AWS account, run your first scan, what the IAM role can do, reading a finding,
+      resolving a finding, the security model, reporting a vulnerability. Scan profiles
+      and member management are priority-2, still ahead, per the IA's writing order
+- [ ] Cloudflare Pages is connected and `docs.teemops.com` resolves to it — **D-13** picked
+      the renderer (MkDocs + Material) and the repo now builds; the Pages project itself
+      still needs connecting in the Cloudflare dashboard, which isn't something a repo
+      commit can do
 - [ ] `README.md`'s setup section trims to a summary linking into `user-docs/`, so
       installation instructions have exactly one canonical copy
 
