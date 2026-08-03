@@ -1,0 +1,136 @@
+<svg role="img" aria-labelledby="t d" viewBox="0 0 900 640" xmlns="http://www.w3.org/2000/svg">
+  <title id="t">TOPS Docker Compose runtime and scan fan-out</title>
+  <desc id="d">Six containers on one host: app, mysql, worker, backup, db-restore and maildev. The worker's supervisord pools poll the database queue for scan jobs and SQS for account linking, and reach AWS outbound only, through sts:AssumeRole.</desc>
+  <style>
+    /* Self-contained: this file is embedded as an image, so it cannot inherit the
+       page's theme tokens. It carries its own and follows the reader's OS setting.
+       Authored at a 900px viewBox so the text survives scaling into a docs column. */
+    svg {
+      --surface:#ffffff; --surface-2:#eef1f7;
+      --ink:#0d1526; --ink-2:#33405a; --muted:#5f6d88;
+      --line:#d3dae6; --line-soft:#e4e9f1;
+      --host:#2255d6; --parent:#0d7168; --child:#a8570b;
+      --tint-host:rgba(34,85,214,.05); --tint-parent:rgba(13,113,104,.055); --tint-child:rgba(168,87,11,.055);
+      --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+      --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: var(--surface);
+    }
+    @media (prefers-color-scheme: dark) {
+      svg {
+        --surface:#0f1725; --surface-2:#18222f;
+        --ink:#e3e9f5; --ink-2:#b6c1d6; --muted:#8a97af;
+        --line:#273246; --line-soft:#1c2534;
+        --host:#6e9bff; --parent:#45c9b8; --child:#e8a33d;
+        --tint-host:rgba(110,155,255,.08); --tint-parent:rgba(69,201,184,.08); --tint-child:rgba(232,163,61,.08);
+      }
+    }
+    .d-zone { fill:none; stroke-width:1.5; stroke-dasharray:7 5; }
+    .z-host { stroke:var(--host); fill:var(--tint-host); }
+    .z-parent { stroke:var(--parent); fill:var(--tint-parent); }
+    .z-child { stroke:var(--child); fill:var(--tint-child); }
+    .d-zlabel { font-family:var(--mono); font-size:11.5px; letter-spacing:.13em; text-transform:uppercase; font-weight:600; }
+    .zl-host { fill:var(--host); } .zl-parent { fill:var(--parent); } .zl-child { fill:var(--child); }
+    .d-card { fill:var(--surface); stroke:var(--line); stroke-width:1.25; }
+    .d-card-ghost { fill:var(--surface); stroke:var(--line); stroke-width:1.25; opacity:.5; }
+    .d-card-soft { fill:var(--surface-2); stroke:var(--line-soft); stroke-width:1.25; }
+    .d-title { font-family:var(--sans); font-size:15.5px; font-weight:620; fill:var(--ink); }
+    .d-mono { font-family:var(--mono); font-size:13px; fill:var(--ink-2); }
+    .d-sub { font-family:var(--sans); font-size:12.5px; fill:var(--muted); }
+    .d-tag { font-family:var(--mono); font-size:11px; letter-spacing:.11em; text-transform:uppercase; fill:var(--muted); }
+    .d-note { font-family:var(--sans); font-size:13px; fill:var(--muted); font-style:italic; }
+    .d-flow { fill:none; stroke:var(--ink-2); stroke-width:1.6; }
+    .d-flow-dash { fill:none; stroke:var(--muted); stroke-width:1.5; stroke-dasharray:5 4; }
+    .d-chip { fill:var(--ink); }
+    .d-chip-t { font-family:var(--mono); font-size:12px; font-weight:600; fill:var(--surface); text-anchor:middle; }
+    .d-dim { opacity:.6; }
+    .arw-head { fill:var(--ink-2); }
+    .arw-head-dim { fill:var(--muted); }
+  </style>
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path class="arw-head" d="M 0 0 L 10 5 L 0 10 z"/>
+    </marker>
+    <marker id="arw-dim" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path class="arw-head-dim" d="M 0 0 L 10 5 L 0 10 z"/>
+    </marker>
+  </defs>
+
+  <rect class="d-zone z-host" x="14" y="48" width="580" height="460" rx="12"/>
+  <text class="d-zlabel zl-host" x="32" y="72">One Docker Compose project</text>
+
+  <rect class="d-card" x="32" y="88" width="246" height="104" rx="8"/>
+  <text class="d-title" x="48" y="114">app</text>
+  <text class="d-mono" x="48" y="138">teem/tops:&#60;tag&#62;</text>
+  <text class="d-sub" x="48" y="160">nginx + php-fpm on :8080</text>
+  <text class="d-sub" x="48" y="179">No AWS credentials at all</text>
+
+  <rect class="d-card" x="306" y="88" width="270" height="104" rx="8"/>
+  <text class="d-title" x="322" y="114">mysql 8.0</text>
+  <text class="d-mono" x="322" y="138">volume: mysql-data</text>
+  <text class="d-sub" x="322" y="160">Orgs, accounts, findings</text>
+  <text class="d-sub" x="322" y="179">&#8212; and the job queue</text>
+
+  <rect class="d-card" x="32" y="212" width="544" height="188" rx="8"/>
+  <text class="d-title" x="48" y="238">worker</text>
+  <text class="d-sub" x="122" y="238">same image, different entrypoint</text>
+  <text class="d-tag" x="48" y="262">supervisord pools</text>
+  <text class="d-mono" x="48" y="286">tops-queue &#215;1</text>
+  <text class="d-sub" x="48" y="305">default, teemops_audit &#8212; orchestrates a scan</text>
+  <text class="d-mono" x="48" y="331">tops-region-queue &#215;5</text>
+  <text class="d-sub" x="48" y="350">teemops_audit_region &#8212; does the scanning</text>
+  <text class="d-mono" x="48" y="376">tops-account-queue &#183; tops-scheduler</text>
+  <text class="d-sub" x="48" y="393">aws:process-sqs, off unless SQS is configured</text>
+
+  <rect class="d-card" x="32" y="416" width="246" height="76" rx="8"/>
+  <text class="d-title" x="48" y="442">backup</text>
+  <text class="d-sub" x="48" y="462">Full 17:00 &#183; diff hourly</text>
+  <text class="d-mono" x="48" y="483">~/.tops/backups</text>
+
+  <rect class="d-card-soft" x="306" y="416" width="270" height="76" rx="8"/>
+  <text class="d-tag" x="322" y="438">Also in the project</text>
+  <text class="d-sub" x="322" y="460">maildev on :8090</text>
+  <text class="d-sub" x="322" y="479">db-restore, parked behind a profile</text>
+
+  <rect class="d-zone z-child" x="614" y="48" width="272" height="460" rx="12"/>
+  <text class="d-zlabel zl-child" x="632" y="72">AWS &#8212; outbound only</text>
+
+  <rect class="d-card" x="632" y="88" width="236" height="92" rx="8"/>
+  <text class="d-title" x="648" y="114">SQS long-poll</text>
+  <text class="d-mono" x="648" y="138">teemops_main</text>
+  <text class="d-sub" x="648" y="160">Account linking only.</text>
+
+  <rect class="d-card" x="632" y="204" width="236" height="102" rx="8"/>
+  <text class="d-title" x="648" y="230">sts:AssumeRole</text>
+  <text class="d-sub" x="648" y="252">Role ARN + external id.</text>
+  <text class="d-sub" x="648" y="271">Temporary credentials,</text>
+  <text class="d-sub" x="648" y="290">held for one job only.</text>
+
+  <rect class="d-card-ghost" x="644" y="342" width="224" height="118" rx="8"/>
+  <rect class="d-card-ghost" x="638" y="336" width="224" height="118" rx="8"/>
+  <rect class="d-card" x="632" y="330" width="224" height="118" rx="8"/>
+  <text class="d-title" x="648" y="356">Child accounts &#215;N</text>
+  <text class="d-sub" x="648" y="378">Describe / List / Get</text>
+  <text class="d-sub" x="648" y="397">across every enabled</text>
+  <text class="d-sub" x="648" y="416">region. Results come</text>
+  <text class="d-sub" x="648" y="435">back to your database.</text>
+
+  <path class="d-flow" d="M 278 140 H 298" marker-end="url(#arw)"/>
+  <circle class="d-chip" cx="288" cy="140" r="10"/>
+  <text class="d-chip-t" x="288" y="144">1</text>
+  <path class="d-flow" d="M 441 192 V 204" marker-end="url(#arw)"/>
+  <circle class="d-chip" cx="441" cy="202" r="10"/>
+  <text class="d-chip-t" x="441" y="206">2</text>
+  <path class="d-flow" d="M 576 240 H 600 V 134 H 624" marker-end="url(#arw)"/>
+  <circle class="d-chip" cx="600" cy="187" r="10"/>
+  <text class="d-chip-t" x="600" y="191">3</text>
+  <path class="d-flow" d="M 576 300 H 624" marker-end="url(#arw)"/>
+  <circle class="d-chip" cx="600" cy="300" r="10"/>
+  <text class="d-chip-t" x="600" y="304">4</text>
+  <path class="d-flow" d="M 750 306 V 322" marker-end="url(#arw)"/>
+
+  <rect class="d-card-soft" x="14" y="530" width="872" height="66" rx="8"/>
+  <text class="d-tag" x="32" y="554">One full scan of one account</text>
+  <text class="d-mono" x="32" y="578">1 orchestrator job &#8594; ~153 region jobs &#8594; 5 workers in parallel</text>
+
+  <text class="d-note" x="16" y="622">Nothing listens for AWS. Every arrow leaving this box was started from inside it.</text>
+</svg>

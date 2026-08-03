@@ -1,0 +1,123 @@
+<svg role="img" aria-labelledby="t d" viewBox="0 0 900 648" xmlns="http://www.w3.org/2000/svg">
+  <title id="t">Linking a child AWS account to TOPS</title>
+  <desc id="d">TOPS generates a CloudFormation quick-create URL. The child account's own administrator creates a stack that makes a cross-account IAM role plus a custom resource. The custom resource publishes the role ARN to your parent SNS topic, your worker long-polls SQS, matches it against a pending record and stores it, then replies to CloudFormation.</desc>
+  <style>
+    /* Self-contained: this file is embedded as an image, so it cannot inherit the
+       page's theme tokens. It carries its own and follows the reader's OS setting.
+       Authored at a 900px viewBox so the text survives scaling into a docs column. */
+    svg {
+      --surface:#ffffff; --surface-2:#eef1f7;
+      --ink:#0d1526; --ink-2:#33405a; --muted:#5f6d88;
+      --line:#d3dae6; --line-soft:#e4e9f1;
+      --host:#2255d6; --parent:#0d7168; --child:#a8570b;
+      --tint-host:rgba(34,85,214,.05); --tint-parent:rgba(13,113,104,.055); --tint-child:rgba(168,87,11,.055);
+      --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+      --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: var(--surface);
+    }
+    @media (prefers-color-scheme: dark) {
+      svg {
+        --surface:#0f1725; --surface-2:#18222f;
+        --ink:#e3e9f5; --ink-2:#b6c1d6; --muted:#8a97af;
+        --line:#273246; --line-soft:#1c2534;
+        --host:#6e9bff; --parent:#45c9b8; --child:#e8a33d;
+        --tint-host:rgba(110,155,255,.08); --tint-parent:rgba(69,201,184,.08); --tint-child:rgba(232,163,61,.08);
+      }
+    }
+    .d-zone { fill:none; stroke-width:1.5; stroke-dasharray:7 5; }
+    .z-host { stroke:var(--host); fill:var(--tint-host); }
+    .z-parent { stroke:var(--parent); fill:var(--tint-parent); }
+    .z-child { stroke:var(--child); fill:var(--tint-child); }
+    .d-zlabel { font-family:var(--mono); font-size:11.5px; letter-spacing:.13em; text-transform:uppercase; font-weight:600; }
+    .zl-host { fill:var(--host); } .zl-parent { fill:var(--parent); } .zl-child { fill:var(--child); }
+    .d-card { fill:var(--surface); stroke:var(--line); stroke-width:1.25; }
+    .d-card-ghost { fill:var(--surface); stroke:var(--line); stroke-width:1.25; opacity:.5; }
+    .d-card-soft { fill:var(--surface-2); stroke:var(--line-soft); stroke-width:1.25; }
+    .d-title { font-family:var(--sans); font-size:15.5px; font-weight:620; fill:var(--ink); }
+    .d-mono { font-family:var(--mono); font-size:13px; fill:var(--ink-2); }
+    .d-sub { font-family:var(--sans); font-size:12.5px; fill:var(--muted); }
+    .d-tag { font-family:var(--mono); font-size:11px; letter-spacing:.11em; text-transform:uppercase; fill:var(--muted); }
+    .d-note { font-family:var(--sans); font-size:13px; fill:var(--muted); font-style:italic; }
+    .d-flow { fill:none; stroke:var(--ink-2); stroke-width:1.6; }
+    .d-flow-dash { fill:none; stroke:var(--muted); stroke-width:1.5; stroke-dasharray:5 4; }
+    .d-chip { fill:var(--ink); }
+    .d-chip-t { font-family:var(--mono); font-size:12px; font-weight:600; fill:var(--surface); text-anchor:middle; }
+    .d-dim { opacity:.6; }
+    .arw-head { fill:var(--ink-2); }
+    .arw-head-dim { fill:var(--muted); }
+  </style>
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path class="arw-head" d="M 0 0 L 10 5 L 0 10 z"/>
+    </marker>
+    <marker id="arw-dim" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path class="arw-head-dim" d="M 0 0 L 10 5 L 0 10 z"/>
+    </marker>
+  </defs>
+
+  <rect class="d-zone z-host" x="14" y="48" width="872" height="132" rx="12"/>
+  <text class="d-zlabel zl-host" x="32" y="72">Your TOPS install</text>
+
+  <rect class="d-card" x="100" y="88" width="380" height="76" rx="8"/>
+  <text class="d-title" x="116" y="114">Add AWS account</text>
+  <text class="d-sub" x="116" y="134">Creates a pending record, then</text>
+  <text class="d-mono" x="116" y="156">external_id &#183; random</text>
+
+  <rect class="d-card" x="506" y="88" width="364" height="76" rx="8"/>
+  <text class="d-title" x="522" y="114">aws:process-sqs</text>
+  <text class="d-sub" x="522" y="134">Matches both ids, then stores</text>
+  <text class="d-sub" x="522" y="156">the role ARN in your database.</text>
+
+  <rect class="d-zone z-child" x="14" y="220" width="872" height="230" rx="12"/>
+  <text class="d-zlabel zl-child" x="32" y="244">Any account you want scanned &#215;N</text>
+
+  <rect class="d-card-ghost" x="112" y="254" width="770" height="76" rx="8"/>
+  <rect class="d-card-ghost" x="106" y="248" width="770" height="76" rx="8"/>
+  <rect class="d-card" x="100" y="242" width="770" height="76" rx="8"/>
+  <text class="d-title" x="116" y="268">CloudFormation stack</text>
+  <text class="d-mono" x="116" y="290">tops-vendor-audit</text>
+  <text class="d-sub" x="116" y="310">Created by that account&#8217;s own admin, in their own console session.</text>
+
+  <rect class="d-card" x="100" y="354" width="374" height="76" rx="8"/>
+  <text class="d-title" x="116" y="380">IAM role</text>
+  <text class="d-sub" x="116" y="400">Trusts your parent account,</text>
+  <text class="d-mono" x="116" y="422">and only with sts:ExternalId</text>
+
+  <rect class="d-card" x="496" y="354" width="374" height="76" rx="8"/>
+  <text class="d-title" x="512" y="380">Custom resource</text>
+  <text class="d-sub" x="512" y="400">Fires at stack create, and</text>
+  <text class="d-mono" x="512" y="422">again at delete &#183; sns:Publish</text>
+
+  <rect class="d-zone z-parent" x="14" y="470" width="872" height="130" rx="12"/>
+  <text class="d-zlabel zl-parent" x="32" y="494">Your parent account</text>
+
+  <rect class="d-card" x="100" y="508" width="374" height="76" rx="8"/>
+  <text class="d-title" x="116" y="534">SQS &#183; teemops_main</text>
+  <text class="d-sub" x="116" y="556">Long-polled from inside your</text>
+  <text class="d-sub" x="116" y="575">own network.</text>
+
+  <rect class="d-card" x="496" y="508" width="374" height="76" rx="8"/>
+  <text class="d-title" x="512" y="534">SNS &#183; teemops-sns</text>
+  <text class="d-sub" x="512" y="556">Messaging only. No credentials,</text>
+  <text class="d-sub" x="512" y="575">no findings, no customer data.</text>
+
+  <path class="d-flow" d="M 290 164 V 234" marker-end="url(#arw)"/>
+  <circle class="d-chip" cx="290" cy="199" r="10"/>
+  <text class="d-chip-t" x="290" y="203">1</text>
+  <path class="d-flow" d="M 287 318 V 346" marker-end="url(#arw)"/>
+  <circle class="d-chip" cx="287" cy="332" r="10"/>
+  <text class="d-chip-t" x="287" y="336">2</text>
+  <path class="d-flow" d="M 683 318 V 346" marker-end="url(#arw)"/>
+  <path class="d-flow" d="M 683 430 V 500" marker-end="url(#arw)"/>
+  <circle class="d-chip" cx="683" cy="465" r="10"/>
+  <text class="d-chip-t" x="683" y="469">3</text>
+  <path class="d-flow" d="M 496 546 H 482" marker-end="url(#arw)"/>
+  <path class="d-flow" d="M 100 546 H 52 V 126 H 498" marker-end="url(#arw)"/>
+  <circle class="d-chip" cx="52" cy="340" r="10"/>
+  <text class="d-chip-t" x="52" y="344">4</text>
+  <path class="d-flow-dash" d="M 688 164 V 234" marker-end="url(#arw-dim)"/>
+  <circle class="d-chip" cx="688" cy="199" r="10"/>
+  <text class="d-chip-t" x="688" y="203">5</text>
+
+  <text class="d-note" x="16" y="628">The link is the only thing that travels outward. What comes back is one message, on one topic, that you own.</text>
+</svg>

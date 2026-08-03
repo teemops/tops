@@ -231,4 +231,4 @@ Future: Integration with AWS Config and Security Hub for additional insights.
 
 See the [Roadmap](./roadmap.md) for what's planned and why, [Progress](./PROGRESS.md) for
 what's built, [AWS Scanner Coverage](./planning.md) for the scanner expansion plan, and
-[Quick Start](./quick-start.md) for setup instructions.
+the [repository README](../README.md#install) for setup instructions.

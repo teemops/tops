@@ -5,7 +5,7 @@ This file provides quick links to all project documentation. For detailed docume
 ## Quick Links
 
 ### Essential Setup
-- [Quick Start](../docs/quick-start.md) - Get started quickly
+- [Install TOPS](../README.md#install) - the canonical setup path
 - [Environment Setup](../docs/laravel-app/ENV_SETUP.md) - Configure environment variables
 - [Database Setup](../docs/laravel-app/database-setup.md) - Database configuration
 

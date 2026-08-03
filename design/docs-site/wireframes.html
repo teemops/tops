@@ -1,0 +1,565 @@
+<title>docs.teemops.com &mdash; structure and wireframes</title>
+<style>
+  :root {
+    --ground: #f4f6fa;
+    --surface: #ffffff;
+    --surface-2: #eaeef5;
+    --ink: #0d1526;
+    --ink-2: #33405a;
+    --muted: #5f6d88;
+    --line: #d3dae6;
+    --line-soft: #e4e9f1;
+    --accent: #2255d6;
+    --accent-soft: rgba(34, 85, 214, 0.08);
+
+    --st-have: #0d7168;
+    --st-partial: #a8570b;
+    --st-write: #5f6d88;
+    --st-skip: #c0332b;
+
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, "JetBrains Mono", Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --shadow: 0 1px 2px rgba(13, 21, 38, 0.05), 0 10px 30px -18px rgba(13, 21, 38, 0.3);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground: #070c15;
+      --surface: #0f1725;
+      --surface-2: #18222f;
+      --ink: #e3e9f5;
+      --ink-2: #b6c1d6;
+      --muted: #8a97af;
+      --line: #273246;
+      --line-soft: #1c2534;
+      --accent: #6e9bff;
+      --accent-soft: rgba(110, 155, 255, 0.12);
+      --st-have: #45c9b8;
+      --st-partial: #e8a33d;
+      --st-write: #8a97af;
+      --st-skip: #f0837a;
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 12px 34px -20px rgba(0,0,0,.9);
+    }
+  }
+
+  :root[data-theme="light"] {
+    --ground: #f4f6fa; --surface: #ffffff; --surface-2: #eaeef5;
+    --ink: #0d1526; --ink-2: #33405a; --muted: #5f6d88;
+    --line: #d3dae6; --line-soft: #e4e9f1;
+    --accent: #2255d6; --accent-soft: rgba(34,85,214,.08);
+    --st-have: #0d7168; --st-partial: #a8570b; --st-write: #5f6d88; --st-skip: #c0332b;
+    --shadow: 0 1px 2px rgba(13,21,38,.05), 0 10px 30px -18px rgba(13,21,38,.3);
+  }
+
+  :root[data-theme="dark"] {
+    --ground: #070c15; --surface: #0f1725; --surface-2: #18222f;
+    --ink: #e3e9f5; --ink-2: #b6c1d6; --muted: #8a97af;
+    --line: #273246; --line-soft: #1c2534;
+    --accent: #6e9bff; --accent-soft: rgba(110,155,255,.12);
+    --st-have: #45c9b8; --st-partial: #e8a33d; --st-write: #8a97af; --st-skip: #f0837a;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 12px 34px -20px rgba(0,0,0,.9);
+  }
+
+  html { background: var(--ground); }
+  body {
+    background: var(--ground); color: var(--ink);
+    font-family: var(--sans); font-size: 16px; line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page { max-width: 1260px; margin: 0 auto; padding: 56px 28px 96px; display: flex; flex-direction: column; gap: 72px; }
+
+  .eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); }
+
+  h1 { font-size: clamp(30px, 4.2vw, 48px); line-height: 1.05; letter-spacing: -.028em; font-weight: 680; text-wrap: balance; max-width: 20ch; }
+
+  .masthead { display: flex; flex-direction: column; gap: 20px; }
+  .thesis { font-size: clamp(17px, 1.5vw, 19.5px); color: var(--ink-2); max-width: 64ch; }
+
+  .meta { display: flex; flex-wrap: wrap; gap: 8px 10px; padding-top: 4px; }
+  .tag { font-family: var(--mono); font-size: 11.5px; padding: 5px 10px; border: 1px solid var(--line); border-radius: 999px; color: var(--ink-2); background: var(--surface); white-space: nowrap; }
+
+  section { display: flex; flex-direction: column; gap: 22px; }
+
+  h2 { font-size: clamp(21px, 2.4vw, 29px); letter-spacing: -.02em; font-weight: 660; line-height: 1.14; text-wrap: balance; }
+  .lede { font-size: 16.5px; color: var(--ink-2); max-width: 68ch; }
+
+  .sec-label { font-family: var(--mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); }
+
+  /* ---------- browser mockup ---------- */
+
+  .browser {
+    border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
+    background: var(--surface); box-shadow: var(--shadow);
+  }
+
+  .chrome {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 14px; background: var(--surface-2); border-bottom: 1px solid var(--line);
+  }
+  .dots { display: flex; gap: 6px; flex: none; }
+  .dots i { width: 10px; height: 10px; border-radius: 50%; background: var(--line); display: block; }
+  .urlbar {
+    flex: 1; font-family: var(--mono); font-size: 11.5px; color: var(--muted);
+    background: var(--surface); border: 1px solid var(--line); border-radius: 6px;
+    padding: 4px 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  .shell { display: grid; grid-template-columns: 216px minmax(0, 1fr) 176px; min-height: 620px; }
+
+  .sidebar { border-right: 1px solid var(--line-soft); padding: 20px 0; background: var(--surface); }
+  .brand { display: flex; align-items: center; gap: 9px; padding: 0 18px 16px; border-bottom: 1px solid var(--line-soft); margin-bottom: 14px; }
+  .brand-mark { width: 22px; height: 22px; border-radius: 5px; background: var(--accent); flex: none; }
+  .brand-name { font-size: 14.5px; font-weight: 650; letter-spacing: -.01em; }
+  .brand-name span { color: var(--muted); font-weight: 400; }
+
+  .searchbox {
+    margin: 0 14px 18px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 7px;
+    font-family: var(--mono); font-size: 11px; color: var(--muted); display: flex; justify-content: space-between; gap: 8px;
+  }
+
+  .nav-group { padding: 0 14px; margin-bottom: 16px; }
+  .nav-h { font-family: var(--mono); font-size: 10px; letter-spacing: .13em; text-transform: uppercase; color: var(--muted); padding: 0 4px 7px; }
+  .nav-i { font-size: 13px; color: var(--ink-2); padding: 5px 8px; border-radius: 6px; }
+  .nav-i.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  .nav-i.dim { color: var(--muted); }
+
+  .content { padding: 30px 38px; min-width: 0; }
+  .toc { border-left: 1px solid var(--line-soft); padding: 30px 16px; }
+  .toc-h { font-family: var(--mono); font-size: 10px; letter-spacing: .13em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+  .toc-i { font-size: 12px; color: var(--muted); padding: 4px 0; line-height: 1.35; }
+  .toc-i.on { color: var(--accent); font-weight: 600; }
+
+  .crumb { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-bottom: 12px; }
+  .content h3 { font-size: 27px; letter-spacing: -.022em; font-weight: 660; line-height: 1.12; margin-bottom: 10px; }
+  .content .sub { color: var(--ink-2); font-size: 14.5px; max-width: 58ch; margin-bottom: 20px; }
+
+  .audience-chip {
+    display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono);
+    font-size: 10px; letter-spacing: .09em; text-transform: uppercase;
+    border: 1px solid var(--st-have); color: var(--st-have); border-radius: 999px; padding: 3px 9px; margin-bottom: 16px;
+  }
+
+  .diagram-slot {
+    border: 1.5px dashed var(--line); border-radius: 10px; background: var(--surface-2);
+    padding: 26px 20px; text-align: center; margin-bottom: 20px;
+  }
+  .diagram-slot .dt { font-size: 13.5px; font-weight: 620; color: var(--ink); margin-bottom: 5px; }
+  .diagram-slot .dd { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+
+  .skel { display: flex; flex-direction: column; gap: 7px; margin-bottom: 18px; }
+  .skel i { display: block; height: 8px; border-radius: 3px; background: var(--surface-2); }
+  .skel i.s60 { width: 60%; } .skel i.s85 { width: 85%; } .skel i.s95 { width: 95%; } .skel i.s40 { width: 40%; }
+
+  .mini-table { border: 1px solid var(--line-soft); border-radius: 8px; overflow: hidden; }
+  .mini-table div { display: grid; grid-template-columns: 92px 1fr 1fr; gap: 10px; padding: 8px 12px; font-size: 11.5px; border-bottom: 1px solid var(--line-soft); }
+  .mini-table div:last-child { border-bottom: none; }
+  .mini-table div:first-child { background: var(--surface-2); font-family: var(--mono); font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  .mini-table b { font-weight: 600; color: var(--ink); }
+  .mini-table span { color: var(--ink-2); }
+  .pill-out { color: var(--accent); font-family: var(--mono); font-size: 10px; }
+  .pill-never { color: var(--st-skip); font-family: var(--mono); font-size: 10px; }
+
+  /* ---------- archetypes ---------- */
+
+  .archetypes { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 20px; }
+  .arch { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); overflow: hidden; display: flex; flex-direction: column; }
+  .arch-head { padding: 16px 18px 14px; border-bottom: 1px solid var(--line-soft); }
+  .arch-n { font-family: var(--mono); font-size: 10px; letter-spacing: .13em; text-transform: uppercase; color: var(--accent); margin-bottom: 6px; }
+  .arch-t { font-size: 16px; font-weight: 650; letter-spacing: -.012em; margin-bottom: 5px; }
+  .arch-d { font-size: 13px; color: var(--muted); line-height: 1.45; }
+  .arch-body { padding: 16px 18px 20px; display: flex; flex-direction: column; gap: 9px; flex: 1; }
+
+  .blk { border: 1px dashed var(--line); border-radius: 6px; padding: 7px 10px; font-family: var(--mono); font-size: 10.5px; color: var(--muted); }
+  .blk.solid { border-style: solid; background: var(--surface-2); color: var(--ink-2); }
+  .blk.accent { border-color: var(--accent); color: var(--accent); }
+
+  .arch-foot { padding: 12px 18px; border-top: 1px solid var(--line-soft); font-size: 12px; color: var(--muted); background: var(--surface-2); }
+  .arch-foot b { color: var(--ink-2); font-weight: 600; }
+
+  /* ---------- site map ---------- */
+
+  .map { display: grid; grid-template-columns: repeat(auto-fit, minmax(268px, 1fr)); gap: 1px; background: var(--line-soft); border: 1px solid var(--line-soft); border-radius: 12px; overflow: hidden; }
+  .map-sec { background: var(--surface); padding: 18px 20px; display: flex; flex-direction: column; gap: 3px; }
+  .map-h { font-size: 14.5px; font-weight: 660; letter-spacing: -.01em; margin-bottom: 9px; display: flex; align-items: baseline; gap: 8px; }
+  .map-h em { font-family: var(--mono); font-size: 10px; font-style: normal; color: var(--muted); letter-spacing: .08em; }
+  .map-p { display: grid; grid-template-columns: 15px minmax(0, 1fr); gap: 8px; align-items: baseline; font-size: 13px; color: var(--ink-2); padding: 3px 0; line-height: 1.4; }
+  .map-p i { font-family: var(--mono); font-size: 10px; font-style: normal; line-height: 1.5; }
+  .i-have { color: var(--st-have); } .i-partial { color: var(--st-partial); } .i-write { color: var(--st-write); }
+  .map-p.key b { font-weight: 640; color: var(--ink); }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 10px 22px; font-size: 13px; color: var(--muted); }
+  .legend span { display: inline-flex; align-items: baseline; gap: 7px; }
+  .legend i { font-family: var(--mono); font-size: 10.5px; font-style: normal; }
+
+  /* ---------- stats ---------- */
+
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 1px; background: var(--line-soft); border: 1px solid var(--line-soft); border-radius: 12px; overflow: hidden; }
+  .stat { background: var(--surface); padding: 20px; display: flex; flex-direction: column; gap: 6px; }
+  .stat-n { font-size: 30px; font-weight: 670; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+  .stat-l { font-family: var(--mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .stat p { font-size: 13px; color: var(--ink-2); line-height: 1.45; }
+
+  .note { border-left: 3px solid var(--accent); background: var(--accent-soft); padding: 15px 18px; border-radius: 0 8px 8px 0; font-size: 14.5px; color: var(--ink-2); max-width: 80ch; }
+  .note b { color: var(--ink); font-weight: 630; }
+  .note.warn { border-left-color: var(--st-skip); background: color-mix(in srgb, var(--st-skip) 8%, transparent); }
+
+  code { font-family: var(--mono); font-size: .88em; background: var(--surface-2); padding: 1px 5px; border-radius: 4px; color: var(--ink); }
+
+  .scroller { overflow-x: auto; }
+  .scroller > .browser { min-width: 880px; }
+
+  footer { border-top: 1px solid var(--line); padding-top: 20px; font-size: 13.5px; color: var(--muted); display: flex; flex-direction: column; gap: 5px; }
+
+  @media (max-width: 640px) {
+    .page { padding: 36px 16px 64px; gap: 52px; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+  a { color: var(--accent); }
+  a:focus-visible, .scroller:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+</style>
+
+<div class="page">
+
+  <header class="masthead">
+    <div class="eyebrow">TOPS &middot; user documentation &middot; structure and wireframes</div>
+    <h1>docs.teemops.com</h1>
+    <p class="thesis">
+      One site, structured by task, serving three audiences without splitting into tracks.
+      This is the shell, the three page archetypes every page fits, and the full content map &mdash;
+      34 pages, of which 12 already exist in substance somewhere in the repo.
+    </p>
+    <div class="meta">
+      <span class="tag">D-10: user-docs/, not docs/</span>
+      <span class="tag">Cloudflare Pages</span>
+      <span class="tag">Plain Markdown &mdash; no framework yet</span>
+      <span class="tag">Marketing site out of scope</span>
+    </div>
+  </header>
+
+  <!-- ============ SHELL ============ -->
+  <section>
+    <div class="sec-label">01 &middot; The shell</div>
+    <h2>What every page sits inside</h2>
+    <p class="lede">
+      Sidebar of sections, content at a readable measure, on-page contents on the right. Nothing
+      here needs a framework &mdash; it is what any renderer in the MkDocs or Docsify class gives you
+      out of the box, which is what keeps D-10's "decide the tooling later" honest.
+      Shown with the page that prompted the site.
+    </p>
+
+    <div class="scroller" tabindex="0">
+      <div class="browser">
+        <div class="chrome">
+          <div class="dots"><i></i><i></i><i></i></div>
+          <div class="urlbar">docs.teemops.com/start-here/how-tops-connects-to-aws</div>
+        </div>
+        <div class="shell">
+
+          <aside class="sidebar">
+            <div class="brand">
+              <div class="brand-mark"></div>
+              <div class="brand-name">TOPS <span>docs</span></div>
+            </div>
+            <div class="searchbox"><span>Search</span><span>/</span></div>
+
+            <div class="nav-group">
+              <div class="nav-h">Start here</div>
+              <div class="nav-i">What TOPS is</div>
+              <div class="nav-i on">How TOPS connects to AWS</div>
+              <div class="nav-i">What it costs to run</div>
+              <div class="nav-i">Install</div>
+              <div class="nav-i">Connect your first account</div>
+              <div class="nav-i">Run your first scan</div>
+            </div>
+            <div class="nav-group">
+              <div class="nav-h">Using TOPS</div>
+              <div class="nav-i dim">6 pages</div>
+            </div>
+            <div class="nav-group">
+              <div class="nav-h">AWS accounts</div>
+              <div class="nav-i dim">4 pages</div>
+            </div>
+            <div class="nav-group">
+              <div class="nav-h">Your organization</div>
+              <div class="nav-i dim">4 pages</div>
+            </div>
+            <div class="nav-group">
+              <div class="nav-h">Running the service</div>
+              <div class="nav-i dim">6 pages</div>
+            </div>
+            <div class="nav-group">
+              <div class="nav-h">Security</div>
+              <div class="nav-i dim">4 pages</div>
+            </div>
+            <div class="nav-group">
+              <div class="nav-h">Reference</div>
+              <div class="nav-i dim">4 pages</div>
+            </div>
+          </aside>
+
+          <main class="content">
+            <div class="crumb">Start here / How TOPS connects to AWS</div>
+            <h3>How TOPS connects to AWS</h3>
+            <div class="audience-chip">Written for security reviewers</div>
+            <p class="sub">
+              TOPS runs on your infrastructure and reads your AWS accounts through cross-account IAM
+              roles. No stored access keys, no inbound network path, no data path to us.
+            </p>
+
+            <div class="diagram-slot">
+              <div class="dt">Stage 1 &mdash; Standing up the parent account</div>
+              <div class="dd">zoned SVG &middot; installer &rarr; CloudFormation &rarr; SNS / SQS / S3</div>
+            </div>
+
+            <div class="skel"><i class="s95"></i><i class="s85"></i><i class="s60"></i></div>
+
+            <div class="diagram-slot">
+              <div class="dt">Stage 2 &mdash; Connecting child accounts</div>
+              <div class="dd">quick-create URL &rarr; IAM role &rarr; custom resource &rarr; your worker</div>
+            </div>
+
+            <div class="skel"><i class="s95"></i><i class="s40"></i></div>
+
+            <div class="mini-table">
+              <div><span>Direction</span><span>Traffic</span><span>Carries</span></div>
+              <div><span class="pill-out">outbound</span><span>AWS API, signed by AssumeRole</span><span>Read calls during a scan</span></div>
+              <div><span class="pill-never">never</span><span>Inbound connections</span><span>There is no listener</span></div>
+              <div><span class="pill-never">never</span><span>Long-lived access keys</span><span>Role ARNs only</span></div>
+            </div>
+          </main>
+
+          <aside class="toc">
+            <div class="toc-h">On this page</div>
+            <div class="toc-i on">The three zones</div>
+            <div class="toc-i">Standing up the parent</div>
+            <div class="toc-i">Connecting child accounts</div>
+            <div class="toc-i">What actually runs</div>
+            <div class="toc-i">What crosses the boundary</div>
+            <div class="toc-i">What the role can do</div>
+          </aside>
+
+        </div>
+      </div>
+    </div>
+
+    <p class="note">
+      <b>The audience chip is the one non-obvious element.</b> D-10 ruled out splitting the site into
+      audience tracks, and that is right &mdash; but a CISO landing here from a vendor review needs to know
+      in one glance that this page was written for them, not that they have wandered into an operator
+      runbook. One chip does that without forking the navigation.
+    </p>
+  </section>
+
+  <!-- ============ ARCHETYPES ============ -->
+  <section>
+    <div class="sec-label">02 &middot; Page archetypes</div>
+    <h2>Three shapes, and every page is one of them</h2>
+    <p class="lede">
+      Constraining to three is what keeps a docs site consistent when pages are written by whoever
+      shipped the feature, months apart. Depth increases down the page in all three &mdash; that is how
+      one site serves a non-technical reader and an engineer without a track switch.
+    </p>
+
+    <div class="archetypes">
+
+      <div class="arch">
+        <div class="arch-head">
+          <div class="arch-n">Archetype 1 &mdash; the default</div>
+          <div class="arch-t">Task page</div>
+          <div class="arch-d">Someone is trying to do a thing right now. Get them to done, then help them when it breaks.</div>
+        </div>
+        <div class="arch-body">
+          <div class="blk solid">H1 &mdash; the task, as a verb</div>
+          <div class="blk">One sentence: what you will have at the end</div>
+          <div class="blk">Before you start &mdash; short list</div>
+          <div class="blk accent">Numbered steps, with real output</div>
+          <div class="blk accent">Numbered steps, with real output</div>
+          <div class="blk">When it goes wrong &mdash; symptom &rarr; cause &rarr; fix</div>
+          <div class="blk">Next: the page they will need after this</div>
+        </div>
+        <div class="arch-foot"><b>18 of 34 pages.</b> Install, connect an account, invite a member, restore a backup.</div>
+      </div>
+
+      <div class="arch">
+        <div class="arch-head">
+          <div class="arch-n">Archetype 2 &mdash; the gate</div>
+          <div class="arch-t">Explainer</div>
+          <div class="arch-d">Someone is deciding whether to trust this. Diagram first, prose second, specifics last.</div>
+        </div>
+        <div class="arch-body">
+          <div class="blk solid">H1 + audience chip</div>
+          <div class="blk">Thesis: the claim, in two sentences</div>
+          <div class="blk accent">Diagram &mdash; zoned, with numbered captions</div>
+          <div class="blk">Prose: what the diagram does not say</div>
+          <div class="blk accent">Table of specifics &mdash; the honest one</div>
+          <div class="blk">What we do not claim</div>
+        </div>
+        <div class="arch-foot"><b>6 pages.</b> How TOPS connects to AWS, the security model, what the IAM role can do.</div>
+      </div>
+
+      <div class="arch">
+        <div class="arch-head">
+          <div class="arch-n">Archetype 3 &mdash; the lookup</div>
+          <div class="arch-t">Reference</div>
+          <div class="arch-d">Arrived at from search or a link, never read top to bottom. Scannable, tabular, no narrative.</div>
+        </div>
+        <div class="arch-body">
+          <div class="blk solid">H1 + one line of scope</div>
+          <div class="blk">Jump links / filter</div>
+          <div class="blk accent">Table, sorted the way it is looked up</div>
+          <div class="blk accent">Table, sorted the way it is looked up</div>
+          <div class="blk">Table, sorted the way it is looked up</div>
+        </div>
+        <div class="arch-foot"><b>10 pages.</b> Glossary, what TOPS scans, command reference, configuration, release notes.</div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============ SITE MAP ============ -->
+  <section>
+    <div class="sec-label">03 &middot; Content map</div>
+    <h2>All 34 pages, and what already exists</h2>
+    <p class="lede">
+      Status is about the content, not the file &mdash; "have it" means the substance is written somewhere
+      in the repo and needs porting and a change of voice, not that a page is ready. Roughly a third of
+      this site is a rewriting job rather than an authoring job, which is the argument for mapping it
+      before writing any of it.
+    </p>
+
+    <div class="legend">
+      <span><i class="i-have">&#9679;</i> Have it &mdash; port and rewrite for the reader</span>
+      <span><i class="i-partial">&#9681;</i> Partial or scattered across files</span>
+      <span><i class="i-write">&#9675;</i> Write from scratch</span>
+    </div>
+
+    <div class="map">
+
+      <div class="map-sec">
+        <div class="map-h">Start here <em>6</em></div>
+        <div class="map-p"><i class="i-write">&#9675;</i><span>What TOPS is &mdash; and what it is not</span></div>
+        <div class="map-p key"><i class="i-have">&#9679;</i><span><b>How TOPS connects to AWS</b></span></div>
+        <div class="map-p"><i class="i-partial">&#9681;</i><span>What it costs to run</span></div>
+        <div class="map-p"><i class="i-have">&#9679;</i><span>Install &mdash; links README, does not copy</span></div>
+        <div class="map-p"><i class="i-have">&#9679;</i><span>Connect your first AWS account</span></div>
+        <div class="map-p"><i class="i-partial">&#9681;</i><span>Run your first scan</span></div>
+      </div>
+
+      <div class="map-sec">
+        <div class="map-h">Using TOPS <em>6</em></div>
+        <div class="map-p"><i class="i-write">&#9675;</i><span>The dashboard</span></div>
+        <div class="map-p"><i class="i-write">&#9675;</i><span>Running a scan</span></div>
+        <div class="map-p"><i class="i-write">&#9675;</i><span>Scan profiles and scan types</span></div>
+        <div class="map-p key"><i class="i-write">&#9675;</i><span><b>Reading a finding</b></span></div>
+        <div class="map-p key"><i class="i-partial">&#9681;</i><span><b>Resolving a finding</b></span></div>
+        <div class="map-p"><i class="i-write">&#9675;</i><span>Insights</span></div>
+      </div>
+
+      <div class="map-sec">
+        <div class="map-h">AWS accounts <em>4</em></div>
+        <div class="map-p"><i class="i-have">&#9679;</i><span>Adding an account</span></div>
+        <div class="map-p key"><i class="i-have">&#9679;</i><span><b>What the IAM role can do</b></span></div>
+        <div class="map-p"><i class="i-write">&#9675;</i><span>Removing an account</span></div>
+        <div class="map-p"><i class="i-write">&#9675;</i><span>Many accounts at once</span></div>
+      </div>
+
+      <div class="map-sec">
+        <div class="map-h">Your organization <em>4</em></div>
+        <div class="map-p"><i class="i-write">&#9675;</i><span>Organizations and data isolation</span></div>
+        <div class="map-p"><i class="i-write">&#9675;</i><span>Inviting and managing members</span></div>
+        <div class="map-p"><i class="i-partial">&#9681;</i><span>Roles and permissions</span></div>
+        <div class="map-p"><i class="i-write">&#9675;</i><span>Your profile</span></div>
+      </div>
+
+      <div class="map-sec">
+        <div class="map-h">Running the service <em>6</em></div>
+        <div class="map-p"><i class="i-partial">&#9681;</i><span>Configuration reference</span></div>
+        <div class="map-p"><i class="i-have">&#9679;</i><span>Upgrading and rolling back</span></div>
+        <div class="map-p"><i class="i-have">&#9679;</i><span>Backups and restore</span></div>
+        <div class="map-p"><i class="i-have">&#9679;</i><span>Workers, queues and scan speed</span></div>
+        <div class="map-p"><i class="i-have">&#9679;</i><span>Troubleshooting</span></div>
+        <div class="map-p"><i class="i-partial">&#9681;</i><span>Uninstalling</span></div>
+      </div>
+
+      <div class="map-sec">
+        <div class="map-h">Security <em>4</em></div>
+        <div class="map-p key"><i class="i-have">&#9679;</i><span><b>The security model</b></span></div>
+        <div class="map-p"><i class="i-write">&#9675;</i><span>Where your data lives</span></div>
+        <div class="map-p key"><i class="i-write">&#9675;</i><span><b>Reporting a vulnerability</b></span></div>
+        <div class="map-p"><i class="i-have">&#9679;</i><span>Licence and trademark</span></div>
+      </div>
+
+      <div class="map-sec">
+        <div class="map-h">Reference <em>4</em></div>
+        <div class="map-p"><i class="i-have">&#9679;</i><span>Glossary</span></div>
+        <div class="map-p"><i class="i-have">&#9679;</i><span>What TOPS scans &mdash; services and rules</span></div>
+        <div class="map-p"><i class="i-write">&#9675;</i><span>Command reference</span></div>
+        <div class="map-p"><i class="i-have">&#9679;</i><span>Release notes</span></div>
+      </div>
+
+      <div class="map-sec">
+        <div class="map-h">Not yet <em>&mdash;</em></div>
+        <div class="map-p"><i style="color:var(--st-skip)">&#10005;</i><span>Firebase / OAuth sign-in &mdash; off by default</span></div>
+        <div class="map-p"><i style="color:var(--st-skip)">&#10005;</i><span>MFA &mdash; partial, deliberately gated</span></div>
+        <div class="map-p"><i style="color:var(--st-skip)">&#10005;</i><span>Report export &mdash; not started</span></div>
+        <div class="map-p"><i style="color:var(--st-skip)">&#10005;</i><span>Scheduled scans &mdash; not started</span></div>
+        <div class="map-p"><i style="color:var(--st-skip)">&#10005;</i><span>Azure, GCP &mdash; AWS only</span></div>
+      </div>
+
+    </div>
+
+    <p class="note">
+      <b>Bold pages are the first slice.</b> Four of them, chosen because they unblock the most: the two
+      evaluator pages are already written as of this session, and the two finding pages are what a design
+      partner hits within minutes of their first scan. Everything else waits for the feature that needs it.
+    </p>
+  </section>
+
+  <!-- ============ STATS + GAPS ============ -->
+  <section>
+    <div class="sec-label">04 &middot; What the map exposed</div>
+    <h2>Two gaps that are not docs problems</h2>
+
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-n">34</div>
+        <div class="stat-l">pages in the map</div>
+        <p>Eight sections. At the point where a sidebar still works without search.</p>
+      </div>
+      <div class="stat">
+        <div class="stat-n">12</div>
+        <div class="stat-l">already written</div>
+        <p>Substance exists in the repo. Needs porting and a change of voice, not authoring.</p>
+      </div>
+      <div class="stat">
+        <div class="stat-n">5</div>
+        <div class="stat-l">partial or scattered</div>
+        <p>True but spread across compose comments, install output and feature specs.</p>
+      </div>
+      <div class="stat">
+        <div class="stat-n">17</div>
+        <div class="stat-l">to write</div>
+        <p>Mostly "Using TOPS" &mdash; the half of the product no document currently describes.</p>
+      </div>
+    </div>
+
+    <p class="note warn">
+      <b>There is no SECURITY.md.</b> A public repo with three open security issues and a CISO-facing
+      architecture page has nowhere to report a vulnerability. That is repo hygiene, not a docs-site
+      page, and it should not wait for the site to be built.
+    </p>
+
+    <p class="note warn">
+      <b><code>docs/quick-start.md</code> is dead.</b> It describes a Nuxt 3 + Serverless + Prisma monorepo
+      &mdash; the pre-pivot stack &mdash; and it is linked from <code>docs/README.md</code>. Anyone who finds it is
+      actively misled. Delete it rather than port it.
+    </p>
+  </section>
+
+  <footer>
+    <div>Design only &mdash; nothing here is built. Full content inventory, audiences and the proposed D-10 amendment: <code>design/docs-site/information-architecture.md</code>.</div>
+    <div>Out of scope: <code>teemops.com</code> marketing site wireframes and design, which continue in a separate worktree.</div>
+  </footer>
+
+</div>

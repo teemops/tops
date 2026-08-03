@@ -184,3 +184,8 @@ Two things sit alongside the licence:
 ## Support
 
 Open an issue. For commercial support, get in touch.
+
+**Found a security vulnerability?** Do not open an issue —
+[report it privately](https://github.com/teemops/tops/security/advisories/new) or email
+security@teemops.com. See [SECURITY.md](SECURITY.md) for scope, what to expect, and the
+issues already known.
