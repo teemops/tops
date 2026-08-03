@@ -1,6 +1,6 @@
 # Feature Specifications
 
-This document contains feature specifications using our [User Story Template](../docs/templates/user-story-template.md). All features follow our [Practices](../docs/practices/) and [Feature Development Process](../docs/processes/feature-development.md).
+This document contains feature specifications using our [User Story Template](../templates/user-story-template.md). All features follow our [Practices](../practices/) and [Feature Development Process](../processes/feature-development.md).
 
 ## Architecture Context
 
@@ -206,10 +206,10 @@ https://console.aws.amazon.com/cloudformation/home?#/stacks/quickcreate?template
 - **User Satisfaction**: Account addition process is clear and straightforward
 
 ### Related Practices
-- [Product Practices](../docs/practices/product.md) - Simplicity First, User Experience
-- [Security Practices](../docs/practices/security.md) - Data Protection (Encryption), Secrets Management, API Security
-- [Database Practices](../docs/practices/database.md) - Schema Design, Data Integrity
-- [Architecture Practices](../docs/practices/architecture.md) - Simplicity First, Standard Patterns
+- [Product Practices](../practices/product.md) - Simplicity First, User Experience
+- [Security Practices](../practices/security.md) - Data Protection (Encryption), Secrets Management, API Security
+- [Database Practices](../practices/database.md) - Schema Design, Data Integrity
+- [Architecture Practices](../practices/architecture.md) - Simplicity First, Standard Patterns
 
 ### Technical Notes
 - IAM Role ARN must be encrypted at rest using AES-256
@@ -724,9 +724,9 @@ Flash Message: success - "Successfully logged in via [Provider]!"
 
 ### Related Practices
 
-- [Product Practices](../docs/practices/product.md) - User Experience, Simplicity First
-- [Frontend Practices](../docs/practices/frontend.md) - Component Design, Accessibility
-- [Security Practices](../docs/practices/security.md) - XSS Prevention
+- [Product Practices](../practices/product.md) - User Experience, Simplicity First
+- [Design Practices](../practices/design.md) - UX principles, component design, accessibility
+- [Security Practices](../practices/security.md) - XSS Prevention
 
 ---
 
@@ -798,7 +798,7 @@ $schedule->command('aws:process-sqs --once')->everyMinute();
 
 ## Notes
 
-- All features follow our [Practices](../docs/practices/) documents
-- Features are developed incrementally following [Feature Development Process](../docs/processes/feature-development.md)
-- See [PROGRESS.md](../docs/PROGRESS.md) for detailed implementation status
+- All features follow our [Practices](../practices/) documents
+- Features are developed incrementally following [Feature Development Process](../processes/feature-development.md)
+- See [PROGRESS.md](../PROGRESS.md) for detailed implementation status
 

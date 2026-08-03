@@ -5,7 +5,7 @@ This directory contains all project documentation organized by topic.
 ## Quick Links
 
 ### Getting Started
-- [Quick Start Guide](./quick-start.md) - Get up and running quickly
+- [Install TOPS](../README.md#install) - the canonical setup path, in the repository README
 - [Laravel App Setup](./laravel-app/setup.md) - Detailed setup instructions
 
 ### Architecture & Planning
@@ -67,7 +67,6 @@ docs/
 ├── README.md (this file)
 ├── architecture.md
 ├── planning.md
-├── quick-start.md
 ├── PROGRESS.md
 ├── laravel-app/          # Laravel application documentation
 │   ├── README.md
