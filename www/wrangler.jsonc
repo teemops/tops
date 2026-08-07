@@ -1,0 +1,37 @@
+{
+  // Deploys teemops.com — the marketing site and its design-partner signup form.
+  //
+  // This is a SECOND Workers project in this repo. The root wrangler.jsonc is
+  // docs.teemops.com (see mkdocs.yml). Run wrangler from inside www/, or pass
+  // `-c www/wrangler.jsonc`, or you will deploy the wrong project.
+  //
+  // "name" must match the Worker shown in the Cloudflare dashboard.
+  "name": "tops-www",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-06",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // Static pages. Requests matching a file here are served directly and never
+  // reach the Worker; everything else (i.e. POST /api/design-partner) does.
+  "assets": {
+    "directory": "./public",
+    "not_found_handling": "404-page"
+  },
+
+  // Design-partner signups. Created with `wrangler d1 create tops-www-leads`.
+  "d1_databases": [
+    {
+      "binding": "LEADS_DB",
+      "database_name": "tops-www-leads",
+      "database_id": "88cc0eec-9c77-4714-8b1a-62c7db52e0e5"
+    }
+  ],
+
+  // No secrets and no vars. The signup endpoint is protected by a honeypot field,
+  // not by a CAPTCHA — see "If you start getting spam" in README.md.
+
+  "observability": {
+    "enabled": true,
+    "logs": { "head_sampling_rate": 1 }
+  }
+}

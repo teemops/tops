@@ -49,3 +49,5 @@ references/*/vendor
 # ("unable to unlink old ... Permission denied"). Untracking it removes that
 # whole class of failure.
 .aws-sam/
+# Wrangler local state (docs site at repo root, and www/)
+.wrangler/

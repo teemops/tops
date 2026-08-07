@@ -1,0 +1,28 @@
+{
+  "name": "tops-www",
+  "private": true,
+  "type": "module",
+  "description": "teemops.com — marketing site and design-partner signup",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "wrangler types && tsc --noEmit",
+    "types": "wrangler types",
+    "db:init": "wrangler d1 execute tops-www-leads --remote --file=./schema.sql",
+    "db:init:local": "wrangler d1 execute tops-www-leads --local --file=./schema.sql",
+    "leads": "wrangler d1 execute tops-www-leads --remote --command=\"SELECT id, created_at, name, email, company, aws_scale FROM design_partner_leads ORDER BY created_at DESC\"",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.20.3",
+    "@types/node": "^24.3.0",
+    "typescript": "^5.9.2",
+    "vitest": "^4.1.10",
+    "wrangler": "^4.119.0"
+  },
+  "allowScripts": {
+    "esbuild@0.28.1": true,
+    "workerd@1.20260801.1": true
+  }
+}

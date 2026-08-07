@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Teemops — open source AWS security scanning you run yourself</title>
+<meta name="description" content="Teemops finds IAM users with AdministratorAccess, S3 buckets missing public access block, security groups open to 0.0.0.0/0 and unencrypted RDS instances. 74 checks across 11 AWS services, each with remediation steps. Open source and self-hosted.">
+<link rel="canonical" href="https://teemops.com/">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" href="/logo.png" type="image/png">
+
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://teemops.com/">
+<meta property="og:title" content="Teemops — open source AWS security scanning you run yourself">
+<meta property="og:description" content="74 checks across 11 AWS services, each with remediation steps. Self-hosted, Apache 2.0, no paid tier. We are looking for five design partners.">
+<meta property="og:image" content="https://teemops.com/og.png">
+<meta name="twitter:card" content="summary_large_image">
+
+<style>
+:root {
+  --bg: #0a0e17;
+  --bg-raised: #111827;
+  --surface: #151d2e;
+  --border: rgba(255,255,255,.09);
+  --border-strong: rgba(255,255,255,.16);
+  --text: #e9edf5;
+  --muted: #98a3b8;
+  --brand: #f5821f;
+  --brand-soft: rgba(245,130,31,.13);
+  --good: #34d399;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --wrap: 1100px;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 17px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  * { transition: none !important; }
+}
+
+a { color: var(--brand); text-decoration: none; }
+a:hover { text-decoration: underline; }
+h1, h2, h3 { line-height: 1.2; letter-spacing: -.02em; margin: 0 0 .5em; font-weight: 700; }
+p { margin: 0 0 1em; }
+
+.wrap { max-width: var(--wrap); margin: 0 auto; padding: 0 24px; }
+.section { padding: 88px 0; border-top: 1px solid var(--border); }
+.section__lead { max-width: 640px; margin-bottom: 48px; }
+.section__lead p { color: var(--muted); font-size: 1.08rem; margin: 0; }
+h2 { font-size: clamp(1.6rem, 3.4vw, 2.15rem); }
+.eyebrow {
+  font-family: var(--mono);
+  font-size: .78rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--brand);
+  margin-bottom: 14px;
+}
+
+/* focus visibility, everywhere */
+a:focus-visible, button:focus-visible, input:focus-visible,
+select:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.skip {
+  position: absolute; left: -9999px;
+  background: var(--brand); color: #12161f; padding: 10px 16px; font-weight: 600;
+}
+.skip:focus { left: 12px; top: 12px; z-index: 100; }
+
+/* ---------- nav ---------- */
+.nav {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(10,14,23,.82);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border);
+}
+.nav__inner { display: flex; align-items: center; gap: 28px; height: 64px; }
+.nav__logo { display: flex; align-items: center; gap: 10px; margin-right: auto; }
+.nav__logo img { height: 30px; width: auto; display: block; }
+.nav__logo span { font-weight: 700; letter-spacing: -.01em; color: var(--text); font-size: 1.1rem; }
+.nav__links { display: flex; align-items: center; gap: 26px; }
+/* :not(.btn) matters — without it these beat .btn--primary on specificity and the
+   CTA renders muted grey on orange, about 1:1 contrast. */
+.nav__links a:not(.btn) { color: var(--muted); font-size: .95rem; font-weight: 500; }
+.nav__links a:not(.btn):hover { color: var(--text); text-decoration: none; }
+@media (max-width: 640px) {
+  .nav__links a:not(.btn) { display: none; }
+}
+
+/* ---------- buttons ---------- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 12px 22px; border-radius: 8px; font-weight: 600; font-size: .96rem;
+  border: 1px solid transparent; cursor: pointer; transition: background .15s, border-color .15s;
+  font-family: inherit;
+}
+.btn--primary { background: var(--brand); color: #12161f; }
+.btn--primary:hover { background: #ff9440; text-decoration: none; }
+.btn--ghost { border-color: var(--border-strong); color: var(--text); }
+.btn--ghost:hover { border-color: var(--muted); text-decoration: none; }
+.btn--sm { padding: 8px 16px; font-size: .9rem; }
+.btn[disabled] { opacity: .55; cursor: not-allowed; }
+
+/* ---------- hero ---------- */
+.hero {
+  padding: 92px 0 80px;
+  background:
+    radial-gradient(760px 380px at 15% -8%, rgba(245,130,31,.16), transparent 62%),
+    radial-gradient(680px 420px at 88% 6%, rgba(52,211,153,.09), transparent 60%);
+}
+.hero h1 {
+  font-size: clamp(2.1rem, 5.6vw, 3.4rem);
+  max-width: 16ch;
+  margin-bottom: 22px;
+}
+.hero__sub { font-size: clamp(1.05rem, 2vw, 1.22rem); color: var(--muted); max-width: 62ch; }
+.hero__sub strong { color: var(--text); font-weight: 600; }
+.hero__sub code {
+  font-family: var(--mono); font-size: .86em; color: #cfd8e8;
+  background: rgba(255,255,255,.06); border: 1px solid var(--border);
+  border-radius: 4px; padding: 1px 6px; white-space: nowrap;
+}
+.hero__cta { display: flex; flex-wrap: wrap; gap: 12px; margin: 30px 0 0; }
+
+.badges { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 22px; }
+.badge {
+  font-family: var(--mono); font-size: .76rem; letter-spacing: .03em;
+  padding: 5px 11px; border-radius: 999px;
+  background: var(--brand-soft); color: var(--brand);
+  border: 1px solid rgba(245,130,31,.28);
+}
+
+/* ---------- code block ---------- */
+.code {
+  margin-top: 38px; background: #060910; border: 1px solid var(--border);
+  border-radius: 10px; overflow: hidden; max-width: 720px;
+}
+.code__bar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px 14px; border-bottom: 1px solid var(--border);
+  font-family: var(--mono); font-size: .76rem; color: var(--muted);
+}
+.code__dot { width: 10px; height: 10px; border-radius: 50%; background: #2c3648; }
+.code__bar span { margin-left: 6px; }
+.code__body { display: flex; align-items: flex-start; gap: 12px; padding: 16px; }
+.code__body pre {
+  margin: 0; flex: 1; overflow-x: auto;
+  font-family: var(--mono); font-size: .84rem; line-height: 1.6; color: #d6deec;
+}
+.code__prompt { color: var(--brand); user-select: none; }
+.code__copy {
+  flex-shrink: 0; background: transparent; border: 1px solid var(--border-strong);
+  color: var(--muted); border-radius: 6px; padding: 5px 11px;
+  font-size: .78rem; font-family: var(--sans); cursor: pointer;
+}
+.code__copy:hover { color: var(--text); border-color: var(--muted); }
+.code__note { font-size: .88rem; color: var(--muted); margin: 12px 0 0; max-width: 720px; }
+
+/* ---------- grids ---------- */
+.grid { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 24px;
+}
+.card h3 { font-size: 1.06rem; margin-bottom: 8px; }
+.card p { color: var(--muted); font-size: .95rem; margin: 0; }
+.card__num {
+  font-family: var(--mono); font-size: .8rem; color: var(--brand);
+  display: block; margin-bottom: 10px;
+}
+
+/* ---------- honest list ---------- */
+.honest { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+.honest li {
+  list-style: none; padding: 16px 18px; border-radius: 10px;
+  background: var(--bg-raised); border: 1px solid var(--border);
+  font-size: .95rem; color: var(--muted);
+}
+.honest ul { padding: 0; margin: 0; }
+.honest strong { color: var(--text); display: block; margin-bottom: 3px; font-weight: 600; }
+
+/* ---------- partner ---------- */
+.partner { background: var(--bg-raised); }
+.partner__cols { display: grid; gap: 48px; grid-template-columns: 1fr 1fr; align-items: start; }
+/* Grid items default to min-width:auto, so a track cannot shrink below its
+   content's min-content width — one fixed-width child then widens the whole
+   page on mobile. This has bitten this column once already. */
+.partner__cols > * { min-width: 0; }
+@media (max-width: 860px) { .partner__cols { grid-template-columns: 1fr; gap: 40px; } }
+.deal { padding: 0; margin: 0 0 28px; }
+.deal li {
+  list-style: none; position: relative; padding-left: 28px; margin-bottom: 12px;
+  color: var(--muted); font-size: .97rem;
+}
+.deal li::before {
+  content: ""; position: absolute; left: 4px; top: .55em;
+  width: 8px; height: 8px; border-radius: 2px; background: var(--good);
+}
+.deal strong { color: var(--text); font-weight: 600; }
+.deal--ask li::before { background: var(--brand); }
+
+/* ---------- form ---------- */
+.form {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; padding: 28px;
+}
+.form h3 { font-size: 1.2rem; margin-bottom: 6px; }
+.form__intro { color: var(--muted); font-size: .93rem; margin-bottom: 22px; }
+.field { margin-bottom: 16px; }
+.field label { display: block; font-size: .88rem; font-weight: 600; margin-bottom: 6px; }
+.field .opt { color: var(--muted); font-weight: 400; }
+.field input, .field select, .field textarea {
+  width: 100%; padding: 11px 13px; border-radius: 8px;
+  background: #0c111c; border: 1px solid var(--border-strong);
+  color: var(--text); font-family: inherit; font-size: .95rem;
+}
+.field textarea { resize: vertical; min-height: 86px; }
+.field input::placeholder, .field textarea::placeholder { color: #5d6880; }
+.form__submit { width: 100%; margin-top: 6px; }
+.form__foot { font-size: .82rem; color: var(--muted); margin: 14px 0 0; text-align: center; }
+.status { margin-top: 14px; padding: 13px 15px; border-radius: 8px; font-size: .92rem; display: none; }
+.status--err { display: block; background: rgba(248,113,113,.11); border: 1px solid rgba(248,113,113,.34); color: #fca5a5; }
+.status--ok { display: block; background: rgba(52,211,153,.1); border: 1px solid rgba(52,211,153,.32); color: #6ee7b7; }
+/* Honeypot. Off-screen rather than display:none or hidden — bots skip those, but
+   most will fill a text input they can see in the markup. Never focusable. */
+.hp {
+  position: absolute; left: -9999px; width: 1px; height: 1px;
+  overflow: hidden; white-space: nowrap;
+}
+
+@media (max-width: 420px) {
+  .wrap { padding: 0 16px; }
+  .form { padding: 22px 16px; }
+}
+
+/* ---------- footer ---------- */
+.footer { border-top: 1px solid var(--border); padding: 44px 0; font-size: .9rem; color: var(--muted); }
+.footer__inner { display: flex; flex-wrap: wrap; gap: 18px 30px; align-items: center; }
+.footer a { color: var(--muted); }
+.footer a:hover { color: var(--text); }
+.footer__copy { margin-left: auto; }
+@media (max-width: 640px) { .footer__copy { margin-left: 0; width: 100%; } }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<nav class="nav">
+  <div class="wrap nav__inner">
+    <a class="nav__logo" href="/">
+      <img src="/logo.png" alt="">
+      <span>Teemops</span>
+    </a>
+    <div class="nav__links">
+      <a href="#what">What it does</a>
+      <a href="#limits">What it isn't</a>
+      <a href="https://docs.teemops.com">Docs</a>
+      <a href="https://github.com/teemops/tops">GitHub</a>
+      <a class="btn btn--primary btn--sm" href="#design-partner">Become a design partner</a>
+    </div>
+  </div>
+</nav>
+
+<main id="main">
+
+  <!-- ================= HERO ================= -->
+  <header class="hero">
+    <div class="wrap">
+      <div class="badges">
+        <span class="badge">Apache-2.0</span>
+        <span class="badge">Self-hosted</span>
+        <span class="badge">No paid tier</span>
+      </div>
+      <h1>Open source AWS security scanning you run yourself</h1>
+      <p class="hero__sub">
+        Teemops finds IAM users with <code>AdministratorAccess</code>, S3 buckets missing
+        public access block, security groups open to <code>0.0.0.0/0</code> on port 22, and
+        unencrypted RDS instances. <strong>74 checks across 11 AWS services, each with the
+        steps to fix it.</strong> It runs in your infrastructure, so findings stay in your
+        account.
+      </p>
+
+      <div class="hero__cta">
+        <a class="btn btn--primary" href="#design-partner">Become a design partner</a>
+        <a class="btn btn--ghost" href="https://docs.teemops.com">Read the documentation</a>
+      </div>
+
+      <div class="code">
+        <div class="code__bar">
+          <i class="code__dot"></i><i class="code__dot"></i><i class="code__dot"></i>
+          <span>install — requires Docker</span>
+        </div>
+        <div class="code__body">
+          <pre><span class="code__prompt">$</span> <code id="install-cmd">bash &lt;(curl -fsSL https://raw.githubusercontent.com/teemops/tops/develop/install.sh)</code></pre>
+          <button class="code__copy" type="button" id="copy-btn">Copy</button>
+        </div>
+      </div>
+      <p class="code__note">
+        The installer pulls tagged images from Docker Hub, so the host needs no PHP, Node or
+        Composer. To read the script before running it, the
+        <a href="https://docs.teemops.com/start-here/install/">install guide</a> shows the
+        download-and-inspect form.
+      </p>
+    </div>
+  </header>
+
+  <!-- ================= WHAT IT DOES ================= -->
+  <section class="section" id="what">
+    <div class="wrap">
+      <div class="section__lead">
+        <p class="eyebrow">What it does</p>
+        <h2>Every finding comes with the fix</h2>
+        <p>
+          A list of problems without remediation steps just moves the work to you.
+        </p>
+      </div>
+
+      <div class="grid">
+        <article class="card">
+          <h3>74 checks across 11 services</h3>
+          <p>S3, IAM, EC2, RDS, CloudTrail, KMS, Lambda, DynamoDB, ELBv2, SNS and SQS. Run the
+             general baseline, the CIS AWS Foundations Benchmark, or both. You can also scan a
+             single service.</p>
+        </article>
+        <article class="card">
+          <h3>Remediation on every check</h3>
+          <p>All 74 checks include a fix. The 28 critical and high severity checks include
+             step-by-step guidance with links to the AWS documentation.</p>
+        </article>
+        <article class="card">
+          <h3>No stored AWS credentials</h3>
+          <p>Teemops assumes a cross-account IAM role that your administrators create with
+             CloudFormation and can revoke at any time. No access keys are stored.</p>
+        </article>
+        <article class="card">
+          <h3>Self-hosted</h3>
+          <p>It runs on your infrastructure against your own database. There is no hosted
+             service, no telemetry and no account to create.</p>
+        </article>
+        <article class="card">
+          <h3>Findings persist across scans</h3>
+          <p>A finding is one record per account, resource and rule. Mark one ignored and it
+             stays ignored on the next scan rather than reappearing.</p>
+        </article>
+        <article class="card">
+          <h3>Apache 2.0, with a DCO</h3>
+          <p>Contributions use a DCO rather than a CLA, so the licence cannot change later
+             without every contributor agreeing. No paid tier, no features behind a licence.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= HOW ================= -->
+  <section class="section" id="how">
+    <div class="wrap">
+      <div class="section__lead">
+        <p class="eyebrow">How it works</p>
+        <h2>From install to first scan</h2>
+      </div>
+      <div class="grid">
+        <article class="card">
+          <span class="card__num">01</span>
+          <h3>Install</h3>
+          <p>One command on a host with Docker. The installer generates its own database
+             credentials and pulls tagged images. There is no build step.</p>
+        </article>
+        <article class="card">
+          <span class="card__num">02</span>
+          <h3>Connect an account</h3>
+          <p>A CloudFormation stack creates the cross-account IAM role in the account you want
+             to scan. You can read the template before you launch it.</p>
+        </article>
+        <article class="card">
+          <span class="card__num">03</span>
+          <h3>Scan</h3>
+          <p>Run the full benchmark or narrow it to specific services. Findings are grouped by
+             severity, each with its remediation.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= WHAT IT ISN'T ================= -->
+  <section class="section" id="limits">
+    <div class="wrap">
+      <div class="section__lead">
+        <p class="eyebrow">What it isn't</p>
+        <h2>What Teemops does not do</h2>
+        <p>
+          Teemops is at v0.5.0. Here are the limits, so you can decide before you install it
+          rather than after.
+        </p>
+      </div>
+
+      <div class="honest">
+        <ul>
+          <li><strong>Not runtime protection</strong> It reads configuration through the AWS
+              API. It does not inspect traffic, block requests or sit in the request path.</li>
+        </ul>
+        <ul>
+          <li><strong>AWS only</strong> Azure and GCP are on the roadmap, not in the code.</li>
+        </ul>
+        <ul>
+          <li><strong>Not a compliance guarantee</strong> A clean scan means the checks
+              Teemops runs found nothing. It is not an audit. The PCI profile has no rules
+              written yet, so it is hidden rather than shown empty.</li>
+        </ul>
+        <ul>
+          <li><strong>No automated remediation</strong> Teemops reports the problem and the
+              fix. You apply the change in your own account.</li>
+        </ul>
+        <ul>
+          <li><strong>No scheduled scans or report export</strong> Scans are run manually.
+              Both features are on the roadmap; neither has a route or a UI today.</li>
+        </ul>
+        <ul>
+          <li><strong>Not yet running outside the project</strong> Teemops has scanned real
+              AWS accounts, but no external team runs it today. That is what design partners
+              are for.</li>
+        </ul>
+      </div>
+
+      <p style="margin-top:28px;color:var(--muted);font-size:.93rem;">
+        The full list, checked against the code rather than against intent, is in
+        <a href="https://github.com/teemops/tops/blob/develop/docs/PROGRESS.md">PROGRESS.md</a>.
+      </p>
+    </div>
+  </section>
+
+  <!-- ================= DESIGN PARTNER ================= -->
+  <section class="section partner" id="design-partner">
+    <div class="wrap">
+      <div class="partner__cols">
+        <div>
+          <p class="eyebrow">The ask</p>
+          <h2>We're looking for five design partners</h2>
+          <p style="color:var(--muted);">
+            Teemops works. It has scanned real AWS accounts and found real problems. What it
+            has not done is run in an environment we did not build. Until it does, decisions
+            about what to build next are guesses.
+          </p>
+
+          <h3 style="font-size:1rem;margin-top:32px;">What you get</h3>
+          <ul class="deal">
+            <li><strong>Direct contact with the maintainer</strong>, by email. Not a support
+                queue.</li>
+            <li><strong>Issues you hit go to the top of the roadmap.</strong> That is the
+                point of the arrangement.</li>
+            <li><strong>Influence over the roadmap.</strong> Scheduled scans, report export
+                and wider service coverage are all waiting on someone to say which matters
+                most.</li>
+            <li><strong>Apache 2.0 with a DCO.</strong> There is no pricing tier waiting to
+                appear.</li>
+          </ul>
+
+          <h3 style="font-size:1rem;">What we ask</h3>
+          <ul class="deal deal--ask">
+            <li><strong>Install it from the documentation</strong> and tell us where the
+                documentation is wrong.</li>
+            <li><strong>Scan a real AWS account</strong>, not a clean test account.</li>
+            <li><strong>Thirty minutes</strong> to tell us what was confusing or missing.</li>
+          </ul>
+          <p style="color:var(--muted);font-size:.93rem;">
+            No cost and no contract. If you install it and decide it is not useful, telling us
+            why is still worth your thirty minutes.
+          </p>
+        </div>
+
+        <div>
+          <form class="form" id="partner-form" novalidate>
+            <h3>Sign up as a design partner</h3>
+            <p class="form__intro">
+              We reply personally, usually within a day or two.
+            </p>
+
+            <div class="field">
+              <label for="name">Name</label>
+              <input type="text" id="name" name="name" required autocomplete="name" maxlength="100">
+            </div>
+
+            <div class="field">
+              <label for="email">Email</label>
+              <input type="email" id="email" name="email" required autocomplete="email" maxlength="254">
+            </div>
+
+            <div class="field">
+              <label for="company">Company <span class="opt">— optional</span></label>
+              <input type="text" id="company" name="company" autocomplete="organization" maxlength="100">
+            </div>
+
+            <div class="field">
+              <label for="aws_scale">How many AWS accounts? <span class="opt">— optional</span></label>
+              <select id="aws_scale" name="aws_scale">
+                <option value="">Prefer not to say</option>
+                <option value="1">Just the one</option>
+                <option value="2-5">2 to 5</option>
+                <option value="6-20">6 to 20</option>
+                <option value="20+">More than 20</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="notes">What would you want Teemops to find in your accounts? <span class="opt">— optional</span></label>
+              <textarea id="notes" name="notes" maxlength="2000" placeholder="This is the part we read first."></textarea>
+            </div>
+
+            <!-- Honeypot. Hidden from people, tempting to bots that fill every input.
+                 Named "website" because that is a field bots expect to find. If it
+                 arrives non-empty the submission is dropped. Keep the name in sync
+                 with HONEYPOT_FIELD in src/index.ts. -->
+            <div class="hp" aria-hidden="true">
+              <label for="website">Website</label>
+              <input type="text" id="website" name="website" tabindex="-1" autocomplete="off">
+            </div>
+
+            <button type="submit" class="btn btn--primary form__submit" id="submit-btn">
+              Sign up
+            </button>
+
+            <div class="status" id="form-status" role="status" aria-live="polite"></div>
+
+            <p class="form__foot">
+              We store your name, email and message. Nothing else, and only to reply. You can
+              also email <a href="mailto:help@teemops.com">help@teemops.com</a>.
+            </p>
+          </form>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <div class="wrap footer__inner">
+    <a href="https://github.com/teemops/tops">GitHub</a>
+    <a href="https://docs.teemops.com">Documentation</a>
+    <a href="https://github.com/teemops/tops/blob/develop/LICENSE">Apache-2.0</a>
+    <a href="https://docs.teemops.com/security/reporting-a-vulnerability/">Report a vulnerability</a>
+    <span class="footer__copy">Teemops is built by Teem, in New Zealand.</span>
+  </div>
+</footer>
+
+<script>
+(function () {
+  "use strict";
+
+  // Copy-to-clipboard on the install command.
+  var copyBtn = document.getElementById("copy-btn");
+  var cmd = document.getElementById("install-cmd");
+  if (copyBtn && cmd && navigator.clipboard) {
+    copyBtn.addEventListener("click", function () {
+      navigator.clipboard.writeText(cmd.textContent.trim()).then(function () {
+        copyBtn.textContent = "Copied";
+        setTimeout(function () { copyBtn.textContent = "Copy"; }, 2000);
+      }).catch(function () {
+        copyBtn.textContent = "Press ⌘C";
+      });
+    });
+  } else if (copyBtn) {
+    copyBtn.hidden = true;
+  }
+
+  var form = document.getElementById("partner-form");
+  var statusEl = document.getElementById("form-status");
+  var submitBtn = document.getElementById("submit-btn");
+  if (!form) return;
+
+  // Captured from the markup so the label cannot drift out of sync with the HTML.
+  var submitLabel = submitBtn.textContent.trim();
+
+  function show(kind, message) {
+    statusEl.className = "status status--" + kind;
+    statusEl.textContent = message;
+  }
+
+  function resetButton() {
+    submitBtn.disabled = false;
+    submitBtn.textContent = submitLabel;
+  }
+
+  form.addEventListener("submit", function (event) {
+    event.preventDefault();
+
+    var name = form.elements.name.value.trim();
+    var email = form.elements.email.value.trim();
+    if (!name) { show("err", "Please tell us your name."); return; }
+    if (!/^[^\s@]+@[^\s@.]+\.[^\s@]+$/.test(email)) {
+      show("err", "That email address does not look right.");
+      return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Sending…";
+    statusEl.className = "status";
+
+    fetch("/api/design-partner", { method: "POST", body: new FormData(form) })
+      .then(function (res) {
+        return res.json().then(function (body) { return { ok: res.ok, body: body }; });
+      })
+      .then(function (result) {
+        if (result.ok) {
+          form.innerHTML =
+            "<h3>Thanks. We have your details.</h3>" +
+            '<p style="color:var(--muted);font-size:.95rem;margin:0;">' +
+            "We will be in touch within a day or two. In the meantime, the " +
+            '<a href="https://docs.teemops.com/start-here/install/">install guide</a> ' +
+            "will get you to a first scan.</p>";
+          form.scrollIntoView({ block: "center" });
+          return;
+        }
+        show("err", (result.body && result.body.error) || "Something went wrong. Please try again.");
+        resetButton();
+      })
+      .catch(function () {
+        show("err", "We couldn't reach the server. Please email help@teemops.com instead.");
+        resetButton();
+      });
+  });
+})();
+</script>
+</body>
+</html>
