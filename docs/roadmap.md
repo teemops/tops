@@ -560,6 +560,7 @@ Tracked on GitHub: [X-1 #29](https://github.com/teemops/tops/issues/29) ·
 | Scheduled / recurring scans | First design partner to ask. Likely the first request you get. | M |
 | Report export (PDF/CSV/JSON) | A partner asking. Solo engineers may be happy with the UI. | M |
 | Expand scanner coverage | Nothing — it's available now. Cheapest: rules for the four pilot services (DynamoDB, ELBv2, SNS, SQS) where plumbing exists. | Ongoing |
+| Scan Amazon Bedrock | **A design partner saying they run Bedrock.** One is enough — the research is done and the marginal cost is low. See below. | S–M |
 | User documentation site | Nothing — it's available now. Built in parallel with feature work, not blocking it. See D-10. | Ongoing |
 | PCI ruleset | A decision: author it or delete it. Empty for six months. | M |
 | Sandbox rule conditions (`eval()`) | **Any feature accepting a ruleset we didn't write.** Community rules turn a condition into RCE. | M |
@@ -576,6 +577,44 @@ Tracked on GitHub: [#35](https://github.com/teemops/tops/issues/35) ·
 [#41](https://github.com/teemops/tops/issues/41) ·
 [#42](https://github.com/teemops/tops/issues/42), and the documentation site below as
 [#62](https://github.com/teemops/tops/issues/62).
+
+### Scan Amazon Bedrock
+
+*Researched 2026-08-11. Not committed — this is a Later item with a named trigger. Full
+research, the control list, the comparator analysis and the sizing:*
+**[docs/features/bedrock-scanning.md](features/bedrock-scanning.md)**.
+
+**Why it's cheap.** The scan engine is already generic enough: the installed AWS SDK
+(3.369.9) ships every Bedrock client, all the calls needed resolve through
+`GenericAwsScanner` with **no PHP**, and `ReadOnlyAccess` on the onboarding role already
+grants every `bedrock:` read action needed — so this would work against **every account
+already onboarded, with no CloudFormation change**. It is two `tasks.json` files (`bedrock` and
+`bedrock-agent` are separate SDK clients) plus rules.
+
+**Why it's not free.** The highest-value check — model invocation logging, off by default —
+is *account-level* on a *regional* service, and that combination is new. It surfaces a
+latent defect in D-11: `ScanResult::identityHash()` does not include region, so the same
+check run in ~17 regions collapses to one finding and the last region job to finish wins.
+Worse, once separated per region, an account using Bedrock in one region gets sixteen
+findings telling it to enable logging in regions it does not use — the exact
+unactionable-coverage failure this product is meant to be the opposite of. Suppressing that
+needs a cross-task condition the evaluator cannot express today.
+
+**The shape of a first ship, if the trigger fires:** resource-scoped rules only — guardrail
+prompt-attack and sensitive-information filters, agents without a guardrail, and CMK
+encryption on custom models, agents, guardrails and prompts. Those fire only where a
+resource exists, so they cannot produce findings in unused regions, and they need no engine
+change at all. **Do not ship the logging check without the region gating**; A+B without C in
+the research doc's table is the one combination that makes the product worse.
+
+**Scope note:** a configuration scanner checks that the controls making runtime attacks
+*detectable and containable* are switched on. It does not detect prompt injection or
+jailbreaks, and nothing we ship or say should imply it does.
+
+**Worth doing regardless:** the identity-hash collision above is a real property of a
+shipped model, not a Bedrock issue. Record it as a known limitation of D-11 whether or not
+Bedrock is ever scanned, so the next regional account-level check does not rediscover it in
+production.
 
 ### User documentation site
 
