@@ -100,6 +100,7 @@ Decisions already made, so we don't relitigate them. Each has a trigger for revi
 | **D-10** | **User documentation lives in a top-level `user-docs/` directory, not under `docs/`, and deploys to `docs.teemops.com`.** One site for technical and non-technical readers — no separate tracks. | 2026-07-31 | See below. | The content outgrows plain Markdown, or a contributor proposes a better home. |
 | **D-12** | **No security score.** Removed rather than recalibrated. Severity counts and the breakdown are what we show; a score can come back later if a design partner asks for one and we know what it should mean. | 2026-08-02 | See below. Closes [#91](https://github.com/teemops/tops/issues/91). | A design partner asks for a single headline number — and then design it so it can *move*. |
 | **D-11** | **A finding is a durable record keyed by AWS account + resource + rule, and findings are current state. No per-scan history, no observations table.** The most recent scan that examined a resource is authoritative for its content; status belongs to the user. | 2026-08-01 | See below. Shipped as [#81](https://github.com/teemops/tops/issues/81). | A design partner asks for trends over time — and then treat it as a new data model, not an addition to this one. |
+| **D-14** | **`teemops.com` is a single page whose only job is recruiting design partners, not a product marketing site.** Built fresh in `www/`; the pre-pivot `design/marketing/web/` is deleted. | 2026-08-06 | See below. | Design partners exist and the constraint moves from recruitment to something else. |
 | **D-13** | **Docs renderer: MkDocs + Material theme**, deployed to `docs.teemops.com` via Cloudflare Pages (`mkdocs build`, output `site/`). Fills in the choice D-10 deliberately deferred. | 2026-08-03 | Clears the "MkDocs- or Docsify-class" bar D-10 set, now that section count and search actually bite (four pages against an eight-section, 34-page IA). Material gives sidebar nav, on-page TOC and client-side search for free — nothing here needed building by hand. Chosen over Docsify because it renders real static HTML per page rather than client-side, which matters for the evaluator audience D-10's own design work identified as arriving via search or a vendor-review link rather than already inside the app. Adds no new language to the repo: `python3` already backs the link-checker and SVG-validator scripts next to it in `user-docs/README.md`. | Content needs something outside MkDocs' plugin ecosystem, or the Python build step becomes a maintenance burden of its own. |
 
 > **Naming collision, flagged 2026-08-01.** [`durable-findings.md`](./features/durable-findings.md)
@@ -108,6 +109,56 @@ Decisions already made, so we don't relitigate them. Each has a trigger for revi
 > prose. The Decisions Log entry above is **D-11**; the story keeps its own ID until someone
 > renames it. **Worth renaming the story's ID to `DF-1`** — deferred rather than done
 > unilaterally, because it touches three docs and a settled wireframe.
+
+### D-14 in full: what teemops.com is for
+
+**The milestone is limited by recruitment, not engineering** — this document has said so
+since 2026-08-01 — and until 2026-08-06 there was no public page to send anyone to.
+`teemops.com` served nothing.
+
+**What was there was worse than nothing.** `design/marketing/web/` held a complete,
+well-built three-page site for a **hosted commercial SaaS**: Free/Starter/Pro/Business
+pricing tiers, "Start Free" CTAs pointing at `app.teem.nz/register` — a domain that now
+redirects to an unrelated property — and no mention anywhere that TOPS is open source. It
+contradicted D-1 and D-6 on its face. It is deleted rather than kept as reference, because
+a second, contradictory description of the product in the repo is a trap for whoever opens
+it next. Git history has it.
+
+**The reframe that shaped the build.** A brand-new page with no traffic, no backlinks and no
+search history will not generate inbound leads inside the milestone window. The realistic
+sequence is outbound — a post, a message, an email — followed by the recipient looking us
+up. So the page is a **conversion asset for outbound**, not a lead engine. That is why it is
+one page and not eight: what it needs is a clear statement of what TOPS is, proof it is real
+(the install one-liner, the GitHub repo, live docs, a version number), an honest account of
+what it does *not* do, and one specific ask. Use-case pages, compliance landing pages and
+SEO keyword targeting — all specified in the old content plan — are premature at zero
+traffic and were dropped.
+
+**The "what it isn't" section is the load-bearing one.** It says AWS-only, not runtime
+protection, not a compliance guarantee, no scheduled scans, no report export, PCI empty —
+and that nobody outside the project is running it. For an audience of sceptical engineers,
+volunteering the limits is what makes the rest of the page credible. It is also lifted
+directly from `user-docs/start-here/what-tops-is.md`, so the two cannot drift into telling
+different stories.
+
+**Every number on the page is checked against the code**, not against intent: 74 rules
+(52 basic + 22 CIS), 11 services, all 74 carrying a remediation, all 28 critical/high
+carrying step-by-step guidance. `www/README.md` records where each is verified, because
+overstating any of them to a design partner costs more than it buys.
+
+**Lead capture is a Cloudflare Worker writing to D1**, protected by a honeypot field.
+**Turnstile was built, tested and then removed before launch** — at five-partner volume a
+few junk rows are cheaper to skim than a widget is to run, the endpoint sends no email and
+publishes nothing so spam has no amplification path, and a third-party challenge script
+that fails to load makes the form unsubmittable and loses a real lead silently. That last
+risk is the one that decided it. Bot Fight Mode and a rate-limiting rule are the first two
+responses if spam arrives; Turnstile is the third, and `www/README.md` records how.
+
+Deliberately no email notification either: reading leads is one command, and building
+notification before a single lead exists is work with no evidence behind it. Deployment
+reuses D-13's pattern — Workers static assets — so this adds no new category of
+infrastructure, only a second project in the same account. **The result is that deploying
+needs one CLI command and one dashboard step, with no secrets to manage at all.**
 
 ### D-12 in full: why the security score is gone rather than fixed
 
@@ -324,14 +375,16 @@ reader gets what they need from the top of a page, a technical reader keeps scro
 **`docs.teemops.com`, not `.teem.nz`.** `teemops.com` is the domain already wired into the
 live app — `MAIL_FROM_ADDRESS` defaults to `help@teemops.com`
 (`app/config/mail.php:114`), and `docs/architecture.md:117` names `app.teemops.com`.
-`teem.nz` only appears in `design/marketing/web/` — an unbuilt, pre-pivot marketing mockup
-that still has a paid "Start Free" pricing page, which contradicts D-6. That directory is
-stale and out of scope here; it's noted so the domain choice isn't relitigated by whoever
-next opens it.
+`teem.nz` only appeared in `design/marketing/web/` — an unbuilt, pre-pivot marketing mockup
+that still had a paid "Start Free" pricing page, which contradicts D-6. **That directory was
+deleted on 2026-08-06** when `www/` replaced it; see D-14. The note is kept so the domain
+choice isn't relitigated by whoever next goes looking for it in git history.
 
 **Deployment: Cloudflare Pages**, connected to this repo, publishing `user-docs/`. This is
-not a new category of infrastructure — `design/marketing/web/DEPLOY.md` already proposes
-Cloudflare Pages for the marketing site; this applies the same plan to a second directory.
+not a new category of infrastructure — the deleted marketing mockup's `DEPLOY.md` already
+proposed Cloudflare Pages; this applies the same plan to a second directory. (In the event
+D-13 landed on Cloudflare **Workers** static assets rather than Pages, and `www/` follows
+it.)
 
 **Format: plain Markdown, tooling decided later.** Per the product practices — ship the
 smallest working version, don't reach for a framework before there's content to render —
@@ -410,6 +463,7 @@ fixes are what made that run succeed, which is the sequencing argument justifyin
 
 | # | Feature | Why it's here | Size |
 | --- | --- | --- | :---: |
+| **N-12** | **`teemops.com` — the design-partner recruitment page** | The milestone has been recruitment-limited since 2026-08-01 and there was nowhere to send anyone: `teemops.com` served nothing, and what was in the repo sold a hosted product with a pricing page. Built 2026-08-06 as one page in `www/`. See **D-14**. **Not yet deployed** — needs `npm run db:init` and the custom domain attached in the dashboard; no secrets. Steps in `www/README.md`. | S |
 | ~~**N-11**~~ | ~~Lock down the account-linking SNS topic~~ | ✅ **Done** 2026-08-03 — consumer-side validation ([#100](https://github.com/teemops/tops/issues/100)) and an install-scoped filter secret ([#101](https://github.com/teemops/tops/issues/101)), verified end to end on a real account: a correct install id links as before, a wrong one is filtered to quarantine and never reaches `teemops_main`. The live run also caught `aws:link-rejections` reporting "nothing rejected" while a message sat in quarantine — the silent failure moved one layer out, and is now fixed. [Feature doc](features/sns-topic-publish-authorization.md). | S + M |
 | ~~**N-1**~~ | ~~Fix the clean-checkout build~~ | ✅ **Done** 2026-07-29 — `@vitejs/plugin-vue` on `^6`, `npm ci` clean, frontend CI job added. | — |
 | ~~**N-2**~~ | ~~Choose and add a licence~~ | ✅ **Done** 2026-07-29 — Apache-2.0, trademark held separately, DCO for contributions. See D-7. | — |
@@ -462,18 +516,14 @@ detail becomes a link into Findings, filtered. The per-finding list comes **off*
 
 #### Open — UI, in dependency order
 
-**The P0/P1 run is complete.** #81, #82, #83, #85 and #86 have all landed; what remains is P2
-and below. **#88 (F-5, Insights by service) is the cheapest next thing** — S-1 built the
-breakdown as a shared service and component precisely so Insights is a re-key rather than a
-rewrite, and there is already a test proving the organization-wide path works.
+**Nothing is left in this table. The UI workstream is closed** — verified against GitHub on
+2026-08-06: #81, #82, #83, #85, #86, #87, #88, #89 and #91 are all closed. Every row that
+used to sit here is in the Shipped table above.
 
-| # | Item | Depends on | Size | Priority |
-| --- | --- | --- | :---: | :---: |
-| **#89** | F-6 · Insights by benchmark — **the last item in the milestone**; F-4 unblocked it | ✅ all met | XS | P3 |
-| **#87** | F-4 · Filter Findings by compliance benchmark — the one genuine data-model change left; nothing records a finding's benchmark | #81 | M | P2 |
-| **#88** | F-5 · Insights by service with severity breakdown | #86, #81 | S | P2 |
-| **#91** | B-2 · Security score pinned at 0 and cannot improve | — | XS–S | P2 · bug |
-| **#89** | F-6 · Insights by benchmark | #87, #88 | XS | P3 |
+*The table that was here listed #87, #88, #89 and #91 as open for four days after they
+landed, which is the failure mode this document is most prone to: the Shipped table gets
+updated and the Open table does not. If you close something here, delete its row in the same
+commit.*
 
 **One architectural instruction, worth repeating from the wireframes:** S-1's grouped,
 severity-stacked, drillable breakdown must be built as a **reusable component**. F-5 and F-6
@@ -534,11 +584,14 @@ Keep it to the P0/P1 items until a partner is actually watching.
 
 | # | Feature | Why it's here | Size |
 | --- | --- | --- | :---: |
-| **X-1** | New-device email OTP | Wanted soon. Code prompt only on an unrecognised browser. Generator already exists — mostly extraction. | M |
+| **X-10** | Trim the child IAM role to what TOPS actually uses | Fell out of N-11 and was never written down here. [#111](https://github.com/teemops/tops/issues/111) | S |
+| **X-11** | `teemops_main` queue policy grants `SQS:ReceiveMessage` to `Principal: "*"` | Dead permission — the `aws:SourceArn` condition can never match a direct call — but it is a `Principal: "*"` in a public repo. Also from N-11. [#109](https://github.com/teemops/tops/issues/109) | XS |
+| **X-1** | New-device email OTP | **Parked 2026-08-06, not dropped.** No design partner has asked, and the milestone is recruitment-limited; building the largest open item ahead of evidence is the anti-pattern this document names. Two findings from the discovery are worth keeping: the generator is welded to a Firebase ID token and keyed on `firebase_uid`, so it is a rewrite rather than the extraction this row claimed; and the default install cannot send email to a real inbox at all (see below). | M |
 | **X-3** | Prove the self-hosted path in CI | Nothing asserts the app boots with `FIREBASE_USER_AUTH=false` — the default config. | S |
 | **X-4** | Delete or route the dead OAuth controller | 99 lines, zero routes, unused dependency. Could give native-auth users OAuth without Firebase. | S |
 | **X-6** | Enforce DCO sign-off in CI | Sign-off is required in writing but unchecked. D-7's guarantee depends on provenance. **The repo is public, so an external PR can now arrive at any time.** | XS |
 | **X-5** | Reconcile member permissions | Code, comments and the plan doc disagree on who can manage members. | XS |
+| **X-12** | A self-hoster cannot point TOPS at their own SMTP | `docker-compose.yml` hardcodes `MAIL_*` in `environment:`, which overrides `env_file:`. Verification and invitation email goes to a catcher on an unauthenticated port. Affects shipped features, not just X-1. | XS |
 | **X-8** | Publish a SHA256 for `install.sh` | N-3 documents the download-and-read form but cannot document a checksum, because the release workflow does not emit one. Small addition to `release.yml`. | XS |
 | **X-7** | Clear the remaining npm audit backlog | 17 → **5**, criticals at 0 and gated in CI. What's left needs a `firebase` major bump; nothing reaches a running instance. | XS |
 
@@ -630,10 +683,10 @@ as a first slice plus continuous growth rather than a checklist.
       AWS account, run your first scan, what the IAM role can do, reading a finding,
       resolving a finding, the security model, reporting a vulnerability. Scan profiles
       and member management are priority-2, still ahead, per the IA's writing order
-- [ ] Cloudflare Pages is connected and `docs.teemops.com` resolves to it — **D-13** picked
-      the renderer (MkDocs + Material) and the repo now builds; the Pages project itself
-      still needs connecting in the Cloudflare dashboard, which isn't something a repo
-      commit can do
+- [x] `docs.teemops.com` resolves and serves the built site — confirmed live 2026-08-06.
+      **D-13** picked the renderer (MkDocs + Material); it deploys as Cloudflare **Workers**
+      static assets (`wrangler.jsonc` at the repo root) rather than Pages as originally
+      written
 - [ ] `README.md`'s setup section trims to a summary linking into `user-docs/`, so
       installation instructions have exactly one canonical copy
 
@@ -699,10 +752,10 @@ Full research, the four options considered and why three were rejected, the open
 the proposed design, and acceptance criteria for both phases:
 **[docs/features/sns-topic-publish-authorization.md](features/sns-topic-publish-authorization.md)**.
 
-- [ ] Phase 1 — consumer-side validation ships with tests — [#100](https://github.com/teemops/tops/issues/100)
-- [ ] Phase 2 — install-scoped filter secret, verified end to end against a real AWS account — [#101](https://github.com/teemops/tops/issues/101)
-- [ ] Payload filtering confirmed to work against a real CloudFormation message before it is relied on
-- [ ] The architecture diagram's "unlimited child accounts" claim still holds after the change
+- [x] Phase 1 — consumer-side validation ships with tests — [#100](https://github.com/teemops/tops/issues/100)
+- [x] Phase 2 — install-scoped filter secret, verified end to end against a real AWS account — [#101](https://github.com/teemops/tops/issues/101) — **shipped and verified; the issue is still open on GitHub and wants closing**
+- [x] Payload filtering confirmed to work against a real CloudFormation message before it is relied on — 2026-08-03
+- [x] The architecture diagram's "unlimited child accounts" claim still holds after the change
 
 ---
 
@@ -1338,9 +1391,34 @@ the code worked fine — so only a test that reads what actually ships would hav
 
 Queued behind the design-partner milestone. Not started, not forgotten.
 
-### X-1 · New-device email OTP
+### X-1 · New-device email OTP — **parked 2026-08-06**
 
-**User story**
+**Why it is parked.** Picked up on 2026-08-06, taken through Discovery, and stopped before a
+user story was written. Nobody has asked for it, the milestone is limited by recruiting
+design partners rather than by shipping features, and it is the largest open item on the
+board. The counter-argument — the repo is public, this is a security product, and
+password-only access to a map of someone's AWS weaknesses is a poor look — is real, and is
+why this is parked rather than moved to *Not Doing*. **D-5 still stands**: when it is built,
+it is email OTP, not TOTP.
+
+**Two findings from the discovery, both worth keeping:**
+
+1. **This is a rewrite, not the extraction the summary below claims.**
+   `FirebaseAuthController::requestEmailOtp()` identifies the user by verifying a Firebase
+   **ID token** and caches under `mfa_email_otp:{firebase_uid}` — a column that is null for
+   every native-auth user. Both the input and the cache key have to be replaced. What is
+   genuinely reusable is about six lines plus `maskEmail()`; the valuable inheritance is the
+   *shape* (cache-backed, 6-digit, 10-minute expiry), not the code. It also uses `Mail::raw`
+   where the repo's pattern is a queued `Notification`.
+
+2. **The default install cannot send email to a real inbox, and `.env` cannot fix it.** See
+   **X-12** below. This is a prerequisite, and shipping OTP without it would deliver the
+   second factor to an unauthenticated mail catcher on the same host — the appearance of MFA
+   without the substance, which is worse than not shipping it.
+
+---
+
+**User story** *(retained as written; not yet agreed)*
 > As a self-hosting user, I want to be asked for an emailed code only when I sign in from
 > a browser I haven't used before, so that a stolen password alone isn't enough to reach
 > my account — without adding friction to everyday logins.
@@ -1368,6 +1446,32 @@ Queued behind the design-partner milestone. Not started, not forgotten.
   or leave them alone.
 
 ---
+
+### X-12 · A self-hoster cannot point TOPS at their own SMTP
+
+*Bug. Found 2026-08-06 during X-1's discovery, but it is not an MFA problem — it affects
+mail that ships today.*
+
+`docker-compose.yml` sets `MAIL_MAILER`, `MAIL_HOST` and `MAIL_PORT` in the `environment:`
+block, hardcoded to the bundled `maildev` catcher. The comment directly above them, added
+for the queue settings, explains exactly why this is a bug: **`environment:` overrides
+`env_file:`**, so a value in the operator's `.env` is ignored. Mail got the treatment the
+queue settings were deliberately spared.
+
+The consequences exist now, without MFA:
+
+- **Email verification** (`MustVerifyEmail` is live) and **organisation invitations** both
+  send to a catcher, so an invited colleague never receives anything. Today the operator
+  has to know to open maildev's web UI on port `8090`.
+- That UI is published on **all interfaces with no authentication** — fine for a local mail
+  catcher, not fine as the place account email lands.
+- Changing it means editing `docker-compose.yml`, a file `install.sh` owns and an upgrade
+  may replace.
+
+**The fix is XS**: move the three `MAIL_*` keys out of `environment:` so `.env` layering
+wins, keep `maildev` as the default for anyone who has configured nothing, and document the
+real-SMTP variables in `.env.example`. **Blocks X-1**, and should be done regardless of
+whether X-1 is ever built.
 
 ### X-3 · Prove the self-hosted path in CI
 
@@ -1489,6 +1593,25 @@ Blocking nothing today, but each one shapes the plan:
 
 ## Changelog
 
+- **2026-08-06** — **The plan turned from shipping to recruiting, and this document caught
+  up with itself.** X-1 (email OTP) was picked up, taken through Discovery and **parked**
+  before a user story existed: nobody has asked for it, and it is the largest open item on a
+  board whose stated constraint is finding five operators. Its discovery is kept, because it
+  found two things worth more than the feature would have been — the "generator already
+  exists, mostly extraction" claim is wrong (it is keyed on a Firebase ID token and
+  `firebase_uid`, so it is a rewrite), and **the default install cannot send email to a real
+  inbox at all**, now filed as **X-12**. That second one is a live bug affecting email
+  verification and organisation invitations today, not a hypothetical MFA prerequisite.
+  In its place, **N-12**: `teemops.com` built as a single design-partner recruitment page
+  (**D-14**), with the pre-pivot `design/marketing/web/` mockup deleted — it sold a hosted
+  product with Free/Starter/Pro/Business pricing and CTAs pointing at a domain that now
+  redirects elsewhere, contradicting D-1 and D-6 on its face. **A review of this document
+  against GitHub also found it stale in four places**, all now corrected: N-11's checkboxes
+  were unticked though it shipped on 2026-08-03; the workstream's "Open — UI" table still
+  listed #87, #88, #89 and #91 four days after they closed; `docs.teemops.com` was recorded
+  as not yet connected when it has been live and serving; and [#109](https://github.com/teemops/tops/issues/109)
+  and [#111](https://github.com/teemops/tops/issues/111), both filed on 2026-08-03 out of
+  N-11, appeared nowhere at all — now **X-11** and **X-10**.
 - **2026-08-02** — **S-1 landed, and the P0/P1 run of this workstream is complete.** Scan
   detail summarises and dispatches: run facts, severity totals, "fix these first" ranked by
   severity weight rather than raw count, and a drillable breakdown whose every row links into
