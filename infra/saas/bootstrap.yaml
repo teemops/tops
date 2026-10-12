@@ -1,0 +1,238 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  TOPS hosted version (app.teemops.com) - one-time bootstrap. Deployed once, by an
+  administrator, before the pipeline can deploy anything: the GitHub OIDC trust, the
+  roles the pipeline uses, the TLS certificate and the two generated secrets.
+  See infra/saas/README.md.
+
+Parameters:
+  DomainName:
+    Type: String
+    Default: app.teemops.com
+  GitHubRepository:
+    Type: String
+    Default: teemops/tops
+    Description: owner/repo allowed to deploy
+  GitHubEnvironment:
+    Type: String
+    Default: saas-production
+    Description: >-
+      GitHub Actions environment the deploy job runs in. The role trusts only that
+      environment, so required reviewers on it gate every production deploy.
+  CreateOidcProvider:
+    Type: String
+    AllowedValues: ["true", "false"]
+    Default: "true"
+    Description: An account holds one provider per URL; set false if it already exists.
+
+Conditions:
+  CreateOidc: !Equals [!Ref CreateOidcProvider, "true"]
+
+Resources:
+  GitHubOidcProvider:
+    Type: AWS::IAM::OIDCProvider
+    Condition: CreateOidc
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList: [sts.amazonaws.com]
+
+  # Laravel encrypts sessions and cookies with this. Generated here so it never exists
+  # anywhere but Secrets Manager, and is identical across every task — a key per
+  # container would log everybody out on each deploy. 32 characters = AES-256.
+  AppKeySecret:
+    Type: AWS::SecretsManager::Secret
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      Name: teemops-saas/app-key
+      Description: Laravel APP_KEY for app.teemops.com
+      GenerateSecretString:
+        PasswordLength: 32
+        ExcludePunctuation: true
+
+  # The N-11 install-scoped filter value. Not recoverable if lost: every onboarding
+  # link already issued would stop working and unlink pings would be filtered out.
+  # Hence Retain.
+  InstallIdSecret:
+    Type: AWS::SecretsManager::Secret
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      Name: teemops-saas/install-id
+      Description: TOPS_INSTALL_ID for app.teemops.com (N-11)
+      GenerateSecretString:
+        PasswordLength: 36
+        ExcludePunctuation: true
+
+  # Stays PENDING_VALIDATION until the CNAME CloudFormation prints in this stack's
+  # events is added in Cloudflare (DNS only, not proxied). The stack waits for it.
+  Certificate:
+    Type: AWS::CertificateManager::Certificate
+    Properties:
+      DomainName: !Ref DomainName
+      ValidationMethod: DNS
+
+  # SES does not exist in Auckland, which is why the whole stack is in Sydney. Easy
+  # DKIM signs as teemops.com, so mail passes the apex's DMARC policy without
+  # touching the Proton SPF record. The three CNAMEs from this identity's DKIM
+  # tokens go in Cloudflare (DNS only).
+  MailIdentity:
+    Type: AWS::SES::EmailIdentity
+    Properties:
+      EmailIdentity: teemops.com
+
+  ArtifactsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub teemops-saas-artifacts-${AWS::AccountId}
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-old-artifacts
+            Status: Enabled
+            ExpirationInDays: 90
+
+  # What CloudFormation acts as when it creates the hosted stack. Broad, because
+  # creating a VPC, RDS, ECS and IAM roles is broad — but only CloudFormation can
+  # assume it, and IAM changes are confined to roles under the teemops-saas path.
+  CloudFormationExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: teemops-saas-cfn-exec
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: cloudformation.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/PowerUserAccess
+      Policies:
+        - PolicyName: saas-iam
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - iam:CreateRole
+                  - iam:DeleteRole
+                  - iam:GetRole
+                  - iam:UpdateRole
+                  - iam:TagRole
+                  - iam:UntagRole
+                  - iam:PutRolePolicy
+                  - iam:DeleteRolePolicy
+                  - iam:GetRolePolicy
+                  - iam:AttachRolePolicy
+                  - iam:DetachRolePolicy
+                  - iam:UpdateAssumeRolePolicy
+                  - iam:PassRole
+                Resource: !Sub arn:aws:iam::${AWS::AccountId}:role/teemops-saas/*
+              - Effect: Allow
+                Action: iam:CreateServiceLinkedRole
+                Resource: "*"
+                Condition:
+                  StringLike:
+                    iam:AWSServiceName:
+                      - ecs.amazonaws.com
+                      - elasticloadbalancing.amazonaws.com
+                      - rds.amazonaws.com
+
+  # What the GitHub Actions job assumes. It cannot create anything itself: it hands
+  # templates to CloudFormation (which acts as the role above) and uploads the public
+  # child-account template. ECS rollouts happen inside the stack update.
+  DeployRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: teemops-saas-deploy
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Sub arn:aws:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+                token.actions.githubusercontent.com:sub: !Sub repo:${GitHubRepository}:environment:${GitHubEnvironment}
+      Policies:
+        - PolicyName: deploy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: Stacks
+                Effect: Allow
+                Action:
+                  - cloudformation:CreateChangeSet
+                  - cloudformation:ExecuteChangeSet
+                  - cloudformation:DescribeChangeSet
+                  - cloudformation:DeleteChangeSet
+                  - cloudformation:DescribeStacks
+                  - cloudformation:DescribeStackEvents
+                  - cloudformation:DescribeStackResource
+                  - cloudformation:DescribeStackResources
+                  - cloudformation:ListStackResources
+                  - cloudformation:GetTemplateSummary
+                  - cloudformation:CreateStack
+                  - cloudformation:UpdateStack
+                Resource:
+                  - !Sub arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/teemops-saas/*
+                  - !Sub arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/teemops-saas-*/*
+                  - !Sub arn:aws:cloudformation:${AWS::Region}:aws:transform/Serverless-2016-10-31
+              - Sid: Validate
+                Effect: Allow
+                Action: cloudformation:ValidateTemplate
+                Resource: "*"
+              - Sid: HandToCloudFormation
+                Effect: Allow
+                Action: iam:PassRole
+                Resource: !GetAtt CloudFormationExecutionRole.Arn
+              - Sid: Artifacts
+                Effect: Allow
+                Action: [s3:PutObject, s3:GetObject, s3:ListBucket, s3:GetBucketLocation]
+                Resource:
+                  - !GetAtt ArtifactsBucket.Arn
+                  - !Sub ${ArtifactsBucket.Arn}/*
+              - Sid: ChildTemplate
+                Effect: Allow
+                Action: s3:PutObject
+                Resource: arn:aws:s3:::teemops-saas-templates-*/templates/*
+              - Sid: Smoke
+                Effect: Allow
+                Action: [ecs:DescribeServices, ecs:DescribeTasks]
+                Resource: "*"
+              - Sid: ReadAppLogs
+                Effect: Allow
+                Action: [logs:GetLogEvents, logs:FilterLogEvents]
+                Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/teemops-saas/*
+
+Outputs:
+  DeployRoleArn:
+    Description: Set as the AWS_DEPLOY_ROLE_ARN variable on the GitHub environment
+    Value: !GetAtt DeployRole.Arn
+  CloudFormationExecutionRoleArn:
+    Value: !GetAtt CloudFormationExecutionRole.Arn
+  ArtifactsBucketName:
+    Value: !Ref ArtifactsBucket
+  CertificateArn:
+    Value: !Ref Certificate
+    Export: { Name: teemops-saas-certificate-arn }
+  AppKeySecretArn:
+    Value: !Ref AppKeySecret
+    Export: { Name: teemops-saas-app-key-secret-arn }
+  DkimRecords:
+    Description: Add each as a CNAME <token>._domainkey.teemops.com -> <token>.dkim.amazonses.com
+    Value: !Join
+      - ","
+      - - !GetAtt MailIdentity.DkimDNSTokenName1
+        - !GetAtt MailIdentity.DkimDNSTokenName2
+        - !GetAtt MailIdentity.DkimDNSTokenName3
+  InstallIdSecretArn:
+    Value: !Ref InstallIdSecret
+    Export: { Name: teemops-saas-install-id-secret-arn }

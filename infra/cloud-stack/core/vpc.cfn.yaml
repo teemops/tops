@@ -115,7 +115,8 @@ Resources:
       Tags:
         - Key: Name
           Value: tops-public
-  #Public Route (Private route will be created automatically)
+  # Public route. The private table needs none: it keeps only the local route
+  # unless a NAT gateway is requested.
   TopsPublicRouteInternet:
     Type: AWS::EC2::Route
     DependsOn: TopsInternetGateway
@@ -125,6 +126,33 @@ Resources:
        DestinationCidrBlock: 0.0.0.0/0
        GatewayId:
          Ref: TopsInternetGateway
+  # Without these every subnet falls back to the VPC's main route table, which
+  # has only the local route: "public" subnets could not reach the internet
+  # gateway at all, and nothing in them could pull an image or call an AWS API.
+  TopsSubnet1PublicRoutes:
+    Condition: HasPublicSubnet1
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref TopsSubnet1Public
+      RouteTableId: !Ref TopsPublicRouteTable
+  TopsSubnet2PublicRoutes:
+    Condition: HasPublicSubnet2
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref TopsSubnet2Public
+      RouteTableId: !Ref TopsPublicRouteTable
+  TopsSubnet1PrivateRoutes:
+    Condition: HasPrivateSubnet1
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref TopsSubnet1Private
+      RouteTableId: !Ref TopsPrivateRouteTable
+  TopsSubnet2PrivateRoutes:
+    Condition: HasPrivateSubnet2
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref TopsSubnet2Private
+      RouteTableId: !Ref TopsPrivateRouteTable
   TopsNATGateway:
     Condition: HasNAT
     Type: AWS::EC2::NatGateway

@@ -775,10 +775,22 @@ $70–110 a month), and how much of the existing `infra/cloud-stack` nested stac
 SAM stays as the deployment tool because the repo already uses it, but for containers it is
 plain CloudFormation under the SAM transform.
 
-- [ ] A dedicated AWS account for production, separate from development
-- [ ] Infrastructure as SAM/CloudFormation templates in the repo — nothing created by hand
+**Progress 2026-10-13:** designed and built, not yet deployed —
+[design](features/saas-deployment.md), [`infra/saas/`](../infra/saas/README.md),
+`.github/workflows/deploy-saas.yml`. Fargate in ap-southeast-2 (Auckland has no SES), in
+the existing account 848310106659 by the owner's choice; the shared-account risk is recorded
+in the design. Two bugs in the reused templates fixed on the way: `core/vpc.cfn.yaml`
+never associated its subnets with a route table, so its "public" subnets had no internet
+route; `db/rds.cfn.yaml` gained opt-in encryption, retention, deletion protection and an
+endpoint output.
+
+- [ ] ~~A dedicated AWS account for production, separate from development~~ — the owner
+      chose the existing account; revisit before the first paying customer
+- [x] Infrastructure as SAM/CloudFormation templates in the repo — nothing created by hand
+      beyond the one-time bootstrap and DNS records
 - [ ] The app reaches AWS through an IAM role (task role or instance profile); **no static
-      access keys** anywhere in the deployment
+      access keys** anywhere in the deployment — *designed that way; tick once a deployed
+      task has linked an account*
 - [ ] RDS MySQL with automated backups, verified by a restore
 - [ ] GitHub Actions deploys on a release tag via OIDC: stacks, migrations, rollout, smoke
       test, automatic rollback

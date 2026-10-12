@@ -44,6 +44,29 @@ Parameters:
     Default: admin
     MinLength: 1
     MaxLength: 63
+  # The four below default to how this template has always behaved, so stacks
+  # already deployed from it see no change. The SaaS stack (infra/saas) turns
+  # them on.
+  DBName:
+    Description: Initial database to create. Empty creates none.
+    Type: String
+    Default: ""
+  StorageEncrypted:
+    Description: Encrypt storage at rest with the AWS-managed RDS key. Changing it replaces the instance.
+    Type: String
+    AllowedValues: ["true", "false"]
+    Default: "false"
+  BackupRetentionPeriod:
+    Description: Days of automated backups (0 disables them).
+    Type: Number
+    Default: 1
+  DeletionProtection:
+    Description: Refuse to delete the instance until this is turned off.
+    Type: String
+    AllowedValues: ["true", "false"]
+    Default: "false"
+Conditions:
+  HasDBName: !Not [!Equals [!Ref DBName, ""]]
 Resources:
   TopsDBSubnetGroup:
     Type: AWS::RDS::DBSubnetGroup
@@ -68,6 +91,10 @@ Resources:
       MaxAllocatedStorage: !Ref MaxAllocatedStorage
       MasterUsername: !Ref MasterUsername
       ManageMasterUserPassword: true
+      DBName: !If [HasDBName, !Ref DBName, !Ref AWS::NoValue]
+      StorageEncrypted: !Ref StorageEncrypted
+      BackupRetentionPeriod: !Ref BackupRetentionPeriod
+      DeletionProtection: !Ref DeletionProtection
       Tags:
         - Key: Name
           Value: !Ref DBInstanceName
@@ -99,3 +126,8 @@ Outputs:
   MasterUserSecretArn:
     Description: Secrets Manager secret ARN for the RDS master user password
     Value: !GetAtt TopsRDS.MasterUserSecret.SecretArn
+  EndpointAddress:
+    Description: Hostname the app connects to
+    Value: !GetAtt TopsRDS.Endpoint.Address
+  EndpointPort:
+    Value: !GetAtt TopsRDS.Endpoint.Port

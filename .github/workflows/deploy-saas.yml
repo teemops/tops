@@ -1,0 +1,160 @@
+name: Deploy app.teemops.com
+
+# Deploys the hosted version (N-13, D-15) to AWS — infra/saas/template.yaml on ECS
+# Fargate in ap-southeast-2. Design: docs/features/saas-deployment.md.
+#
+# Runs after "Tag and release" has published a version's images, and only when that
+# run actually cut a tag for its commit (VERSION changes that were already released
+# are no-ops there, and here). Run it by hand, from develop, with a tag for the
+# first deploy or to roll back to an earlier version's image.
+#
+# Rollback is automatic: the stack update waits for both ECS services to settle,
+# ECS's circuit breaker fails a rollout whose tasks never pass the /up health check
+# (a failed migration exits the container before it does), and CloudFormation then
+# rolls the whole stack back to the previous image.
+#
+# No AWS keys are stored anywhere. The job assumes teemops-saas-deploy through
+# GitHub's OIDC token, and that role trusts only jobs running in the
+# `saas-production` environment of this repository — add required reviewers there
+# to gate production. Set two variables on that environment, from the bootstrap
+# stack's outputs: AWS_DEPLOY_ROLE_ARN and AWS_ACCOUNT_ID.
+
+on:
+  workflow_run:
+    workflows: ["Tag and release"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to deploy, e.g. v0.6.0
+        required: true
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-saas
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ap-southeast-2
+  STACK_NAME: teemops-saas
+  DOMAIN: app.teemops.com
+  IMAGE: teem/tops
+
+jobs:
+  resolve:
+    name: Which version?
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Resolve the tag
+        id: tag
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          if [ -n "${INPUT_TAG:-}" ]; then
+            tag="$INPUT_TAG"
+          else
+            tag="v$(tr -d '[:space:]' < VERSION)"
+            # "Tag and release" succeeds without releasing when VERSION was already
+            # tagged. Only deploy when this run's commit is the one the tag is on.
+            tagged="$(git rev-list -n 1 "$tag" 2>/dev/null || true)"
+            if [ "$tagged" != "$HEAD_SHA" ]; then
+              echo "No new release on this commit ($tag is on ${tagged:-nothing}); nothing to deploy."
+              exit 0
+            fi
+          fi
+          [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::Not a release tag: $tag"; exit 1; }
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    name: Deploy ${{ needs.resolve.outputs.tag }}
+    needs: resolve
+    if: needs.resolve.outputs.tag != ''
+    runs-on: ubuntu-latest
+    environment: saas-production
+    timeout-minutes: 60
+    env:
+      TAG: ${{ needs.resolve.outputs.tag }}
+    steps:
+      # After a release, templates come from the release itself, so infrastructure
+      # and image move together. A manual run uses the templates on the branch it was
+      # started from with the image tag it was given — which is what lets a rollback
+      # (or the very first deploy, of a release older than infra/saas) work at all.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.sha || needs.resolve.outputs.tag }}
+
+      - name: Require the image to exist for arm64
+        run: |
+          set -euo pipefail
+          docker manifest inspect "${IMAGE}:${TAG}" | grep -q '"architecture": "arm64"' \
+            || { echo "::error::${IMAGE}:${TAG} has no arm64 image on Docker Hub."; exit 1; }
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: aws-actions/setup-sam@v2
+        with:
+          use-installer: true
+
+      - name: Deploy the stack
+        env:
+          ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          sam deploy \
+            --template-file infra/saas/template.yaml \
+            --stack-name "$STACK_NAME" \
+            --region "$AWS_REGION" \
+            --s3-bucket "teemops-saas-artifacts-${ACCOUNT_ID}" \
+            --s3-prefix "$STACK_NAME" \
+            --role-arn "arn:aws:iam::${ACCOUNT_ID}:role/teemops-saas-cfn-exec" \
+            --capabilities CAPABILITY_IAM CAPABILITY_AUTO_EXPAND \
+            --parameter-overrides "ImageTag=${TAG}" \
+            --no-confirm-changeset \
+            --no-fail-on-empty-changeset
+
+      # Customers' quick-create links point here. Uploaded from the same release so
+      # the role customers create matches the code assuming it.
+      - name: Publish the child-account template
+        env:
+          ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
+        run: |
+          aws s3 cp templates/iam.role.child.account.cfn.yaml \
+            "s3://teemops-saas-templates-${ACCOUNT_ID}/templates/iam.role.child.account.cfn.yaml" \
+            --region "$AWS_REGION"
+
+      # Through the load balancer by name, with the real hostname for TLS, so this
+      # checks the certificate and the app even before Cloudflare DNS points here.
+      - name: Smoke test
+        run: |
+          set -euo pipefail
+          alb="$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" --region "$AWS_REGION" \
+            --query "Stacks[0].Outputs[?OutputKey=='LoadBalancerDnsName'].OutputValue" --output text)"
+          for i in $(seq 1 10); do
+            if curl -fsS --max-time 10 --connect-to "${DOMAIN}:443:${alb}:443" "https://${DOMAIN}/up" >/dev/null; then
+              echo "https://${DOMAIN}/up is healthy on ${TAG}."
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "::error::https://${DOMAIN}/up did not answer through ${alb}."
+          exit 1
+
+      - name: Summary
+        if: always()
+        run: echo "Deployed **${TAG}** to ${DOMAIN} (${{ job.status }})." >> "$GITHUB_STEP_SUMMARY"

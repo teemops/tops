@@ -1,0 +1,503 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >-
+  TOPS hosted version (app.teemops.com). The published TOPS images on ECS Fargate,
+  plus the same SQS/SNS messaging every self-hosted install gets. Deployed by
+  .github/workflows/deploy-saas.yml; requires bootstrap.yaml first.
+  Design: docs/features/saas-deployment.md.
+
+Parameters:
+  ImageTag:
+    Type: String
+    Description: Release tag of the published images, e.g. v0.6.0. Never "latest".
+    AllowedPattern: ^v\d+\.\d+\.\d+$
+  ImageRepository:
+    Type: String
+    Default: docker.io/teem/tops
+  DomainName:
+    Type: String
+    Default: app.teemops.com
+  MailFromAddress:
+    Type: String
+    Default: noreply@teemops.com
+  WorkerProcesses:
+    Type: Number
+    Default: 5
+    Description: Region-scan workers in the worker task (PERF-6)
+
+Resources:
+  # ------------------------------------------------------------------ network
+  # Two public subnets for the ALB and the tasks, two private for RDS. No NAT
+  # gateway: tasks get public IPs to reach Docker Hub and AWS APIs, and their
+  # security group admits nothing but the ALB.
+  VpcStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: ../cloud-stack/core/vpc.cfn.yaml
+      Parameters:
+        Name: teemops-saas
+        CIDR: 10.110.0.0/16
+        Option: standard
+        NATGateway: "false"
+
+  AlbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: teemops-saas load balancer - HTTPS from anywhere, HTTP only to redirect
+      VpcId: !GetAtt VpcStack.Outputs.VpcId
+      SecurityGroupIngress:
+        - { IpProtocol: tcp, FromPort: 443, ToPort: 443, CidrIp: 0.0.0.0/0 }
+        - { IpProtocol: tcp, FromPort: 80, ToPort: 80, CidrIp: 0.0.0.0/0 }
+
+  TaskSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: teemops-saas tasks - inbound from the load balancer only
+      VpcId: !GetAtt VpcStack.Outputs.VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId: !Ref AlbSecurityGroup
+
+  # ------------------------------------------------------------------ data
+  # The instance itself snapshots on delete (the RDS default) and has deletion
+  # protection on, so removing this stack cannot silently take the data with it.
+  DbStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: ../cloud-stack/db/rds.cfn.yaml
+      Parameters:
+        VPC: !GetAtt VpcStack.Outputs.VpcId
+        DBSubnet1: !GetAtt VpcStack.Outputs.PrivateSubnet1Id
+        DBSubnet2: !GetAtt VpcStack.Outputs.PrivateSubnet2Id
+        TopsAppSecurityGroup: !Ref TaskSecurityGroup
+        DBInstanceName: teemops-saas
+        DBInstanceClass: db.t4g.micro
+        DBName: teemops
+        MasterUsername: teemops
+        StorageEncrypted: "true"
+        BackupRetentionPeriod: 7
+        DeletionProtection: "true"
+
+  # ------------------------------------------------------------------ messaging
+  # Exactly what install.sh deploys for a self-hosted install.
+  SqsStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: ../cloud-stack/core-docker/sqs.cfn.yaml
+
+  SnsStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn: SqsStack # the subscription points at teemops_main by name
+    Properties:
+      TemplateURL: ../cloud-stack/stackset/sns.topic.cfn.yaml
+      Parameters:
+        # Created by bootstrap.yaml. Referenced by name: dynamic references cannot
+        # be assembled from other intrinsic functions.
+        TopsInstallIds: "{{resolve:secretsmanager:teemops-saas/install-id}}"
+
+  # Serves templates/iam.role.child.account.cfn.yaml to customers' CloudFormation
+  # quick-create links. Public read on that prefix only; the pipeline uploads it.
+  ChildTemplateBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub teemops-saas-templates-${AWS::AccountId}
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: false
+        RestrictPublicBuckets: false
+
+  ChildTemplateBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref ChildTemplateBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: PublicReadChildAccountTemplate
+            Effect: Allow
+            Principal: "*"
+            Action: s3:GetObject
+            Resource: !Sub ${ChildTemplateBucket.Arn}/templates/*
+
+  # ------------------------------------------------------------------ load balancer
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: teemops-saas
+      Scheme: internet-facing
+      Type: application
+      SecurityGroups: [!Ref AlbSecurityGroup]
+      Subnets:
+        - !GetAtt VpcStack.Outputs.PublicSubnet1Id
+        - !GetAtt VpcStack.Outputs.PublicSubnet2Id
+      LoadBalancerAttributes:
+        - { Key: routing.http.drop_invalid_header_fields.enabled, Value: "true" }
+
+  HttpListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: redirect
+          RedirectConfig: { Protocol: HTTPS, Port: "443", StatusCode: HTTP_301 }
+
+  HttpsListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 443
+      Protocol: HTTPS
+      SslPolicy: ELBSecurityPolicy-TLS13-1-2-2021-06
+      Certificates:
+        - CertificateArn: !ImportValue teemops-saas-certificate-arn
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref AppTargetGroup
+
+  AppTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      VpcId: !GetAtt VpcStack.Outputs.VpcId
+      TargetType: ip
+      Protocol: HTTP
+      Port: 80
+      HealthCheckPath: /up
+      HealthCheckIntervalSeconds: 15
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+      TargetGroupAttributes:
+        - { Key: deregistration_delay.timeout_seconds, Value: "30" }
+
+  # ------------------------------------------------------------------ IAM
+  # Pulls nothing private (the images are public on Docker Hub); reads the two
+  # secrets the containers are started with, and writes logs.
+  ExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: /teemops-saas/
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ecs-tasks.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+      Policies:
+        - PolicyName: read-startup-secrets
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource:
+                  - !ImportValue teemops-saas-app-key-secret-arn
+                  - !ImportValue teemops-saas-install-id-secret-arn
+                  - !GetAtt DbStack.Outputs.MasterUserSecretArn
+
+  # What the app itself runs as. This replaces the access key a self-hosted install
+  # mounts from ~/.aws: temporary credentials, rotated by ECS, attributed to the task
+  # in CloudTrail. Everything it can do is listed here.
+  TaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: /teemops-saas/
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ecs-tasks.amazonaws.com }
+            Action: sts:AssumeRole
+            Condition:
+              ArnLike:
+                aws:SourceArn: !Sub arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:*
+      Policies:
+        - PolicyName: tops-app
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              # Customers' read-only roles. The child template does not name the role,
+              # so CloudFormation calls it <stack>-TeemOps-<suffix>; the external id
+              # in its trust policy is the real check.
+              - Sid: AssumeCustomerRoles
+                Effect: Allow
+                Action: sts:AssumeRole
+                Resource: arn:aws:iam::*:role/*-TeemOps-*
+              - Sid: AccountLinkingQueues
+                Effect: Allow
+                Action:
+                  - sqs:ReceiveMessage
+                  - sqs:DeleteMessage
+                  - sqs:ChangeMessageVisibility
+                  - sqs:GetQueueUrl
+                  - sqs:GetQueueAttributes
+                  - sqs:SendMessage
+                Resource:
+                  - !GetAtt SqsStack.Outputs.TopsMainQueueArn
+                  - !GetAtt SqsStack.Outputs.TopsMainDlqArn
+                  - !GetAtt SnsStack.Outputs.QuarantineQueueArn
+              - Sid: SendMail
+                Effect: Allow
+                Action: [ses:SendEmail, ses:SendRawEmail]
+                Resource: "*"
+                Condition:
+                  StringLike:
+                    ses:FromAddress: "*@teemops.com"
+
+  # ------------------------------------------------------------------ compute
+  Cluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: teemops-saas
+      ClusterSettings:
+        - { Name: containerInsights, Value: enabled }
+
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /teemops-saas/app
+      RetentionInDays: 30
+
+  # One definition of the container environment, shared by both task definitions
+  # through YAML anchors, so the web tier and the workers cannot drift apart. Mirrors what generated/teemops.env gives a
+  # self-hosted install, minus everything that pointed at ~/.aws.
+  AppTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: teemops-saas-app
+      RequiresCompatibilities: [FARGATE]
+      NetworkMode: awsvpc
+      RuntimePlatform: { CpuArchitecture: ARM64, OperatingSystemFamily: LINUX }
+      Cpu: "512"
+      Memory: "1024"
+      ExecutionRoleArn: !GetAtt ExecutionRole.Arn
+      TaskRoleArn: !GetAtt TaskRole.Arn
+      ContainerDefinitions:
+        - Name: app
+          Image: !Sub ${ImageRepository}:${ImageTag}
+          Essential: true
+          PortMappings: [{ ContainerPort: 80, Protocol: tcp }]
+          Environment: &environment
+            - { Name: APP_ENV, Value: production }
+            - { Name: APP_DEBUG, Value: "false" }
+            - { Name: APP_URL, Value: !Sub "https://${DomainName}" }
+            - { Name: LOG_CHANNEL, Value: stderr }
+            - { Name: DB_CONNECTION, Value: mysql }
+            - { Name: DB_HOST, Value: !GetAtt DbStack.Outputs.EndpointAddress }
+            - { Name: DB_PORT, Value: !GetAtt DbStack.Outputs.EndpointPort }
+            - { Name: DB_DATABASE, Value: teemops }
+            - { Name: DB_USERNAME, Value: teemops }
+            - { Name: FIREBASE_USER_AUTH, Value: "false" }
+            - { Name: MAIL_MAILER, Value: ses }
+            - { Name: MAIL_FROM_ADDRESS, Value: !Ref MailFromAddress }
+            - { Name: AWS_DEFAULT_REGION, Value: !Ref AWS::Region }
+            - { Name: AWS_REGION, Value: !Ref AWS::Region }
+            - { Name: AWS_PARENT_ACCOUNT_ID, Value: !Ref AWS::AccountId }
+            - { Name: TOPS_ENVIRONMENT, Value: saas }
+            - { Name: TOPS_DEPLOYMENT_REGION, Value: !Ref AWS::Region }
+            - { Name: TOPS_DEPLOY_BUCKET, Value: !Ref ChildTemplateBucket }
+            - Name: TOPS_CFN_TEMPLATE_URL
+              Value: !Sub https://${ChildTemplateBucket}.s3.${AWS::Region}.amazonaws.com/templates/iam.role.child.account.cfn.yaml
+            - { Name: TOPS_SQS_NAME, Value: !GetAtt SqsStack.Outputs.TopsMainQueueName }
+            - { Name: TOPS_SQS_ARN, Value: !GetAtt SqsStack.Outputs.TopsMainQueueArn }
+            - { Name: TOPS_SQS_DLQ_NAME, Value: !GetAtt SqsStack.Outputs.TopsMainDlqName }
+            - { Name: TOPS_SQS_DLQ_ARN, Value: !GetAtt SqsStack.Outputs.TopsMainDlqArn }
+            - { Name: TOPS_SNS_ARN, Value: !GetAtt SnsStack.Outputs.TopicArn }
+            - { Name: TOPS_QUARANTINE_SQS_NAME, Value: !GetAtt SnsStack.Outputs.QuarantineQueueName }
+            - { Name: TOPS_QUARANTINE_SQS_ARN, Value: !GetAtt SnsStack.Outputs.QuarantineQueueArn }
+            # Scans run on the database queue, as on a self-hosted install; only
+            # account linking uses SQS.
+            - { Name: QUEUE_CONNECTION, Value: database }
+            - { Name: SCAN_QUEUE_CONNECTION, Value: database }
+            - { Name: SCAN_REGION_QUEUE_CONNECTION, Value: database }
+            - { Name: TOPS_WORKER_PROCESSES, Value: !Ref WorkerProcesses }
+          Secrets: &secrets
+            - Name: APP_KEY
+              ValueFrom: !ImportValue teemops-saas-app-key-secret-arn
+            - Name: TOPS_INSTALL_ID
+              ValueFrom: !ImportValue teemops-saas-install-id-secret-arn
+            - Name: DB_PASSWORD
+              ValueFrom: !Sub
+                - "${Arn}:password::"
+                - Arn: !GetAtt DbStack.Outputs.MasterUserSecretArn
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref LogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: app
+
+  WorkerTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: teemops-saas-worker
+      RequiresCompatibilities: [FARGATE]
+      NetworkMode: awsvpc
+      RuntimePlatform: { CpuArchitecture: ARM64, OperatingSystemFamily: LINUX }
+      Cpu: "1024"
+      Memory: "2048"
+      ExecutionRoleArn: !GetAtt ExecutionRole.Arn
+      TaskRoleArn: !GetAtt TaskRole.Arn
+      ContainerDefinitions:
+        - Name: worker
+          Image: !Sub ${ImageRepository}:${ImageTag}
+          Essential: true
+          EntryPoint: [/usr/local/bin/worker-entrypoint.sh]
+          Environment: *environment
+          Secrets: *secrets
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref LogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: worker
+
+  # The app container migrates on start (docker/app/entrypoint.sh), as it does
+  # self-hosted. That is safe because DesiredCount is 1: a rollout starts exactly
+  # one new task, so migrations never run twice at once. A failed migration exits
+  # the container, the circuit breaker rolls the service back, and CloudFormation
+  # rolls the stack back with it. Raising DesiredCount means moving migrations to a
+  # one-off task first.
+  AppService:
+    Type: AWS::ECS::Service
+    DependsOn: HttpsListener
+    Properties:
+      ServiceName: app
+      Cluster: !Ref Cluster
+      LaunchType: FARGATE
+      TaskDefinition: !Ref AppTaskDefinition
+      DesiredCount: 1
+      HealthCheckGracePeriodSeconds: 60
+      DeploymentConfiguration:
+        MinimumHealthyPercent: 100
+        MaximumPercent: 200
+        DeploymentCircuitBreaker: { Enable: true, Rollback: true }
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          SecurityGroups: [!Ref TaskSecurityGroup]
+          Subnets:
+            - !GetAtt VpcStack.Outputs.PublicSubnet1Id
+            - !GetAtt VpcStack.Outputs.PublicSubnet2Id
+      LoadBalancers:
+        - ContainerName: app
+          ContainerPort: 80
+          TargetGroupArn: !Ref AppTargetGroup
+
+  # Stop-then-start rather than overlap: two workers would run two schedulers
+  # (schedule:work) side by side for the length of the rollout.
+  WorkerService:
+    Type: AWS::ECS::Service
+    Properties:
+      ServiceName: worker
+      Cluster: !Ref Cluster
+      LaunchType: FARGATE
+      TaskDefinition: !Ref WorkerTaskDefinition
+      DesiredCount: 1
+      DeploymentConfiguration:
+        MinimumHealthyPercent: 0
+        MaximumPercent: 100
+        DeploymentCircuitBreaker: { Enable: true, Rollback: true }
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          SecurityGroups: [!Ref TaskSecurityGroup]
+          Subnets:
+            - !GetAtt VpcStack.Outputs.PublicSubnet1Id
+            - !GetAtt VpcStack.Outputs.PublicSubnet2Id
+
+  # ------------------------------------------------------------------ alarms
+  AlarmTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: teemops-saas-alarms
+
+  Alb5xxAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: app.teemops.com is returning 5xx
+      Namespace: AWS/ApplicationELB
+      MetricName: HTTPCode_Target_5XX_Count
+      Dimensions:
+        - { Name: LoadBalancer, Value: !GetAtt LoadBalancer.LoadBalancerFullName }
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 5
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlarmTopic]
+
+  UnhealthyHostAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: No healthy app task behind the load balancer
+      Namespace: AWS/ApplicationELB
+      MetricName: HealthyHostCount
+      Dimensions:
+        - { Name: LoadBalancer, Value: !GetAtt LoadBalancer.LoadBalancerFullName }
+        - { Name: TargetGroup, Value: !GetAtt AppTargetGroup.TargetGroupFullName }
+      Statistic: Minimum
+      Period: 60
+      EvaluationPeriods: 3
+      Threshold: 1
+      ComparisonOperator: LessThanThreshold
+      TreatMissingData: breaching
+      AlarmActions: [!Ref AlarmTopic]
+
+  # Account-link messages piling up means aws:process-sqs is not consuming them.
+  LinkQueueAgeAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Account-linking messages are not being consumed
+      Namespace: AWS/SQS
+      MetricName: ApproximateAgeOfOldestMessage
+      Dimensions:
+        - { Name: QueueName, Value: !GetAtt SqsStack.Outputs.TopsMainQueueName }
+      Statistic: Maximum
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 600
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlarmTopic]
+
+  LinkDlqAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: An account-linking message failed five times (redrive with aws:redrive-dlq)
+      Namespace: AWS/SQS
+      MetricName: ApproximateNumberOfMessagesVisible
+      Dimensions:
+        - { Name: QueueName, Value: !GetAtt SqsStack.Outputs.TopsMainDlqName }
+      Statistic: Maximum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlarmTopic]
+
+Outputs:
+  LoadBalancerDnsName:
+    Description: Point app.teemops.com at this with a CNAME in Cloudflare
+    Value: !GetAtt LoadBalancer.DNSName
+  ClusterName:
+    Value: !Ref Cluster
+  ChildTemplateBucketName:
+    Value: !Ref ChildTemplateBucket
+  TaskSecurityGroupId:
+    Value: !Ref TaskSecurityGroup
+  TaskSubnetIds:
+    Value: !Join
+      - ","
+      - - !GetAtt VpcStack.Outputs.PublicSubnet1Id
+        - !GetAtt VpcStack.Outputs.PublicSubnet2Id
+  AlarmTopicArn:
+    Description: Subscribe an email address to get alarms
+    Value: !Ref AlarmTopic
