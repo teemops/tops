@@ -16,16 +16,40 @@ deliberately excluded.
 
 ## Direction
 
-TOPS is an **open-source, self-hosted** AWS security scanner. There is **no revenue model
-yet** — no billing, no plans, no licence gating, no paid tier. Every roadmap item is
-judged on one question:
+**Changed 2026-10-13 — see D-15.** TOPS is an **open-source AWS security scanner that
+you can self-host or use as a hosted service**. The open-source product and its licence
+are unchanged (D-7): Apache-2.0, every feature, no licence gating. Alongside it,
+**`app.teemops.com`** is a hosted version of exactly the same product, from **$50 a
+month**, for customers who have asked for a signup link because they do not want to
+download and install it. It is not labelled "beta".
+
+Every roadmap item is still judged on one question:
 
 > Does this help someone run the scanner and act on what it finds?
 
-Anything that only makes sense for a hosted commercial product is out of scope until that
-changes.
+— and "run" now covers both paths. A feature that only works on one of them needs a
+reason.
 
-## Milestone: Self-Hosted Design Partners
+*Until 2026-10-13 this section said there was no revenue model, and that anything only a
+hosted commercial product needed was out of scope. Customers asking for a hosted signup
+is the trigger D-1 and D-6 named.*
+
+## Milestone: Leads, then the hosted version
+
+**Set 2026-10-13, replacing the design-partner milestone below.** There is no
+design-partner programme. `teemops.com` now asks for leads — people who want to see TOPS
+working and can install it themselves — with **Get a demo** as its call to action. The
+next build is the hosted version: **SaaS Deployment (N-13)**, then **Stripe checkout
+(N-14)**. See D-15.
+
+**Done when:** someone can go from `teemops.com` to a paid `app.teemops.com` account,
+connect an AWS account and see findings, without a call — and the self-hosted path still
+works the same way.
+
+## ~~Milestone: Self-Hosted Design Partners~~ — superseded 2026-10-13
+
+*Kept for the history. The 2026-08-31 target passed with no design partners recruited,
+and the programme was dropped in favour of demos and a hosted version (D-15).*
 
 Get a small number of real operators running TOPS on their own infrastructure, scanning
 their own AWS accounts, and telling us what's wrong with it.
@@ -88,20 +112,21 @@ Decisions already made, so we don't relitigate them. Each has a trigger for revi
 
 | # | Decision | Date | Rationale | Revisit when |
 | --- | --- | --- | --- | --- |
-| **D-1** | **Open source, self-hosted first.** Hosted multi-tenant SaaS is not the focus. | 2026-07-29 | Removes the entire commercial layer from the roadmap; every hard dependency on a hosted service becomes an adoption barrier instead of an assumption. | A commercial model is chosen. |
+| **D-1** | **Open source, self-hosted first.** Hosted multi-tenant SaaS is not the focus. **Revisited 2026-10-13 (D-15):** still open source, but self-hosted is no longer the only path. | 2026-07-29 | Removes the entire commercial layer from the roadmap; every hard dependency on a hosted service becomes an adoption barrier instead of an assumption. | A commercial model is chosen. |
 | **D-2** | **Firebase auth stays, opt-in and off by default.** Not removed. | 2026-07-29 | It's built and works; some self-hosters will want OAuth. The default path must never require a Firebase project. | Never — it stays optional. |
 | **D-3** | **AWS onboarding stays as-is** (`install.sh` + CFN + SNS/SQS); we document it better rather than simplifying it. **Still true of the AWS architecture** — N-10 simplified the *script*, not what it deploys. | 2026-07-29 | With a handful of hand-held design partners the friction is tolerable, and we'll learn whether the SNS automation is actually valued before investing in replacing it. | **Public release**, or the first design partner who gives up during setup. |
 | ~~**D-4**~~ | ~~**Public repo release is a separate, later milestone.**~~ **Superseded 2026-07-30 — the repo is public.** | 2026-07-29 | Design partners were meant to come first, with public release held to a higher bar on security, docs and contributor experience. That sequencing did not happen. | **Done.** Its dependants are listed below. |
 | **D-5** | **MFA ships as new-device email OTP, not TOTP.** No authenticator app, no external OTP service. | 2026-07-29 | Delivers most of the protection (stolen password alone is insufficient) for a fraction of the work, and works on the native auth path where TOTP currently doesn't. | Design partners ask for authenticator-app support, or a compliance requirement forces it. |
-| **D-6** | **No billing, plans, or licence gating.** | 2026-07-29 | No revenue model yet (D-1). | A commercial model is chosen. |
+| ~~**D-6**~~ | ~~**No billing, plans, or licence gating.**~~ **Superseded 2026-10-13 by D-15** — billing for the hosted version; still no licence gating. | 2026-07-29 | No revenue model yet (D-1). | A commercial model is chosen. |
 | **D-7** | **Apache-2.0, with trademark held separately and a DCO for contributions.** | 2026-07-29 | See below — this one has enough reasoning behind it to warrant its own section. | Effectively never; the DCO is what makes it durable. |
 | **D-8** | **Ship prebuilt images from Docker Hub, cut by a real release pipeline.** `install.sh` pulls tagged images; it never builds. | 2026-07-30 | See below — this is the biggest single change to how TOPS is delivered. | A registry other than Docker Hub is chosen, or images stop being the distribution unit. |
 | **D-9** | **No application-level encryption at rest. `iam_role_arn` is stored plaintext; encryption is the host's job.** | 2026-07-30 | See below — deliberately reducing encryption on a security product needs its reasoning on the record. | A field is introduced that is genuinely a credential (an access key, a token, a password). Then encrypt *that* and revisit key rotation. |
 | **D-10** | **User documentation lives in a top-level `user-docs/` directory, not under `docs/`, and deploys to `docs.teemops.com`.** One site for technical and non-technical readers — no separate tracks. | 2026-07-31 | See below. | The content outgrows plain Markdown, or a contributor proposes a better home. |
 | **D-12** | **No security score.** Removed rather than recalibrated. Severity counts and the breakdown are what we show; a score can come back later if a design partner asks for one and we know what it should mean. | 2026-08-02 | See below. Closes [#91](https://github.com/teemops/tops/issues/91). | A design partner asks for a single headline number — and then design it so it can *move*. |
 | **D-11** | **A finding is a durable record keyed by AWS account + resource + rule, and findings are current state. No per-scan history, no observations table.** The most recent scan that examined a resource is authoritative for its content; status belongs to the user. | 2026-08-01 | See below. Shipped as [#81](https://github.com/teemops/tops/issues/81). | A design partner asks for trends over time — and then treat it as a new data model, not an addition to this one. |
-| **D-14** | **`teemops.com` is a single page whose only job is recruiting design partners, not a product marketing site.** Built fresh in `www/`; the pre-pivot `design/marketing/web/` is deleted. | 2026-08-06 | See below. | Design partners exist and the constraint moves from recruitment to something else. |
+| ~~**D-14**~~ | ~~**`teemops.com` is a single page whose only job is recruiting design partners, not a product marketing site.**~~ **Superseded 2026-10-13 by D-15:** still one page, but its job is now leads — "Get a demo" — and it will link to `app.teemops.com` when that exists. Built fresh in `www/`; the pre-pivot `design/marketing/web/` is deleted. | 2026-08-06 | See below. | Design partners exist and the constraint moves from recruitment to something else. |
 | **D-13** | **Docs renderer: MkDocs + Material theme**, deployed to `docs.teemops.com` via Cloudflare Pages (`mkdocs build`, output `site/`). Fills in the choice D-10 deliberately deferred. | 2026-08-03 | Clears the "MkDocs- or Docsify-class" bar D-10 set, now that section count and search actually bite (four pages against an eight-section, 34-page IA). Material gives sidebar nav, on-page TOC and client-side search for free — nothing here needed building by hand. Chosen over Docsify because it renders real static HTML per page rather than client-side, which matters for the evaluator audience D-10's own design work identified as arriving via search or a vendor-review link rather than already inside the app. Adds no new language to the repo: `python3` already backs the link-checker and SVG-validator scripts next to it in `user-docs/README.md`. | Content needs something outside MkDocs' plugin ecosystem, or the Python build step becomes a maintenance burden of its own. |
+| **D-15** | **A hosted SaaS version at `app.teemops.com`, from $50/month, alongside the unchanged open-source product.** Same product, same code, same Apache-2.0 licence; the hosted version charges for running it, not for features. Not labelled "beta". Stripe Checkout for payment. **Supersedes D-6** and the hosted-SaaS exclusion in D-1; **D-14** becomes a leads page. | 2026-10-13 | Customers have asked for a signup link because they do not want to install it themselves — the trigger D-1 and D-6 both named ("a commercial model is chosen"). Charging for operation rather than for features keeps D-7's no-rug-pull promise intact: nothing moves behind a paywall. See **D-15 in full** below. | The hosted version needs a feature the open-source product cannot have — then decide it explicitly, never by drift. |
 
 > **Naming collision, flagged 2026-08-01.** [`durable-findings.md`](./features/durable-findings.md)
 > and the wireframes label the durable-findings decision **D-1**, which in *this* document is
@@ -109,6 +134,35 @@ Decisions already made, so we don't relitigate them. Each has a trigger for revi
 > prose. The Decisions Log entry above is **D-11**; the story keeps its own ID until someone
 > renames it. **Worth renaming the story's ID to `DF-1`** — deferred rather than done
 > unilaterally, because it touches three docs and a settled wireframe.
+
+### D-15 in full: a hosted version, same product
+
+**What changed.** Customers asked for a signup link because they do not want to download
+and install TOPS. That is the trigger D-1 and D-6 were waiting for, and the design-partner
+milestone had passed its date with nobody recruited. So, on 2026-10-13:
+
+- **The open-source product does not change.** Apache-2.0, DCO, every feature (D-7).
+- **`app.teemops.com` is a hosted version of exactly that product**, from **$50 a month**,
+  paid through **Stripe Checkout**. It is not labelled "beta".
+- **`teemops.com` becomes a leads page** — "Get a demo" — and links to `app.teemops.com`
+  once it exists. There is no design-partner programme.
+
+**What we charge for is operation, not features.** That is what keeps D-7's no-rug-pull
+promise honest: nothing moves behind a paywall, and a self-hoster can always run the same
+code for free. If the hosted version ever needs something the open-source product cannot
+have, that is a new decision to record here, not something to let happen.
+
+**Hosting: AWS, not Cloudflare Containers.** Researched 2026-10-13 —
+[`features/saas-hosting.md`](features/saas-hosting.md). Containers could run it, but the app
+would need a long-lived AWS access key that can assume a role into every customer's
+account, sitting in an environment variable. On AWS a task role gives it rotating,
+temporary credentials instead, which is also what the product tells customers it does.
+Disk that resets on sleep and no restart guarantees for the queue workers point the same
+way.
+
+**What this makes load-bearing.** Multi-tenant isolation by `organization_id` has always
+been a non-negotiable in `CLAUDE.md`; with public signup it stops being defence in depth
+and becomes the boundary between paying customers.
 
 ### D-14 in full: what teemops.com is for
 
@@ -411,6 +465,9 @@ Sizes are rough and relative, for one person: **XS** under a day · **S** a day 
 
 ### Now — the path to a design partner
 
+**Since 2026-10-13 Now is N-13 then N-14 — the hosted version (D-15).** The prose below is
+the design-partner history and is kept as written.
+
 **The original Now emptied on 2026-08-01.** Every item on the sequenced path to a design
 partner has closed, four weeks ahead of the **2026-08-31** deadline. N-7 was the last of them:
 install → add AWS account → scan, on a real account, on v0.3.1, reaching Insights and Findings.
@@ -463,7 +520,9 @@ fixes are what made that run succeed, which is the sequencing argument justifyin
 
 | # | Feature | Why it's here | Size |
 | --- | --- | --- | :---: |
-| **N-12** | **`teemops.com` — the design-partner recruitment page** | The milestone has been recruitment-limited since 2026-08-01 and there was nowhere to send anyone: `teemops.com` served nothing, and what was in the repo sold a hosted product with a pricing page. Built 2026-08-06 as one page in `www/`. See **D-14**. **Not yet deployed** — needs `npm run db:init` and the custom domain attached in the dashboard; no secrets. Steps in `www/README.md`. | S |
+| **N-13** | **SaaS Deployment — `app.teemops.com` on AWS, deployed end to end by automation** | The hosted version (D-15) needs somewhere to run, and "automated end to end" is the requirement: a release tag reaches production with no manual step. AWS rather than Cloudflare Containers so the app uses an IAM role, not a static key that can reach every customer account. [Hosting research](features/saas-hosting.md). | L |
+| **N-14** | **Stripe Checkout for the hosted version** | $50/month subscriptions, sold from `teemops.com` and signed up for on `app.teemops.com`. Behind a config flag, off by default, so a self-hosted install never sees billing. | M |
+| ~~**N-12**~~ | ~~`teemops.com` — the design-partner recruitment page~~ | ✅ **Done** 2026-10-13 — deployed and live on `teemops.com` and `www.teemops.com`. Built 2026-08-06 but sat undeployed for two months, partly because the root `.gitignore`'s `*.sql` rule silently kept `www/schema.sql` out of the repo, so the documented `npm run db:init` could not have run. Restored from the copy in the tests; the custom domains moved from a dashboard step into `wrangler.jsonc`. See **D-14**. | S |
 | ~~**N-11**~~ | ~~Lock down the account-linking SNS topic~~ | ✅ **Done** 2026-08-03 — consumer-side validation ([#100](https://github.com/teemops/tops/issues/100)) and an install-scoped filter secret ([#101](https://github.com/teemops/tops/issues/101)), verified end to end on a real account: a correct install id links as before, a wrong one is filtered to quarantine and never reaches `teemops_main`. The live run also caught `aws:link-rejections` reporting "nothing rejected" while a message sat in quarantine — the silent failure moved one layer out, and is now fixed. [Feature doc](features/sns-topic-publish-authorization.md). | S + M |
 | ~~**N-1**~~ | ~~Fix the clean-checkout build~~ | ✅ **Done** 2026-07-29 — `@vitejs/plugin-vue` on `^6`, `npm ci` clean, frontend CI job added. | — |
 | ~~**N-2**~~ | ~~Choose and add a licence~~ | ✅ **Done** 2026-07-29 — Apache-2.0, trademark held separately, DCO for contributions. See D-7. | — |
@@ -699,6 +758,57 @@ documentation sprint; no page written for a feature that doesn't exist yet.
 ## NOW
 
 The path to putting TOPS in a design partner's hands. Sequenced — do them in order.
+
+### N-13 · SaaS Deployment
+
+*Infrastructure. Added 2026-10-13 with D-15. The next thing to build.*
+
+Run the published TOPS images at `app.teemops.com` on AWS, with a full SAM deployment and
+end-to-end automation: a release tag goes to production with no manual step, and a failed
+deploy rolls itself back.
+
+The research, the comparison with Cloudflare Containers and a seven-part outline (account and
+network, RDS, messaging, compute, migrations, pipeline, operations) are in
+**[docs/features/saas-hosting.md](features/saas-hosting.md)**. Two choices are left for the
+Design phase: **one EC2 host vs ECS Fargate** for the first version (roughly $40–60 vs
+$70–110 a month), and how much of the existing `infra/cloud-stack` nested stacks to reuse.
+SAM stays as the deployment tool because the repo already uses it, but for containers it is
+plain CloudFormation under the SAM transform.
+
+- [ ] A dedicated AWS account for production, separate from development
+- [ ] Infrastructure as SAM/CloudFormation templates in the repo — nothing created by hand
+- [ ] The app reaches AWS through an IAM role (task role or instance profile); **no static
+      access keys** anywhere in the deployment
+- [ ] RDS MySQL with automated backups, verified by a restore
+- [ ] GitHub Actions deploys on a release tag via OIDC: stacks, migrations, rollout, smoke
+      test, automatic rollback
+- [ ] Account linking (SNS) verified end to end against a real customer-side stack
+- [ ] Alarms on 5xx, queue age and dead-letter depth
+- [ ] The self-hosted install path is unchanged and still passes its tests
+
+### N-14 · Stripe Checkout for the hosted version
+
+*Feature — goes through `feature-development`. Added 2026-10-13 with D-15. After N-13, or in
+parallel once N-13's Design is settled.*
+
+A visitor chooses the hosted version, pays $50/month through Stripe Checkout, and lands in
+a new organization on `app.teemops.com`. Starting points for Discovery, not decisions:
+
+- **Stripe Checkout and the Customer Portal**, not a custom payment form — Stripe hosts the
+  card fields, so card data never touches TOPS.
+- **Webhooks are the source of truth** for subscription state, verified by signature, and
+  scoped to an organization.
+- **Billing behind a config flag, off by default**, the way Firebase is (D-2). A self-hosted
+  install must never show a price, a plan or a checkout.
+- **Decide in Discovery:** what happens when a payment fails or a subscription is cancelled
+  — read-only, a grace period, or suspension — and whether there is a trial.
+- **Keys** live in Secrets Manager (N-13), never in the repo.
+
+**Also required at launch:** `teemops.com` currently says "No paid tier" and "There is no
+hosted service". Both become false the day this ships and must change in the same release,
+along with the link to `app.teemops.com`.
+
+---
 
 ### N-11 · Lock down the account-linking SNS topic
 
@@ -1563,10 +1673,13 @@ Real, but not now. Most need a user to ask before they're worth building.
 
 Explicitly out of scope, so they don't creep back in:
 
-- **Billing, subscription plans, licence gating, paid tiers** — no revenue model (D-6)
-- **Hosted multi-tenant SaaS operations** — autoscaling, RDS Proxy, ALB tuning and the
-  rest of the EC2 deployment story. These were specified in `planning.md` and were pruned
-  from it on 2026-07-29; recover them from git history if the direction ever reverses.
+- **Licence gating or features held back from the open-source product** — the hosted
+  version charges for running TOPS, not for features (D-15). *Billing itself moved out of
+  this list on 2026-10-13.*
+- **Scaling the hosted version ahead of customers** — autoscaling, RDS Proxy, ALB tuning
+  and the rest of the EC2 story pruned from `planning.md` on 2026-07-29. D-15 brings a
+  hosted version back, but N-13 ships the smallest deployment that works and is automated
+  end to end; scale work waits for load that needs it.
 - **TOTP / authenticator-app MFA** — superseded by D-5
 - **Removing Firebase** — it stays, opt-in (D-2)
 
@@ -1593,6 +1706,17 @@ Blocking nothing today, but each one shapes the plan:
 
 ## Changelog
 
+- **2026-10-13** — **Direction changed: a hosted version, and leads instead of design
+  partners (D-15).** The 2026-08-31 design-partner target passed with nobody recruited, and
+  customers have asked for a signup link rather than an installer. The open-source product
+  and its licence are unchanged; `app.teemops.com` will host exactly the same product from
+  $50/month via Stripe, not labelled beta. D-6 superseded, D-1 revisited, D-14 superseded.
+  `teemops.com`'s "Become a design partner" became **Get a demo**, and the design-partner
+  section became a demo request. **Hosting researched:** AWS, not Cloudflare Containers,
+  because Containers would need a long-lived AWS key able to reach every customer account —
+  see [`features/saas-hosting.md`](features/saas-hosting.md). Added **N-13 SaaS Deployment**
+  (SAM, end-to-end automation) and **N-14 Stripe Checkout** to Now.
+- **2026-10-13** — **N-12 closed: `teemops.com` is live.** The recruitment page had been built since 2026-08-06 and the 2026-08-31 milestone date passed with nowhere to send a prospective partner. Deploying it found `www/schema.sql` missing — the root `.gitignore` drops `*.sql`, so the README's first command referenced a file that was never committed. Restored with a `!schema.sql` exception, and the custom domains are now declared in `wrangler.jsonc` rather than set by hand. Leads are read with `npm run leads` from `www/`; nothing notifies on arrival.
 - **2026-08-06** — **The plan turned from shipping to recruiting, and this document caught
   up with itself.** X-1 (email OTP) was picked up, taken through Discovery and **parked**
   before a user story existed: nobody has asked for it, and it is the largest open item on a
