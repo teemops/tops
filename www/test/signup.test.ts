@@ -17,6 +17,24 @@ CREATE TABLE IF NOT EXISTS design_partner_leads (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );`;
 
+/**
+ * Stands in for the EMAIL binding, so tests record what would be sent rather
+ * than sending it. Set `failNext` to make the next send throw like a real
+ * binding error does.
+ */
+const email = {
+	sent: [] as EmailMessageBuilder[],
+	failNext: false,
+	async send(message: EmailMessageBuilder): Promise<EmailSendResult> {
+		if (email.failNext) {
+			email.failNext = false;
+			throw Object.assign(new Error('delivery failed'), { code: 'E_DELIVERY_FAILED' });
+		}
+		email.sent.push(message);
+		return { messageId: 'test' };
+	},
+};
+
 async function post(fields: Record<string, string>, method = 'POST'): Promise<Response> {
 	const body = new FormData();
 	for (const [k, v] of Object.entries(fields)) body.append(k, v);
@@ -26,7 +44,7 @@ async function post(fields: Record<string, string>, method = 'POST'): Promise<Re
 		body: method === 'POST' ? body : undefined,
 	});
 	const ctx = createExecutionContext();
-	const response = await worker.fetch(request, env, ctx);
+	const response = await worker.fetch(request, { ...env, EMAIL: email as unknown as SendEmail }, ctx);
 	await waitOnExecutionContext(ctx);
 	return response;
 }
@@ -49,6 +67,8 @@ const VALID = {
 beforeEach(async () => {
 	await env.LEADS_DB.exec(SCHEMA.replace(/\n/g, ' '));
 	await env.LEADS_DB.exec('DELETE FROM design_partner_leads');
+	email.sent = [];
+	email.failNext = false;
 });
 
 describe('POST /api/design-partner', () => {
@@ -85,6 +105,36 @@ describe('POST /api/design-partner', () => {
 		).first<{ name: string; notes: string }>();
 		expect(row?.name).toBe('Grace');
 		expect(row?.notes).toHaveLength(2000);
+	});
+});
+
+describe('notification', () => {
+	it('emails the lead to the inbox, with replies going to the lead', async () => {
+		await post(VALID);
+
+		expect(email.sent).toHaveLength(1);
+		const [message] = email.sent;
+		expect(message.from).toEqual({ email: 'leads@notify.teemops.com', name: 'teemops.com' });
+		expect(message.to).toBe('help@teemops.com');
+		expect(message.replyTo).toEqual({ email: 'grace@example.com', name: 'Grace Hopper' });
+		expect(message.subject).toBe('Demo request: Grace Hopper (Navy)');
+		expect(message.text).toContain('Worried about IAM sprawl.');
+	});
+
+	it('still stores the lead and answers 201 when the email fails', async () => {
+		email.failNext = true;
+
+		const res = await post(VALID);
+
+		expect(res.status).toBe(201);
+		expect(await leadCount()).toBe(1);
+	});
+
+	it('sends nothing for a rejected or trapped submission', async () => {
+		await post({ ...VALID, email: 'not-an-email' });
+		await post({ ...VALID, website: 'http://spam.example' });
+
+		expect(email.sent).toHaveLength(0);
 	});
 });
 

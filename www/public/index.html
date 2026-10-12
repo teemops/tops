@@ -12,7 +12,7 @@
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://teemops.com/">
 <meta property="og:title" content="Teemops — open source AWS security scanning you run yourself">
-<meta property="og:description" content="74 checks across 11 AWS services, each with remediation steps. Self-hosted, Apache 2.0, no paid tier. We are looking for five design partners.">
+<meta property="og:description" content="74 checks across 11 AWS services, each with remediation steps. Self-hosted, Apache 2.0. Book a demo, or install it yourself in minutes.">
 <meta property="og:image" content="https://teemops.com/og.png">
 <meta name="twitter:card" content="summary_large_image">
 
@@ -271,7 +271,7 @@ select:focus-visible, textarea:focus-visible {
       <a href="#limits">What it isn't</a>
       <a href="https://docs.teemops.com">Docs</a>
       <a href="https://github.com/teemops/tops">GitHub</a>
-      <a class="btn btn--primary btn--sm" href="#design-partner">Become a design partner</a>
+      <a class="btn btn--primary btn--sm" href="#demo">Get a demo</a>
     </div>
   </div>
 </nav>
@@ -296,7 +296,7 @@ select:focus-visible, textarea:focus-visible {
       </p>
 
       <div class="hero__cta">
-        <a class="btn btn--primary" href="#design-partner">Become a design partner</a>
+        <a class="btn btn--primary" href="#demo">Get a demo</a>
         <a class="btn btn--ghost" href="https://docs.teemops.com">Read the documentation</a>
       </div>
 
@@ -429,11 +429,6 @@ select:focus-visible, textarea:focus-visible {
           <li><strong>No scheduled scans or report export</strong> Scans are run manually.
               Both features are on the roadmap; neither has a route or a UI today.</li>
         </ul>
-        <ul>
-          <li><strong>Not yet running outside the project</strong> Teemops has scanned real
-              AWS accounts, but no external team runs it today. That is what design partners
-              are for.</li>
-        </ul>
       </div>
 
       <p style="margin-top:28px;color:var(--muted);font-size:.93rem;">
@@ -443,48 +438,42 @@ select:focus-visible, textarea:focus-visible {
     </div>
   </section>
 
-  <!-- ================= DESIGN PARTNER ================= -->
-  <section class="section partner" id="design-partner">
+  <!-- ================= DEMO ================= -->
+  <section class="section partner" id="demo">
     <div class="wrap">
       <div class="partner__cols">
         <div>
-          <p class="eyebrow">The ask</p>
-          <h2>We're looking for five design partners</h2>
+          <p class="eyebrow">Get a demo</p>
+          <h2>See Teemops scan an AWS account</h2>
           <p style="color:var(--muted);">
-            Teemops works. It has scanned real AWS accounts and found real problems. What it
-            has not done is run in an environment we did not build. Until it does, decisions
-            about what to build next are guesses.
+            We'll show you a scan from start to finish: connecting an account, running the
+            checks, and working through the findings and their fixes. Then you can decide
+            whether to install it yourself.
           </p>
 
-          <h3 style="font-size:1rem;margin-top:32px;">What you get</h3>
+          <h3 style="font-size:1rem;margin-top:32px;">In the demo</h3>
           <ul class="deal">
-            <li><strong>Direct contact with the maintainer</strong>, by email. Not a support
-                queue.</li>
-            <li><strong>Issues you hit go to the top of the roadmap.</strong> That is the
-                point of the arrangement.</li>
-            <li><strong>Influence over the roadmap.</strong> Scheduled scans, report export
-                and wider service coverage are all waiting on someone to say which matters
-                most.</li>
-            <li><strong>Apache 2.0 with a DCO.</strong> There is no pricing tier waiting to
-                appear.</li>
+            <li><strong>A live scan</strong>, from connecting an account to findings grouped
+                by severity.</li>
+            <li><strong>How the fixes work.</strong> Every check has a remediation, and the
+                critical and high ones come with step-by-step guidance.</li>
+            <li><strong>What it can reach.</strong> The cross-account IAM role, what it can
+                read, and how your administrators revoke it.</li>
+            <li><strong>Getting it running on your own infrastructure</strong>, and answers to
+                your questions about your setup.</li>
           </ul>
 
-          <h3 style="font-size:1rem;">What we ask</h3>
-          <ul class="deal deal--ask">
-            <li><strong>Install it from the documentation</strong> and tell us where the
-                documentation is wrong.</li>
-            <li><strong>Scan a real AWS account</strong>, not a clean test account.</li>
-            <li><strong>Thirty minutes</strong> to tell us what was confusing or missing.</li>
-          </ul>
-          <p style="color:var(--muted);font-size:.93rem;">
-            No cost and no contract. If you install it and decide it is not useful, telling us
-            why is still worth your thirty minutes.
+          <h3 style="font-size:1rem;">Prefer to try it yourself?</h3>
+          <p style="color:var(--muted);">
+            Install it with the command at the top of this page and follow the
+            <a href="https://docs.teemops.com/start-here/install/">install guide</a> to a first
+            scan. It's Apache 2.0, so there's no trial and no licence key.
           </p>
         </div>
 
         <div>
           <form class="form" id="partner-form" novalidate>
-            <h3>Sign up as a design partner</h3>
+            <h3>Request a demo</h3>
             <p class="form__intro">
               We reply personally, usually within a day or two.
             </p>
@@ -516,7 +505,7 @@ select:focus-visible, textarea:focus-visible {
             </div>
 
             <div class="field">
-              <label for="notes">What would you want Teemops to find in your accounts? <span class="opt">— optional</span></label>
+              <label for="notes">What would you like to see? <span class="opt">— optional</span></label>
               <textarea id="notes" name="notes" maxlength="2000" placeholder="This is the part we read first."></textarea>
             </div>
 
@@ -530,7 +519,7 @@ select:focus-visible, textarea:focus-visible {
             </div>
 
             <button type="submit" class="btn btn--primary form__submit" id="submit-btn">
-              Sign up
+              Request a demo
             </button>
 
             <div class="status" id="form-status" role="status" aria-live="polite"></div>
@@ -616,9 +605,9 @@ select:focus-visible, textarea:focus-visible {
       .then(function (result) {
         if (result.ok) {
           form.innerHTML =
-            "<h3>Thanks. We have your details.</h3>" +
+            "<h3>Thanks. We'll be in touch to set up your demo.</h3>" +
             '<p style="color:var(--muted);font-size:.95rem;margin:0;">' +
-            "We will be in touch within a day or two. In the meantime, the " +
+            "We usually reply within a day or two. In the meantime, the " +
             '<a href="https://docs.teemops.com/start-here/install/">install guide</a> ' +
             "will get you to a first scan.</p>";
           form.scrollIntoView({ block: "center" });

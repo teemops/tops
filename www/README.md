@@ -1,6 +1,6 @@
 # teemops.com
 
-The marketing site and its design-partner signup form. One page, deployed to Cloudflare
+The marketing site and its demo-request form. One page, deployed to Cloudflare
 Workers as static assets plus a single API route.
 
 **This is a separate Workers project from the docs site.** The repo root's
@@ -17,9 +17,9 @@ www/
 ├── vitest.config.ts      # runs the tests inside workerd, against a real local D1
 ├── build-assets.py       # regenerates public/og.png and public/favicon.ico
 ├── src/
-│   └── index.ts          # POST /api/design-partner — the only server-side code
+│   └── index.ts          # POST /api/design-partner — demo requests, the only server-side code
 ├── test/
-│   └── signup.test.ts    # 16 tests over that endpoint
+│   └── signup.test.ts    # 19 tests over that endpoint
 └── public/               # everything else is static
     ├── index.html        # the page, with its CSS and JS inline
     ├── 404.html
@@ -32,7 +32,8 @@ www/
 
 ## First-time setup
 
-Two CLI commands and one dashboard step. There are no secrets to set.
+Two CLI commands. There are no secrets to set. (Email Sending on `notify.teemops.com`
+was enabled once with `npx wrangler email sending enable notify.teemops.com`.)
 
 ### 1. Create the leads table
 
@@ -48,10 +49,10 @@ npm run db:init
 npm run deploy
 ```
 
-### 3. Point teemops.com at it
-
-In **Workers & Pages → tops-www → Settings → Domains & Routes**, add `teemops.com` and
-`www.teemops.com` as custom domains. This is dashboard-only — a repo commit cannot do it.
+That also attaches `teemops.com` and `www.teemops.com`: they are declared as custom
+domains under `routes` in `wrangler.jsonc`, so Wrangler creates the DNS records and
+certificates itself. Declaring routes turns the `workers.dev` URL off, so there is no
+preview address — test locally with `npm run dev`.
 
 ## Reading the leads
 
@@ -66,11 +67,16 @@ npx wrangler d1 execute tops-www-leads --remote \
   --command="SELECT created_at, name, email, company, aws_scale, notes FROM design_partner_leads ORDER BY created_at DESC LIMIT 20"
 ```
 
-**Nothing emails you when a lead arrives.** You have to run this. That is a deliberate
-starting point rather than an oversight — it is one command, and adding notification
-before there is a single lead to notify about is work with no evidence behind it. When
-checking manually gets annoying, that is the signal to add it, and the account already has
-`email_sending` available for exactly that.
+**Each new lead is also emailed to `help@teemops.com`**, from `leads@notify.teemops.com`
+with Reply-To set to the lead, so you can answer from your inbox. The database is still the
+record: the email is sent after the row is stored, and a failed send is logged as
+`lead_notify_failed` without affecting the visitor. Check the Worker's logs if the emails
+stop arriving.
+
+`notify.teemops.com`, not the apex, is onboarded to Cloudflare Email Sending, because
+`teemops.com`'s mail and DMARC record belong to Proton and a second DMARC record would
+break both. The recipient is pinned by `destination_address` on the `EMAIL` binding in
+`wrangler.jsonc`, and `NOTIFY_TO` in `src/index.ts` must match it.
 
 ## Spam protection, and what to do if it stops working
 
@@ -81,8 +87,8 @@ defined once in `src/index.ts` as `HONEYPOT_FIELD` and must match the input in
 `public/index.html`.
 
 **There is deliberately no CAPTCHA.** Turnstile was built and then removed before launch,
-for three reasons: at five-design-partner volume a handful of junk rows is easier to skim
-past than a widget is to maintain; the endpoint sends no email and publishes nothing, so
+for three reasons: at current lead volume a handful of junk rows is easier to skim
+past than a widget is to maintain; the endpoint emails only our own pinned inbox and publishes nothing, so
 spam has no amplification path; and a third-party challenge script that fails to load —
 corporate network, privacy extension — makes the form unsubmittable and loses a real lead
 with no signal that it happened.
@@ -106,11 +112,12 @@ Reach for 3 only if 1 and 2 have not held.
 npm test
 ```
 
-16 tests covering `POST /api/design-partner`, run inside `workerd` against a real local D1
+19 tests covering `POST /api/design-partner`, run inside `workerd` against a real local D1
 via `@cloudflare/vitest-pool-workers` — so the SQL is genuinely executed rather than
 mocked. They cover the happy path, field trimming and length caps, every validation
 rejection, the honeypot (including that a trapped request is byte-for-byte
-indistinguishable from a genuine one), and the method and path guards.
+indistinguishable from a genuine one), the lead notification (with the `EMAIL` binding
+replaced by a recorder, so tests never send mail), and the method and path guards.
 
 Each assertion checks the database as well as the status code, because the failure that
 matters is a submission that answers `201` and stores nothing.
@@ -160,5 +167,5 @@ change the rules, check them again:
 | 28 with step-by-step guidance | `app/rules/recommendations/tips.json` |
 | Install needs only Docker | `install.sh`, and D-8 in `docs/roadmap.md` |
 
-Overstating any of these to a design partner costs more than it buys — they will install it
+Overstating any of these to a lead costs more than it buys — they will install it
 and find out.
