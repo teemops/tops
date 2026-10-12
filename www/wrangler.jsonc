@@ -11,6 +11,13 @@
   "compatibility_date": "2026-08-06",
   "compatibility_flags": ["nodejs_compat"],
 
+  // Custom domains. Wrangler creates the DNS records and certificates on deploy,
+  // so the domain lives in the repo rather than as a dashboard-only setting.
+  "routes": [
+    { "pattern": "teemops.com", "custom_domain": true },
+    { "pattern": "www.teemops.com", "custom_domain": true }
+  ],
+
   // Static pages. Requests matching a file here are served directly and never
   // reach the Worker; everything else (i.e. POST /api/design-partner) does.
   "assets": {
@@ -25,6 +32,13 @@
       "database_name": "tops-www-leads",
       "database_id": "88cc0eec-9c77-4714-8b1a-62c7db52e0e5"
     }
+  ],
+
+  // New-lead notifications. destination_address pins the recipient, so the
+  // Worker can only ever email this one inbox. notify.teemops.com (not the apex,
+  // whose DMARC record belongs to Proton) is onboarded to Email Sending.
+  "send_email": [
+    { "name": "EMAIL", "destination_address": "help@teemops.com" }
   ],
 
   // No secrets and no vars. The signup endpoint is protected by a honeypot field,

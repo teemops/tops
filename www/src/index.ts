@@ -2,7 +2,9 @@
  * teemops.com — static pages plus one endpoint.
  *
  * Static files in public/ are served by the assets binding before this Worker
- * runs, so the only thing here is the design-partner signup handler.
+ * runs, so the only thing here is the demo-request handler. The /api/design-partner
+ * path and design_partner_leads table keep their original names; renaming the
+ * table would mean migrating live data for no visible benefit.
  */
 
 const MAX_BODY_BYTES = 8 * 1024;
@@ -65,7 +67,49 @@ function parseSubmission(form: FormData): { lead: LeadSubmission } | { error: st
 	return { lead };
 }
 
-async function handleSignup(request: Request, env: Env): Promise<Response> {
+/** Leads are emailed from here; notify.teemops.com is onboarded to Email Sending. */
+const NOTIFY_FROM = { email: 'leads@notify.teemops.com', name: 'teemops.com' };
+/** Must match the EMAIL binding's destination_address in wrangler.jsonc, or the send is refused. */
+const NOTIFY_TO = 'help@teemops.com';
+
+/**
+ * Tell a human a lead arrived. The binding's destination_address pins the
+ * recipient, so a bug here cannot email anyone else.
+ * Runs after the row is stored and never throws: the database is the record,
+ * and a failed email must not turn a captured lead into an error.
+ */
+async function notifyLead(env: Env, lead: LeadSubmission): Promise<void> {
+	const text = [
+		`Name:      ${lead.name}`,
+		`Email:     ${lead.email}`,
+		`Company:   ${lead.company || '—'}`,
+		`AWS scale: ${lead.aws_scale || 'unstated'} accounts`,
+		'',
+		lead.notes || '(no notes)',
+		'',
+		'Reply to this email to reach them directly. All leads: `npm run leads` in www/.',
+	].join('\n');
+
+	try {
+		await env.EMAIL.send({
+			from: NOTIFY_FROM,
+			to: NOTIFY_TO,
+			replyTo: { email: lead.email, name: lead.name },
+			subject: `Demo request: ${lead.name}${lead.company ? ` (${lead.company})` : ''}`,
+			text,
+		});
+	} catch (error) {
+		console.error(
+			JSON.stringify({
+				event: 'lead_notify_failed',
+				code: (error as { code?: string }).code,
+				message: error instanceof Error ? error.message : String(error),
+			})
+		);
+	}
+}
+
+async function handleSignup(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
 	const contentLength = Number(request.headers.get('content-length') ?? '0');
 	if (contentLength > MAX_BODY_BYTES) {
 		return json({ error: 'That message is too long.' }, 413);
@@ -117,19 +161,20 @@ async function handleSignup(request: Request, env: Env): Promise<Response> {
 	}
 
 	console.log(JSON.stringify({ event: 'lead_captured', scale: lead.aws_scale || 'unstated' }));
+	ctx.waitUntil(notifyLead(env, lead));
 
 	return json({ ok: true }, 201);
 }
 
 export default {
-	async fetch(request: Request, env: Env): Promise<Response> {
+	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
 		const url = new URL(request.url);
 
 		if (url.pathname === '/api/design-partner') {
 			if (request.method !== 'POST') {
 				return json({ error: 'Method not allowed.' }, 405);
 			}
-			return handleSignup(request, env);
+			return handleSignup(request, env, ctx);
 		}
 
 		return new Response('Not found', { status: 404 });
