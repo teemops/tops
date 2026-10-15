@@ -107,6 +107,95 @@ A problem found by both a Basic and an NZISM scan is one finding, attributed to 
   in the November 2025 manual; 1945 is its closest successor. Agreed 2026-10-15 to confirm with
   the first customer rather than hold the check back.
 
+## Design
+
+*Proposed 2026-10-15.*
+
+### `nzism.json` is a mapping, not a second copy of the checks
+
+```json
+{
+  "$schema": "tops/findings/ruleset/schema.v1",
+  "name": "nzism.json",
+  "framework": "NZISM",
+  "version": "3.9 (November 2025)",
+  "controls": {
+    "6843": { "paragraph": "16.4.37.C.02", "level": "MUST", "section": "16.4 Privileged Access Management" }
+  },
+  "rules": [
+    { "ref": "tops-iam-001", "controls": ["6843", "6953", "7436", "1841", "7437"] }
+  ]
+}
+```
+
+- **`rules` holds references**, not rules: `{ "ref": "<existing rule id>", "controls": [CIDs] }`.
+  The condition, severity and remediation stay in `basic.json` or `cis.json`, so NZISM can
+  never drift from the check it reuses — "NZISM adds attribution, not new advice".
+- **`controls` is a catalogue keyed by CID** — each control's paragraph, level and section
+  title, once. Generated from the manual's export (the script is recorded in
+  [`nzism.md`](nzism.md)); carries **section titles only, never control text**.
+- **The four new checks go in `basic.json`** (`tops-rds-010` cluster deletion protection,
+  `tops-rds-011` cluster Multi-AZ, `tops-rds-012` log exports, `tops-s3-006` KMS default
+  encryption) and `nzism.json` references them. They are ordinary hygiene, useful to every
+  user, so a Basic scan gains them too.
+
+### One loader resolves references
+
+The ruleset JSON is parsed in four places today (`FindingsEngine`, `ScanProfilesService`,
+`ComplianceScoreService`, `ValidateScanRules`). A small `RulesetLoader` reads a ruleset and
+resolves each `ref` to the referenced rule from the other ruleset files; the three runtime
+readers go through it. `FindingsEngine::evaluateScan` is otherwise unchanged: a referenced
+rule keeps its id, so F-4's existing merge attributes the finding to every ruleset the scan
+ran that contains it. **No schema change, no migration.**
+
+### Validation
+
+`scan:validate-rules` learns three things: a `ref` must name a rule that exists in another
+ruleset and must not carry its own condition; every CID a rule lists must exist in the
+catalogue; and every catalogue entry has a paragraph shaped `N.N.N.C.NN` and a level of
+MUST / MUST NOT / SHOULD / SHOULD NOT. The cross-ruleset id-uniqueness check stays for
+full rules — references are how a rule legitimately appears twice.
+
+### What the user sees
+
+- **Scan modal** — an **NZISM** profile, offered automatically once `nzism.json` has rules
+  and the eight services it uses list `nzism` in their `tasks.json` profiles. Description:
+  *"Checks mapped to NZISM 3.9 controls — the subset a configuration scan can evidence."*
+- **Findings list** — under the title of any finding attributed to NZISM, one line:
+  `NZISM  CID 6843 · 16.4.37.C.02 · MUST  ·  CID 7437 · 23.3.19.C.02 · SHOULD`, MUST first,
+  no click needed. The controls reach the page the way `tips.json` guidance already does — a
+  `controlsMap` keyed by rule id alongside the findings — so nothing is stored per finding and
+  a mapping fix shows on existing findings immediately.
+- **Benchmark filter** — NZISM appears as a pill through F-4's existing facets.
+
+### Decisions in this design
+
+1. **No NZISM score on Insights.** `ComplianceScoreService` would otherwise show "NZISM 72%"
+   automatically — a percentage of *checks passing*, which reads as a compliance level and is
+   exactly what the story rules out. NZISM is excluded from those scores; G-2 decides how
+   control-level status is presented, with "not assessed" made explicit.
+2. **Overlaps resolved:** `cis-1.8` is left out of NZISM — its condition is identical to
+   `tops-iam-013` (minimum length 14), so including both would raise two findings for one
+   problem. `cis-1.9` (password reuse) stays: it checks something different.
+3. **Attribution follows F-4:** a finding is attributed to the rulesets of the scan that last
+   evaluated it. A scan run with Basic *and* NZISM gives one finding attributed to both; a
+   later Basic-only scan re-attributes it to Basic. *This refines the story's "attributed to
+   both" criterion: it holds for a scan that runs both profiles.*
+
+### The decision framework
+
+1. *Simpler for the end user?* Yes — the control is on the finding they are already reading.
+2. *Simpler to maintain?* Yes — one loader instead of four parsers; NZISM holds no conditions.
+3. *Less complexity for the same outcome?* Restating rules under `nzism-*` ids needs no
+   loader, but duplicates every finding and every condition. The reference costs one class.
+4. *What do we remove?* The four duplicated JSON parsers.
+
+### Not handled in v1
+- Showing NZISM controls on findings from scans that did not run the NZISM profile.
+- Control-level status, coverage or any percentage (G-2).
+- The finding detail page (`Findings/Show.vue`) — the list line covers the demo; added if
+  the first customer reads findings there.
+
 ## Related Practices
 - [Product Practices](../practices/product.md) — honest claims; the smallest version that
   solves the problem
