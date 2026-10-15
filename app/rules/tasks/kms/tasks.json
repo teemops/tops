@@ -10,7 +10,8 @@
         "profiles": [
             "basic",
             "cis",
-            "pci"
+            "pci",
+            "nzism"
         ],
         "start": "listKeys",
         "defaults": {
