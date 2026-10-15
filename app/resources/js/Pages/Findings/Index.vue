@@ -2,12 +2,12 @@
 import { ref, computed, onMounted, watch } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import SidebarAppLayout from '@/Layouts/SidebarAppLayout.vue';
-import { useFindings, type Finding, type Recommendation } from '@/composables/useFindings';
+import { useFindings, type Finding, type Recommendation, type NzismControl } from '@/composables/useFindings';
 import { useAwsAccounts } from '@/composables/useAwsAccounts';
 import { useOrganizations } from '@/composables/useOrganizations';
 import { useNotifications } from '@/composables/useNotifications';
 
-const { findings, summary, serviceFacets, benchmarkFacets, recommendationsMap, loading, error, fetchFindings, updateFindingStatus } = useFindings();
+const { findings, summary, serviceFacets, benchmarkFacets, benchmarkTotal, recommendationsMap, controlsMap, loading, error, fetchFindings, updateFindingStatus } = useFindings();
 const { accounts, fetchAccounts } = useAwsAccounts();
 const { currentOrganization } = useOrganizations();
 const { showSuccess, showError } = useNotifications();
@@ -72,10 +72,12 @@ const selectRuleset = (ruleset: string) => {
     selectedRuleset.value = selectedRuleset.value === ruleset ? '' : ruleset;
 };
 
-/** The "All" benchmark pill. Findings with no benchmark are not counted under any. */
-const allBenchmarksCount = computed(() =>
-    benchmarkFacets.value.reduce((sum, facet) => sum + facet.count, 0)
-);
+/**
+ * The "All" benchmark pill: findings attributed to any benchmark, counted once. Summing
+ * the facets double-counts a finding attributed to two benchmarks (e.g. Basic and NZISM).
+ * Findings with no benchmark (raised before F-4) are not counted under any.
+ */
+const allBenchmarksCount = computed(() => benchmarkTotal.value);
 
 /**
  * Mirror the filters into the address bar so the view can be bookmarked or sent to a
@@ -159,6 +161,18 @@ watch(findings, (list) => {
 
 const getRecommendation = (finding: Finding): Recommendation | null => {
     return recommendationsMap.value[finding.findingType] ?? null;
+};
+
+/** NZISM controls for a finding, shown only when it is attributed to the NZISM ruleset. */
+const getNzismControls = (finding: Finding): NzismControl[] => {
+    if (!finding.rulesets?.includes('nzism')) return [];
+    return controlsMap.value[finding.findingType] ?? [];
+};
+
+const getLevelBadge = (level: string) => {
+    return level.startsWith('MUST')
+        ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+        : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300';
 };
 
 const getSeverityBadge = (severity: string) => {
@@ -401,6 +415,14 @@ const goToFindingType = (findingType: string) => {
                                         <span class="text-xs text-gray-500 dark:text-gray-400">{{ finding.service }} · {{ finding.findingType }}</span>
                                     </div>
                                     <p class="mt-1 font-medium text-gray-900 dark:text-white">{{ finding.title }}</p>
+                                    <p v-if="getNzismControls(finding).length" class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
+                                        <span class="font-semibold text-gray-700 dark:text-gray-300">NZISM</span>
+                                        <!-- nowrap per control, so the line wraps between controls, never inside one. -->
+                                        <span v-for="control in getNzismControls(finding)" :key="control.cid" class="inline-flex items-center gap-1.5 whitespace-nowrap" :title="control.section">
+                                            CID {{ control.cid }} · {{ control.paragraph }}
+                                            <span :class="['inline-flex rounded-full px-2 py-0.5 text-xs font-medium', getLevelBadge(control.level)]">{{ control.level }}</span>
+                                        </span>
+                                    </p>
                                     <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">{{ finding.awsAccountName }} · {{ finding.resourceId }}</p>
                                 </div>
                                 <div class="flex items-center gap-2">

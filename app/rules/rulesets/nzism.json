@@ -1,0 +1,337 @@
+{
+    "$schema": "tops/findings/ruleset/schema.v1",
+    "name": "nzism.json",
+    "description": "NZISM 3.9 (November 2025): references to existing TOPS checks that evidence configuration-checkable NZISM controls. Mapping derived from AWS's NZISM conformance packs (CC0) and checked against the manual. Holds control ids, paragraphs, levels and section titles only - never the manual's text. See docs/features/nzism.md.",
+    "framework": "NZISM",
+    "version": "3.9 (November 2025)",
+    "controls": {
+        "1841": {
+            "paragraph": "16.1.29.C.02",
+            "level": "SHOULD",
+            "section": "16.1 Identification, Authentication and Authorisation"
+        },
+        "1945": {
+            "paragraph": "16.3.5.C.01",
+            "level": "MUST",
+            "section": "16.3 Privileged User Access"
+        },
+        "1998": {
+            "paragraph": "16.6.6.C.02",
+            "level": "SHOULD",
+            "section": "16.6 Event Monitoring, Logging and Auditing"
+        },
+        "2013": {
+            "paragraph": "16.6.10.C.02",
+            "level": "SHOULD",
+            "section": "16.6 Event Monitoring, Logging and Auditing"
+        },
+        "2022": {
+            "paragraph": "16.6.12.C.01",
+            "level": "MUST",
+            "section": "16.6 Event Monitoring, Logging and Auditing"
+        },
+        "2082": {
+            "paragraph": "17.1.53.C.04",
+            "level": "SHOULD",
+            "section": "17.1 Cryptographic Fundamentals"
+        },
+        "2726": {
+            "paragraph": "17.5.8.C.02",
+            "level": "SHOULD",
+            "section": "17.5 Secure Shell"
+        },
+        "3021": {
+            "paragraph": "17.9.31.C.01",
+            "level": "SHOULD",
+            "section": "17.9 Key Management"
+        },
+        "3452": {
+            "paragraph": "12.4.4.C.05",
+            "level": "SHOULD",
+            "section": "12.4 Product Patching and Updating"
+        },
+        "3562": {
+            "paragraph": "19.1.12.C.01",
+            "level": "MUST",
+            "section": "19.1 Gateways"
+        },
+        "3623": {
+            "paragraph": "19.1.14.C.02",
+            "level": "SHOULD",
+            "section": "19.1 Gateways"
+        },
+        "4441": {
+            "paragraph": "21.4.4.C.02",
+            "level": "SHOULD",
+            "section": "21.4 Databases"
+        },
+        "4445": {
+            "paragraph": "21.4.5.C.02",
+            "level": "SHOULD",
+            "section": "21.4 Databases"
+        },
+        "4829": {
+            "paragraph": "20.1.23.C.01",
+            "level": "MUST",
+            "section": "20.1 Cloud Computing"
+        },
+        "4839": {
+            "paragraph": "20.1.24.C.04",
+            "level": "SHOULD",
+            "section": "20.1 Cloud Computing"
+        },
+        "4849": {
+            "paragraph": "20.1.26.C.01",
+            "level": "MUST",
+            "section": "20.1 Cloud Computing"
+        },
+        "6843": {
+            "paragraph": "16.4.37.C.02",
+            "level": "MUST",
+            "section": "16.4 Privileged Access Management"
+        },
+        "6860": {
+            "paragraph": "16.4.41.C.02",
+            "level": "MUST",
+            "section": "16.4 Privileged Access Management"
+        },
+        "6953": {
+            "paragraph": "16.7.42.C.02",
+            "level": "MUST",
+            "section": "16.7 Multi-Factor Authentication"
+        },
+        "7436": {
+            "paragraph": "23.3.19.C.01",
+            "level": "MUST",
+            "section": "23.3 Identity Management and Access Control"
+        },
+        "7437": {
+            "paragraph": "23.3.19.C.02",
+            "level": "SHOULD",
+            "section": "23.3 Identity Management and Access Control"
+        },
+        "7466": {
+            "paragraph": "23.4.10.C.01",
+            "level": "MUST",
+            "section": "23.4 Data Protection in Public Cloud"
+        },
+        "7496": {
+            "paragraph": "23.5.11.C.01",
+            "level": "MUST",
+            "section": "23.5 Logging and Alerting in Public Cloud"
+        },
+        "7545": {
+            "paragraph": "16.1.31.C.02",
+            "level": "MUST",
+            "section": "16.1 Identification, Authentication and Authorisation"
+        },
+        "7546": {
+            "paragraph": "16.1.31.C.03",
+            "level": "MUST",
+            "section": "16.1 Identification, Authentication and Authorisation"
+        }
+    },
+    "rules": [
+        {
+            "ref": "cis-1.9",
+            "controls": [
+                "7545",
+                "7546"
+            ]
+        },
+        {
+            "ref": "cis-5.2",
+            "controls": [
+                "2726"
+            ]
+        },
+        {
+            "ref": "cis-5.4",
+            "controls": [
+                "3562",
+                "7466"
+            ]
+        },
+        {
+            "ref": "tops-cloudtrail-001",
+            "controls": [
+                "6860",
+                "7496",
+                "1998",
+                "2013"
+            ]
+        },
+        {
+            "ref": "tops-cloudtrail-002",
+            "controls": [
+                "2022",
+                "7496"
+            ]
+        },
+        {
+            "ref": "tops-cloudtrail-003",
+            "controls": [
+                "6860",
+                "7496",
+                "1998",
+                "2013"
+            ]
+        },
+        {
+            "ref": "tops-cloudtrail-004",
+            "controls": [
+                "6860",
+                "1998"
+            ]
+        },
+        {
+            "ref": "tops-cloudtrail-005",
+            "controls": [
+                "2082"
+            ]
+        },
+        {
+            "ref": "tops-dynamodb-001",
+            "controls": [
+                "4849"
+            ]
+        },
+        {
+            "ref": "tops-ec2-002",
+            "controls": [
+                "3562",
+                "7466"
+            ]
+        },
+        {
+            "ref": "tops-ec2-006",
+            "controls": [
+                "3562",
+                "7466"
+            ]
+        },
+        {
+            "ref": "tops-ec2-007",
+            "controls": [
+                "3562",
+                "7466"
+            ]
+        },
+        {
+            "ref": "tops-iam-001",
+            "controls": [
+                "6843",
+                "6953",
+                "7436",
+                "1841",
+                "7437"
+            ]
+        },
+        {
+            "ref": "tops-iam-011",
+            "controls": [
+                "7436",
+                "1841",
+                "7437"
+            ]
+        },
+        {
+            "ref": "tops-iam-012",
+            "controls": [
+                "1945"
+            ]
+        },
+        {
+            "ref": "tops-iam-013",
+            "controls": [
+                "7545",
+                "7546"
+            ]
+        },
+        {
+            "ref": "tops-kms-002",
+            "controls": [
+                "3021"
+            ]
+        },
+        {
+            "ref": "tops-rds-001",
+            "controls": [
+                "3562",
+                "7466",
+                "3623"
+            ]
+        },
+        {
+            "ref": "tops-rds-002",
+            "controls": [
+                "2082",
+                "4441",
+                "4839"
+            ]
+        },
+        {
+            "ref": "tops-rds-003",
+            "controls": [
+                "4829"
+            ]
+        },
+        {
+            "ref": "tops-rds-004",
+            "controls": [
+                "4849"
+            ]
+        },
+        {
+            "ref": "tops-rds-007",
+            "controls": [
+                "4849"
+            ]
+        },
+        {
+            "ref": "tops-rds-009",
+            "controls": [
+                "3452"
+            ]
+        },
+        {
+            "ref": "tops-rds-010",
+            "controls": [
+                "4849"
+            ]
+        },
+        {
+            "ref": "tops-rds-011",
+            "controls": [
+                "4829"
+            ]
+        },
+        {
+            "ref": "tops-rds-012",
+            "controls": [
+                "7496",
+                "2013",
+                "4441",
+                "4445"
+            ]
+        },
+        {
+            "ref": "tops-s3-003",
+            "controls": [
+                "4849"
+            ]
+        },
+        {
+            "ref": "tops-s3-006",
+            "controls": [
+                "2082"
+            ]
+        },
+        {
+            "ref": "tops-sns-001",
+            "controls": [
+                "4839"
+            ]
+        }
+    ]
+}

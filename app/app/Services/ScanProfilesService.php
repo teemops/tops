@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use Illuminate\Support\Facades\File;
+use App\Services\RulesEngine\RulesetLoader;
 
 /**
  * Scan profiles (a.k.a. "groups") bundle two things a scan needs:
@@ -34,6 +34,11 @@ class ScanProfilesService
             'label' => 'CIS',
             'description' => 'CIS AWS Foundations Benchmark',
             'rulesets' => ['cis'],
+        ],
+        'nzism' => [
+            'label' => 'NZISM',
+            'description' => 'Checks mapped to NZISM 3.9 controls — the subset a configuration scan can evidence.',
+            'rulesets' => ['nzism'],
         ],
         'pci' => [
             'label' => 'PCI',
@@ -261,13 +266,10 @@ class ScanProfilesService
      */
     private static function rulesOf(string $ruleset): array
     {
-        $path = base_path("rules/rulesets/{$ruleset}.json");
-        if (!File::exists($path)) {
+        try {
+            return app(RulesetLoader::class)->load($ruleset);
+        } catch (\Exception) {
             return [];
         }
-
-        $decoded = json_decode(File::get($path), true);
-
-        return $decoded['rules'] ?? [];
     }
 }

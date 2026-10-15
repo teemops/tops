@@ -312,4 +312,88 @@ class NewServiceRulesTest extends TestCase
 
         $this->assertEmpty($this->findingTypes($scan));
     }
+
+    public function test_rds_cluster_deletion_protection_and_multi_az(): void
+    {
+        $scan = Scan::factory()->create();
+        $this->detail($scan, 'rds', 'describeDBClusters', [
+            'DBClusterIdentifier' => 'bad', 'DeletionProtection' => false, 'MultiAZ' => false,
+        ], 'bad');
+        $this->detail($scan, 'rds', 'describeDBClusters', [
+            'DBClusterIdentifier' => 'good', 'DeletionProtection' => true, 'MultiAZ' => true,
+        ], 'good');
+        // Aggregate list response (no DBClusterIdentifier) must not trigger either rule
+        $this->detail($scan, 'rds', 'describeDBClusters', [
+            'DBClusters' => [['DBClusterIdentifier' => 'bad']],
+        ]);
+
+        $this->evaluate($scan);
+
+        $results = ScanResult::where('scan_id', $scan->id)
+            ->whereIn('finding_type', ['tops-rds-010', 'tops-rds-011'])->get();
+        $this->assertCount(2, $results);
+        $this->assertEqualsCanonicalizing(['tops-rds-010', 'tops-rds-011'], $results->pluck('finding_type')->all());
+    }
+
+    public function test_rds_instance_without_log_exports_is_flagged(): void
+    {
+        $scan = Scan::factory()->create();
+        $this->detail($scan, 'rds', 'describeDBInstances', ['DBInstanceIdentifier' => 'missing'], 'missing');
+        $this->detail($scan, 'rds', 'describeDBInstances', [
+            'DBInstanceIdentifier' => 'empty', 'EnabledCloudwatchLogsExports' => [],
+        ], 'empty');
+        $this->detail($scan, 'rds', 'describeDBInstances', [
+            'DBInstanceIdentifier' => 'exporting', 'EnabledCloudwatchLogsExports' => ['audit', 'error'],
+        ], 'exporting');
+        $this->detail($scan, 'rds', 'describeDBInstances', [
+            'DBInstances' => [['DBInstanceIdentifier' => 'missing']],
+        ]);
+
+        $this->evaluate($scan);
+
+        $ids = ScanResult::where('scan_id', $scan->id)->where('finding_type', 'tops-rds-012')->pluck('resource_id')->all();
+        $this->assertEqualsCanonicalizing(['missing', 'empty'], $ids);
+    }
+
+    /**
+     * Aurora, DocumentDB and Neptune keep these settings on the cluster; their member
+     * instances report them false/empty, so the instance rules must skip cluster members.
+     */
+    public function test_instance_rules_skip_cluster_members_but_flag_standalone_instances(): void
+    {
+        $scan = Scan::factory()->create();
+        $this->detail($scan, 'rds', 'describeDBInstances', [
+            'DBInstanceIdentifier' => 'member', 'DBClusterIdentifier' => 'aurora-1',
+            'MultiAZ' => false, 'DeletionProtection' => false, 'EnabledCloudwatchLogsExports' => [],
+        ], 'member');
+        $this->detail($scan, 'rds', 'describeDBInstances', [
+            'DBInstanceIdentifier' => 'standalone',
+            'MultiAZ' => false, 'DeletionProtection' => false, 'EnabledCloudwatchLogsExports' => [],
+        ], 'standalone');
+
+        $this->evaluate($scan);
+
+        foreach (['tops-rds-003', 'tops-rds-007', 'tops-rds-012'] as $rule) {
+            $ids = ScanResult::where('scan_id', $scan->id)->where('finding_type', $rule)->pluck('resource_id')->all();
+            $this->assertSame(['standalone'], $ids, $rule);
+        }
+    }
+
+    public function test_s3_bucket_default_encryption_not_kms(): void
+    {
+        $enc = fn (string $alg) => ['ServerSideEncryptionConfiguration' => ['Rules' => [[
+            'ApplyServerSideEncryptionByDefault' => ['SSEAlgorithm' => $alg],
+            'BucketKeyEnabled' => true,
+        ]]]];
+        $scan = Scan::factory()->create();
+        $this->detail($scan, 's3', 'getBucketEncryption', $enc('AES256'), 'sse-s3');
+        $this->detail($scan, 's3', 'getBucketEncryption', $enc('aws:kms'), 'kms');
+        $this->detail($scan, 's3', 'getBucketEncryption', $enc('aws:kms:dsse'), 'dsse');
+        $this->detail($scan, 's3', 'getBucketEncryption', [], 'no-config');
+
+        $this->evaluate($scan);
+
+        $ids = ScanResult::where('scan_id', $scan->id)->where('finding_type', 'tops-s3-006')->pluck('resource_id')->all();
+        $this->assertSame(['sse-s3'], $ids);
+    }
 }

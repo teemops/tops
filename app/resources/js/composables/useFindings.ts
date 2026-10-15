@@ -25,9 +25,19 @@ export interface Finding {
     resourceType: string;
     status: string;
     remediation: string | null;
+    /** Rulesets of the scan that last evaluated this finding (F-4); empty on older findings. */
+    rulesets: string[];
     createdAt: string;
     awsAccountId?: string;
     awsAccountName?: string;
+}
+
+/** An NZISM control a rule evidences; level is MUST, MUST NOT, SHOULD or SHOULD NOT. */
+export interface NzismControl {
+    cid: string;
+    paragraph: string;
+    level: string;
+    section: string;
 }
 
 export interface Recommendation {
@@ -62,7 +72,9 @@ export interface FindingsIndexResponse {
     findings: Finding[];
     serviceFacets: ServiceFacet[];
     benchmarkFacets: BenchmarkFacet[];
+    benchmarkTotal: number;
     recommendationsMap: Record<string, Recommendation>;
+    controlsMap: Record<string, NzismControl[]>;
     total: number;
     limit: number;
     offset: number;
@@ -94,7 +106,9 @@ const findings = ref<Finding[]>([]);
 const summary = ref<FindingSummary | null>(null);
 const serviceFacets = ref<ServiceFacet[]>([]);
 const benchmarkFacets = ref<BenchmarkFacet[]>([]);
+const benchmarkTotal = ref(0);
 const recommendationsMap = ref<Record<string, Recommendation>>({});
+const controlsMap = ref<Record<string, NzismControl[]>>({});
 const loading = ref(false);
 const error = ref<string | null>(null);
 const pagination = ref({ total: 0, limit: 50, offset: 0 });
@@ -137,7 +151,9 @@ export function useFindings() {
             findings.value = data.findings;
             serviceFacets.value = data.serviceFacets ?? [];
             benchmarkFacets.value = data.benchmarkFacets ?? [];
+            benchmarkTotal.value = data.benchmarkTotal ?? 0;
             recommendationsMap.value = data.recommendationsMap ?? {};
+            controlsMap.value = data.controlsMap ?? {};
             pagination.value = {
                 total: data.total,
                 limit: data.limit,
@@ -149,6 +165,7 @@ export function useFindings() {
             summary.value = null;
             serviceFacets.value = [];
             benchmarkFacets.value = [];
+            benchmarkTotal.value = 0;
         } finally {
             loading.value = false;
         }
@@ -211,7 +228,9 @@ export function useFindings() {
         summary,
         serviceFacets,
         benchmarkFacets,
+        benchmarkTotal,
         recommendationsMap,
+        controlsMap,
         loading,
         error,
         pagination,

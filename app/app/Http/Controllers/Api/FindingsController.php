@@ -7,6 +7,7 @@ use App\Models\Scan;
 use App\Models\ScanResult;
 use App\Services\OrganizationPermission;
 use App\Services\RecommendationsLoader;
+use App\Services\RulesEngine\RulesetLoader;
 use App\Services\ScanProfilesService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -15,7 +16,8 @@ class FindingsController extends Controller
 {
     public function __construct(
         protected OrganizationPermission $permission,
-        protected RecommendationsLoader $recommendations
+        protected RecommendationsLoader $recommendations,
+        protected RulesetLoader $rulesets
     ) {}
 
     /**
@@ -66,6 +68,7 @@ class FindingsController extends Controller
                 'resourceType' => $result->resource_type,
                 'status' => $result->status,
                 'remediation' => $result->remediation,
+                'rulesets' => $result->rulesets ?? [],
                 'createdAt' => $result->created_at->toISOString(),
                 'awsAccountId' => $awsAccount?->id,
                 'awsAccountName' => $awsAccount?->name,
@@ -105,12 +108,26 @@ class FindingsController extends Controller
 
         $recommendationsMap = $this->recommendations->getMapByRuleId();
 
+        // NZISM controls per rule id, shown on findings attributed to NZISM. Read from the
+        // ruleset rather than stored per finding, so a mapping fix reaches existing findings.
+        try {
+            $controlsMap = $this->rulesets->controlsByRuleId('nzism');
+        } catch (\Exception) {
+            $controlsMap = [];
+        }
+
         return response()->json([
             'summary' => $summary,
             'findings' => $findings,
             'serviceFacets' => $this->serviceFacets($request, $organization->id),
             'benchmarkFacets' => $this->benchmarkFacets($request, $organization->id),
+            // Counted once per finding: summing the facets would double-count a finding
+            // attributed to more than one benchmark.
+            'benchmarkTotal' => (clone $this->filteredFindings($request, $organization->id, except: 'ruleset'))
+                ->whereNotNull('scan_results.rulesets')
+                ->count(),
             'recommendationsMap' => $recommendationsMap,
+            'controlsMap' => $controlsMap,
             'total' => $total,
             'limit' => $limit,
             'offset' => $offset,

@@ -16,6 +16,19 @@ deliberately excluded.
 
 ## Direction
 
+**Changed again 2026-10-15 — see D-16 and D-17.** The first customer TOPS is built for is
+**a New Zealand government agency**, running TOPS in its own AWS account to check a workload
+or a department against the **NZISM**. Being open source and self-hosted is the advantage
+there, not a limitation: the agency can read the code, nothing leaves its account, and there
+is no vendor to be locked into. The work is co-funded through professional services — we
+install it, run it as a proof of concept, then roll it out to a subset of agencies (D-17).
+
+The hosted version below (D-15) still stands as a plan, but is **paused behind this**: an
+agency will not put a scan of its AWS estate in a Sydney-hosted SaaS before it has run the
+product itself.
+
+*What follows is the 2026-10-13 direction, kept as written.*
+
 **Changed 2026-10-13 — see D-15.** TOPS is an **open-source AWS security scanner that
 you can self-host or use as a hosted service**. The open-source product and its licence
 are unchanged (D-7): Apache-2.0, every feature, no licence gating. Alongside it,
@@ -34,7 +47,25 @@ reason.
 hosted commercial product needed was out of scope. Customers asking for a hosted signup
 is the trigger D-1 and D-6 named.*
 
-## Milestone: Leads, then the hosted version
+## Milestone: A first NZ government customer
+
+**Set 2026-10-15.** Ben is talking to government contacts about securing cloud, starting with
+one AWS workload or one department.
+
+**Done when:** an agency runs TOPS **in its own AWS account** under a funded
+proof of concept, scans with the **NZISM** profile, and has agreed what a rollout to a subset
+of agencies looks like.
+
+**Engineering's job is to make that conversation easy to say yes to**, in this order:
+something to show (the NZISM profile on a real account, G-1a), something an assessor can use
+(the report by control, G-2), proof it runs where they need it (Auckland, G-4), and a security
+pack that answers the questions a CISO will ask before any of that (G-5). Everything else
+waits — including the hosted version.
+
+## ~~Milestone: Leads, then the hosted version~~ — paused 2026-10-15
+
+*Superseded by the government milestone above. The hosted-version work (N-13) is built on
+branch `claude/saas-deployment` and not deployed; N-13 and N-14 move to Next.*
 
 **Set 2026-10-13, replacing the design-partner milestone below.** There is no
 design-partner programme. `teemops.com` now asks for leads — people who want to see TOPS
@@ -126,7 +157,9 @@ Decisions already made, so we don't relitigate them. Each has a trigger for revi
 | **D-11** | **A finding is a durable record keyed by AWS account + resource + rule, and findings are current state. No per-scan history, no observations table.** The most recent scan that examined a resource is authoritative for its content; status belongs to the user. | 2026-08-01 | See below. Shipped as [#81](https://github.com/teemops/tops/issues/81). | A design partner asks for trends over time — and then treat it as a new data model, not an addition to this one. |
 | ~~**D-14**~~ | ~~**`teemops.com` is a single page whose only job is recruiting design partners, not a product marketing site.**~~ **Superseded 2026-10-13 by D-15:** still one page, but its job is now leads — "Get a demo" — and it will link to `app.teemops.com` when that exists. Built fresh in `www/`; the pre-pivot `design/marketing/web/` is deleted. | 2026-08-06 | See below. | Design partners exist and the constraint moves from recruitment to something else. |
 | **D-13** | **Docs renderer: MkDocs + Material theme**, deployed to `docs.teemops.com` via Cloudflare Pages (`mkdocs build`, output `site/`). Fills in the choice D-10 deliberately deferred. | 2026-08-03 | Clears the "MkDocs- or Docsify-class" bar D-10 set, now that section count and search actually bite (four pages against an eight-section, 34-page IA). Material gives sidebar nav, on-page TOC and client-side search for free — nothing here needed building by hand. Chosen over Docsify because it renders real static HTML per page rather than client-side, which matters for the evaluator audience D-10's own design work identified as arriving via search or a vendor-review link rather than already inside the app. Adds no new language to the repo: `python3` already backs the link-checker and SVG-validator scripts next to it in `user-docs/README.md`. | Content needs something outside MkDocs' plugin ecosystem, or the Python build step becomes a maintenance burden of its own. |
-| **D-15** | **A hosted SaaS version at `app.teemops.com`, from $50/month, alongside the unchanged open-source product.** Same product, same code, same Apache-2.0 licence; the hosted version charges for running it, not for features. Not labelled "beta". Stripe Checkout for payment. **Supersedes D-6** and the hosted-SaaS exclusion in D-1; **D-14** becomes a leads page. | 2026-10-13 | Customers have asked for a signup link because they do not want to install it themselves — the trigger D-1 and D-6 both named ("a commercial model is chosen"). Charging for operation rather than for features keeps D-7's no-rug-pull promise intact: nothing moves behind a paywall. See **D-15 in full** below. | The hosted version needs a feature the open-source product cannot have — then decide it explicitly, never by drift. |
+| **D-15** | **Paused 2026-10-15 behind D-17 — still the plan, not the priority.** **A hosted SaaS version at `app.teemops.com`, from $50/month, alongside the unchanged open-source product.** Same product, same code, same Apache-2.0 licence; the hosted version charges for running it, not for features. Not labelled "beta". Stripe Checkout for payment. **Supersedes D-6** and the hosted-SaaS exclusion in D-1; **D-14** becomes a leads page. | 2026-10-13 | Customers have asked for a signup link because they do not want to install it themselves — the trigger D-1 and D-6 both named ("a commercial model is chosen"). Charging for operation rather than for features keeps D-7's no-rug-pull promise intact: nothing moves behind a paywall. See **D-15 in full** below. | The hosted version needs a feature the open-source product cannot have — then decide it explicitly, never by drift. |
+| **D-16** | **NZISM is the first compliance framework**, ahead of PCI and any further CIS work. Built from AWS's NZISM 3.9 conformance-pack mapping; findings carry the NZISM control id and MUST/SHOULD; reported as "maps to N of the controls AWS identifies as configuration-checkable" — **never "NZISM compliant"**. | 2026-10-15 | The first customer is NZ government, for whom NZISM is mandated. Validated by the owner in design discussions with government contacts, so it skips the usual "wait for someone to ask". TOPS already covers 30 of the 46 mapped controls. See [`features/nzism.md`](features/nzism.md). | An agency asks for another framework first, or NZISM v4 changes the cloud chapters. |
+| **D-17** | **Partnership model with NZ government.** We supply the software; government co-funds its development through paid professional services — install, proof of concept, then rollout to a subset of agencies. **Features funded this way ship in the open-source product under Apache-2.0** — no agency fork, no private build. | 2026-10-15 | Turns the absence of a revenue model into one that suits both sides: the agency pays for delivery and gets an auditable, lock-in-free tool; the product gets funded features shaped by the most demanding users it could have. See **D-17 in full** below. | A procurement or contract term requires something D-7 cannot accommodate — decide that explicitly. |
 
 > **Naming collision, flagged 2026-08-01.** [`durable-findings.md`](./features/durable-findings.md)
 > and the wireframes label the durable-findings decision **D-1**, which in *this* document is
@@ -134,6 +167,33 @@ Decisions already made, so we don't relitigate them. Each has a trigger for revi
 > prose. The Decisions Log entry above is **D-11**; the story keeps its own ID until someone
 > renames it. **Worth renaming the story's ID to `DF-1`** — deferred rather than done
 > unilaterally, because it touches three docs and a settled wireframe.
+
+### D-17 in full: the government partnership model
+
+**The shape.** Three phases, each paid for as professional services:
+
+| Phase | What we do | What the agency gets | What TOPS gets |
+| --- | --- | --- | --- |
+| **1. Install** | Install TOPS in the agency's own AWS account (Auckland where it matters), connect the workload or department, first NZISM scan | A working scanner inside its boundary; nothing leaves its account | A real install on a government network — every assumption tested |
+| **2. Proof of concept** | Run it for an agreed period against agreed success criteria; walk the findings and the NZISM report with the security team and the assessor | Evidence it can put in front of its Accreditation Authority | The features the POC exposes, funded and prioritised by a real user |
+| **3. Rollout** | Deploy to a subset of agencies — repeatable install, onboarding, handover | A tool its peers can adopt without starting from zero | A reference customer, and a repeatable delivery |
+
+**Why open source helps here.** An agency has to risk-assess any tool that reads its AWS
+configuration. Source it can audit, a deployment it controls, data that never leaves its
+account, and no licence to be withdrawn answer most of that assessment before it is asked.
+D-7's DCO and Apache-2.0 are what make "no lock-in" a promise rather than a claim.
+
+**The rule that keeps it one product.** Anything an agency pays to have built is built in
+`develop`, ships in a release and is available to every self-hoster. No agency branch, no
+private build, no feature flag that only one customer has. If a contract ever needs
+otherwise, that is a new decision, recorded here first.
+
+**Open — Ben's to decide, not engineering's** (tracked in Open Questions):
+- Day rate, and whether the POC is fixed price; its length and success criteria.
+- Procurement route: direct, an all-of-government panel, or Marketplace.govt.nz.
+- Who operates the install after phase 1 — agency staff, or us with access to their account
+  (which changes what the security pack has to say).
+- Support terms after rollout.
 
 ### D-15 in full: a hosted version, same product
 
@@ -465,8 +525,9 @@ Sizes are rough and relative, for one person: **XS** under a day · **S** a day 
 
 ### Now — the path to a design partner
 
-**Since 2026-10-13 Now is N-13 then N-14 — the hosted version (D-15).** The prose below is
-the design-partner history and is kept as written.
+**Since 2026-10-15 Now is the G-series — the path to a first government customer (D-16,
+D-17).** N-13/N-14 (the hosted version) moved to Next. The prose below is the
+design-partner history and is kept as written.
 
 **The original Now emptied on 2026-08-01.** Every item on the sequenced path to a design
 partner has closed, four weeks ahead of the **2026-08-31** deadline. N-7 was the last of them:
@@ -520,8 +581,11 @@ fixes are what made that run succeed, which is the sequencing argument justifyin
 
 | # | Feature | Why it's here | Size |
 | --- | --- | --- | :---: |
-| **N-13** | **SaaS Deployment — `app.teemops.com` on AWS, deployed end to end by automation** | The hosted version (D-15) needs somewhere to run, and "automated end to end" is the requirement: a release tag reaches production with no manual step. AWS rather than Cloudflare Containers so the app uses an IAM role, not a static key that can reach every customer account. [Hosting research](features/saas-hosting.md). | L |
-| **N-14** | **Stripe Checkout for the hosted version** | $50/month subscriptions, sold from `teemops.com` and signed up for on `app.teemops.com`. Behind a config flag, off by default, so a self-hosted install never sees billing. | M |
+| **G-1** | **NZISM scan profile** — in three slices: (a) from what TOPS already collects, (b) new API calls in services it already scans, (c) new services by control weight | The thing to show an agency. 30 of AWS's 46 mapped NZISM controls already have a TOPS check behind them; (a) makes that visible as a profile with control ids on every finding. [Coverage and plan](features/nzism.md). | a: S–M · b: M · c: L |
+| **G-2** | **NZISM report by control** — each control, MUST/SHOULD, pass / fail / not assessed, with accepted risks | The C&A evidence an assessor can use. Fires the *Report export* Later item. | M |
+| **G-3** | **Accept a risk the way NZISM 1.1 says** — reason, effect, mitigations, residual risk, who accepted it, review within a year | NZISM 1.1.65–1.1.69 specifies what a non-compliance record must hold; this turns "ignored" into that record. | S–M |
+| **G-4** | **Prove the Auckland path** — install and scan in ap-southeast-6 on a real account | Agencies are expected to keep RESTRICTED-and-below data onshore where they can, and AWS's own NZISM pack does not deploy to Auckland. Verify before claiming it. | S |
+| **G-5** | **Agency security pack** — architecture and data flow, what the IAM role can read, data residency, the NZISM coverage matrix, vulnerability reporting | Most of it exists (the CISO architecture diagram, `user-docs/`); this assembles it for the first meeting. | S |
 | ~~**N-12**~~ | ~~`teemops.com` — the design-partner recruitment page~~ | ✅ **Done** 2026-10-13 — deployed and live on `teemops.com` and `www.teemops.com`. Built 2026-08-06 but sat undeployed for two months, partly because the root `.gitignore`'s `*.sql` rule silently kept `www/schema.sql` out of the repo, so the documented `npm run db:init` could not have run. Restored from the copy in the tests; the custom domains moved from a dashboard step into `wrangler.jsonc`. See **D-14**. | S |
 | ~~**N-11**~~ | ~~Lock down the account-linking SNS topic~~ | ✅ **Done** 2026-08-03 — consumer-side validation ([#100](https://github.com/teemops/tops/issues/100)) and an install-scoped filter secret ([#101](https://github.com/teemops/tops/issues/101)), verified end to end on a real account: a correct install id links as before, a wrong one is filtered to quarantine and never reaches `teemops_main`. The live run also caught `aws:link-rejections` reporting "nothing rejected" while a message sat in quarantine — the silent failure moved one layer out, and is now fixed. [Feature doc](features/sns-topic-publish-authorization.md). | S + M |
 | ~~**N-1**~~ | ~~Fix the clean-checkout build~~ | ✅ **Done** 2026-07-29 — `@vitejs/plugin-vue` on `^6`, `npm ci` clean, frontend CI job added. | — |
@@ -643,6 +707,10 @@ Keep it to the P0/P1 items until a partner is actually watching.
 
 | # | Feature | Why it's here | Size |
 | --- | --- | --- | :---: |
+| **N-13** | **Paused 2026-10-15 (D-17); built on `claude/saas-deployment`, not deployed.** **SaaS Deployment — `app.teemops.com` on AWS, deployed end to end by automation** | The hosted version (D-15) needs somewhere to run, and "automated end to end" is the requirement: a release tag reaches production with no manual step. AWS rather than Cloudflare Containers so the app uses an IAM role, not a static key that can reach every customer account. [Hosting research](features/saas-hosting.md). | L |
+| **N-14** | **Stripe Checkout for the hosted version** | $50/month subscriptions, sold from `teemops.com` and signed up for on `app.teemops.com`. Behind a config flag, off by default, so a self-hosted install never sees billing. | M |
+| **X-13** | Onboard a whole AWS Organization at once | Linking is one CloudFormation stack per account. **Trigger: a POC scoped to a department with more than a handful of accounts** — then a StackSet deploying the child role across the organization. | M |
+| **X-14** | Single sign-on (SAML / Entra ID) | Agencies sign in with their own identity provider. **Trigger: the first agency asks**, which is likely. D-2's Firebase path is not that. | M |
 | **X-10** | Trim the child IAM role to what TOPS actually uses | Fell out of N-11 and was never written down here. [#111](https://github.com/teemops/tops/issues/111) | S |
 | **X-11** | `teemops_main` queue policy grants `SQS:ReceiveMessage` to `Principal: "*"` | Dead permission — the `aws:SourceArn` condition can never match a direct call — but it is a `Principal: "*"` in a public repo. Also from N-11. [#109](https://github.com/teemops/tops/issues/109) | XS |
 | **X-1** | New-device email OTP | **Parked 2026-08-06, not dropped.** No design partner has asked, and the milestone is recruitment-limited; building the largest open item ahead of evidence is the anti-pattern this document names. Two findings from the discovery are worth keeping: the generator is welded to a Firebase ID token and keyed on `firebase_uid`, so it is a rewrite rather than the extraction this row claimed; and the default install cannot send email to a real inbox at all (see below). | M |
@@ -759,7 +827,65 @@ documentation sprint; no page written for a feature that doesn't exist yet.
 
 The path to putting TOPS in a design partner's hands. Sequenced — do them in order.
 
-### N-13 · SaaS Deployment
+### G-1 · NZISM scan profile
+
+*Feature — goes through `feature-development` (Discovery is short: D-16). Added 2026-10-15.*
+
+Full coverage analysis, the per-control matrix and the slice plan:
+**[docs/features/nzism.md](features/nzism.md)** and
+[`features/nzism/aws-config-mapping.csv`](features/nzism/aws-config-mapping.csv).
+
+Of AWS's 103 NZISM checks: **24 covered** by an existing TOPS rule, **9 partial**, **6** need
+only a new rule on data already collected, **11** need a new API call in a service TOPS
+already scans, **53** need a service TOPS does not scan yet.
+
+- [x] **G-1a** — *built 2026-10-15, in review* ([story](features/nzism-scan-profile.md)) — `nzism` profile reusing the covered rules by id (relax
+      `scan:validate-rules`' cross-ruleset uniqueness, which F-4 was designed for), the five
+      data-only rules, and a `controls` field (framework, CID, paragraph, MUST/SHOULD) shown
+      on each finding
+- [ ] **G-1b** — the 11 new collections in existing services; upgrade the 9 partials
+- [ ] **G-1c** — GuardDuty and Security Hub first, then CloudWatch Logs, AWS Backup and ACM;
+      further services only when an agency's workload uses them
+- [x] Every CID checked against the manual (v3.9 Nov 2025, full export) — AWS's mapping lags
+      it on 18 of 46 controls: 13 renumbered, **3 changed level** (two are now MUST), 2 CIDs
+      gone. Reports use the manual's levels. Two successor CIDs to confirm by hand
+- [ ] **G-1d — beyond AWS's mapping**, in Discovery: a **data-location inventory** for
+      23.4.11 (7469/7470, MUST) — where data and replicas sit, by region; for an NZ agency
+      that is the sovereignty question. Also offboarding (7440, MUST)
+- [ ] Never described as "NZISM compliant" — on the site, in the app, or in a proposal
+
+### G-2 · NZISM report by control
+
+*Feature. Added 2026-10-15. Fires the Report export Later item, scoped to what an assessor
+needs rather than a general export.* Each in-scope control with its MUST/SHOULD level, its
+status — pass, fail, **not assessed** (no TOPS check, or the service was not scanned) — and
+the accepted-risk findings with their reasons. "Not assessed" must never render as a pass.
+
+### G-3 · Accept a risk with a reason
+
+*Feature, S–M. Added 2026-10-15; specified the same day by NZISM 1.1 itself.* Extends
+ignoring a finding (which already survives rescans, D-11) into a recorded risk acceptance
+with the fields NZISM 1.1.65.C.01 (CID 131) requires — reason, effect, alternative
+mitigations and their strength, residual risk — plus **who accepted it** (CIDs 127, 152: the
+Accreditation Authority) and a **review date at most a year out** (CID 146), after which the
+acceptance lapses and the finding reopens. Shown in G-2, retained (CID 151). Detail in
+[`features/nzism.md`](features/nzism.md#from-the-manual-itself).
+
+### G-4 · Prove the Auckland path
+
+*Verification, S. Added 2026-10-15.* Install TOPS with the account-linking stack in
+ap-southeast-6 on a real account, link an account, scan an Auckland workload. Known
+unknowns: whether SNS payload filtering (N-11) and every service TOPS scans are available
+there. Outcome is either "verified" on the security pack, or a list of gaps.
+
+### G-5 · Agency security pack
+
+*Docs, S. Added 2026-10-15.* One place, linkable from a proposal: the AWS integration
+architecture diagram, what the IAM role can read (`user-docs/`), where data lives (the
+agency's account, nothing leaves it), the NZISM coverage matrix with its honest limits, how
+to report a vulnerability, and the licence.
+
+### N-13 · SaaS Deployment — *moved to Next 2026-10-15 (D-17)*
 
 *Infrastructure. Added 2026-10-13 with D-15. The next thing to build.*
 
@@ -786,7 +912,7 @@ plain CloudFormation under the SAM transform.
 - [ ] Alarms on 5xx, queue age and dead-letter depth
 - [ ] The self-hosted install path is unchanged and still passes its tests
 
-### N-14 · Stripe Checkout for the hosted version
+### N-14 · Stripe Checkout for the hosted version — *moved to Next 2026-10-15 (D-17)*
 
 *Feature — goes through `feature-development`. Added 2026-10-13 with D-15. After N-13, or in
 parallel once N-13's Design is settled.*
@@ -1699,13 +1825,31 @@ Blocking nothing today, but each one shapes the plan:
 4. ~~**Does the SNS gap need closing before you hand the code to an external party?**~~
    ✅ **Answered by events 2026-07-30** — the repo is public, so the code is already in
    arm's-length hands. Promoted to **N-6**.
-5. **What does a design partner have to tell us for this milestone to count as a
-   success?** Worth deciding before we start, not after.
+5. ~~**What does a design partner have to tell us for this milestone to count as a
+   success?**~~ Moot — the design-partner programme was dropped (D-15).
+6. **D-17's commercial terms** — day rate, fixed-price POC or not, its length and success
+   criteria, procurement route, who operates the install after phase 1, support after
+   rollout. Ben's to decide; each changes what the security pack (G-5) has to say.
+7. **Does the shared AWS account (848310106659) stay the hosted version's home?** Recorded
+   as a risk in `features/saas-deployment.md` on `claude/saas-deployment`; matters again when
+   N-13 resumes.
 
 ---
 
 ## Changelog
 
+- **2026-10-15** — **Focus moved to a first NZ government customer (D-16, D-17).** NZISM
+  becomes the first compliance framework, built from AWS's NZISM 3.9 conformance-pack mapping
+  (CC0): of its 103 checks TOPS already covers 25, partly covers 9, and can add 16 more inside
+  services it already scans; 30 of the 46 mapped controls have a TOPS check behind them.
+  Partnership model recorded: government co-funds development through professional services —
+  install, POC, rollout to a subset of agencies — with everything built released under
+  Apache-2.0. Checked against the full NZISM 3.9 (Nov 2025) export the same day: AWS's
+  mapping lags the manual on 18 of 46 controls, including three level changes. New Now:
+  **G-1** NZISM profile, **G-2** report by control, **G-3** accepted risk
+  with a reason, **G-4** prove Auckland, **G-5** agency security pack. The hosted version
+  (N-13, built on `claude/saas-deployment`, not deployed; N-14) moved to Next. Added X-13
+  (whole-Organization onboarding) and X-14 (SSO) with triggers.
 - **2026-10-13** — **Direction changed: a hosted version, and leads instead of design
   partners (D-15).** The 2026-08-31 design-partner target passed with nobody recruited, and
   customers have asked for a signup link rather than an installer. The open-source product

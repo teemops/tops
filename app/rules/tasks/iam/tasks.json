@@ -10,7 +10,8 @@
         "profiles": [
             "basic",
             "cis",
-            "pci"
+            "pci",
+            "nzism"
         ],
         "scanner": "App\\Services\\Scanners\\IamScanner",
         "start": "listUsers",
