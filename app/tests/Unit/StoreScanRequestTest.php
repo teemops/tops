@@ -124,6 +124,36 @@ class StoreScanRequestTest extends TestCase
         $this->assertTrue($validator->errors()->has('scan_profiles.0'));
     }
 
+    public function test_validation_passes_with_the_nzism_profile(): void
+    {
+        $organization = Organization::factory()->create();
+        $awsAccount = AwsAccount::factory()->completed()->create([
+            'organization_id' => $organization->id,
+        ]);
+
+        $validator = $this->validate([
+            'aws_account_id' => $awsAccount->id,
+            'scan_profiles' => ['nzism'],
+        ]);
+
+        $this->assertTrue($validator->passes());
+    }
+
+    public function test_validation_still_rejects_an_unknown_profile(): void
+    {
+        $organization = Organization::factory()->create();
+        $awsAccount = AwsAccount::factory()->completed()->create([
+            'organization_id' => $organization->id,
+        ]);
+
+        $validator = $this->validate([
+            'aws_account_id' => $awsAccount->id,
+            'scan_profiles' => ['nzism-typo'],
+        ]);
+
+        $this->assertTrue($validator->errors()->has('scan_profiles.0'));
+    }
+
     /**
      * Test validation fails with invalid scan type
      */

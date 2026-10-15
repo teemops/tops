@@ -79,4 +79,21 @@ class ScanProfilesServiceTest extends TestCase
         $this->assertContains('s3', $services);
         $this->assertEqualsCanonicalizing(['basic', 'cis'], $rulesets);
     }
+
+    public function test_the_nzism_profile_is_available_with_its_label_and_description(): void
+    {
+        $this->assertTrue(ScanProfilesService::isAvailable('nzism'));
+        $this->assertSame(['nzism'], ScanProfilesService::rulesetsFor(['nzism']));
+
+        $profile = collect(ScanProfilesService::getAvailableWithLabels())->firstWhere('value', 'nzism');
+
+        $this->assertNotNull($profile);
+        $this->assertSame('NZISM', $profile['label']);
+        $this->assertSame(
+            'Checks mapped to NZISM 3.9 controls — the subset a configuration scan can evidence.',
+            $profile['description']
+        );
+        $this->assertNotEmpty($profile['services']);
+        $this->assertGreaterThan(0, $profile['ruleCount']);
+    }
 }

@@ -287,4 +287,83 @@ class ValidateScanRulesTest extends TestCase
             ->expectsOutputToContain("no 'items' or 'itemsPath'")
             ->assertFailed();
     }
+
+    private function writeMapping(array $controls, array $rules): void
+    {
+        $path = base_path('rules/rulesets/fixturemapping.json');
+        $this->created[] = $path;
+        File::put($path, json_encode(['controls' => $controls, 'rules' => $rules], JSON_PRETTY_PRINT));
+    }
+
+    private function validControls(): array
+    {
+        return ['100' => ['paragraph' => '16.4.37.C.02', 'level' => 'MUST', 'section' => 'S']];
+    }
+
+    public function test_a_valid_mapping_ruleset_passes(): void
+    {
+        $this->writeMapping($this->validControls(), [['ref' => 'tops-iam-001', 'controls' => ['100']]]);
+
+        $this->artisan('scan:validate-rules')->assertSuccessful();
+    }
+
+    public function test_it_rejects_a_reference_to_an_unknown_rule(): void
+    {
+        $this->writeMapping($this->validControls(), [['ref' => 'no-such-rule-999', 'controls' => ['100']]]);
+
+        $this->artisan('scan:validate-rules')
+            ->expectsOutputToContain("ref 'no-such-rule-999' names a rule id that no other ruleset defines")
+            ->assertFailed();
+    }
+
+    public function test_it_rejects_a_reference_carrying_its_own_condition(): void
+    {
+        $this->writeMapping($this->validControls(), [
+            ['ref' => 'tops-iam-001', 'condition' => 'true', 'controls' => ['100']],
+        ]);
+
+        $this->artisan('scan:validate-rules')
+            ->expectsOutputToContain("ref 'tops-iam-001' carries its own 'condition'")
+            ->assertFailed();
+    }
+
+    public function test_it_rejects_a_control_missing_from_the_catalogue(): void
+    {
+        $this->writeMapping($this->validControls(), [['ref' => 'tops-iam-001', 'controls' => ['100', '424242']]]);
+
+        $this->artisan('scan:validate-rules')
+            ->expectsOutputToContain('CID 424242')
+            ->assertFailed();
+    }
+
+    public function test_it_rejects_a_malformed_paragraph(): void
+    {
+        $controls = ['100' => ['paragraph' => '16.4.37.2', 'level' => 'MUST', 'section' => 'S']];
+        $this->writeMapping($controls, [['ref' => 'tops-iam-001', 'controls' => ['100']]]);
+
+        $this->artisan('scan:validate-rules')
+            ->expectsOutputToContain('CID 100 has a bad paragraph')
+            ->assertFailed();
+    }
+
+    public function test_it_rejects_an_unknown_level(): void
+    {
+        $controls = ['100' => ['paragraph' => '16.4.37.C.02', 'level' => 'MAY', 'section' => 'S']];
+        $this->writeMapping($controls, [['ref' => 'tops-iam-001', 'controls' => ['100']]]);
+
+        $this->artisan('scan:validate-rules')
+            ->expectsOutputToContain('CID 100 has a bad level')
+            ->assertFailed();
+    }
+
+    public function test_a_reference_may_repeat_an_id_without_tripping_the_uniqueness_check(): void
+    {
+        $this->writeMapping($this->validControls(), [
+            ['ref' => 'tops-iam-001', 'controls' => ['100']],
+        ]);
+
+        $this->artisan('scan:validate-rules')
+            ->doesntExpectOutputToContain('reuses the rule id')
+            ->assertSuccessful();
+    }
 }

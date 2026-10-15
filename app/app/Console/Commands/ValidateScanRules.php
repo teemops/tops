@@ -201,6 +201,7 @@ class ValidateScanRules extends Command
     private function validateRulesets(array $collected): array
     {
         $seenIds = [];
+        $fullRuleFiles = $this->fullRuleFiles();
 
         foreach (File::glob(base_path('rules/rulesets/*.json')) as $path) {
             $name = basename($path, '.json');
@@ -213,8 +214,17 @@ class ValidateScanRules extends Command
                 continue;
             }
 
+            $this->validateControlCatalogue($name, $decoded['controls'] ?? []);
+
             foreach ($decoded['rules'] ?? [] as $index => $rule) {
                 $this->ruleCount++;
+
+                if (array_key_exists('ref', $rule)) {
+                    $this->validateReference($name, $index, $rule, $decoded['controls'] ?? [], $fullRuleFiles);
+
+                    continue;
+                }
+
                 $id = $rule['rule'] ?? null;
                 $where = $id ? "{$name}.json:{$id}" : "{$name}.json rule #{$index}";
 
@@ -259,6 +269,76 @@ class ValidateScanRules extends Command
         }
 
         return $seenIds;
+    }
+
+    /**
+     * Rule id => the ruleset files holding it as a full rule (not a reference).
+     *
+     * @return array<string, string[]>
+     */
+    private function fullRuleFiles(): array
+    {
+        $files = [];
+
+        foreach (File::glob(base_path('rules/rulesets/*.json')) as $path) {
+            $decoded = json_decode(File::get($path), true);
+
+            foreach ($decoded['rules'] ?? [] as $rule) {
+                if (is_array($rule) && isset($rule['rule'])) {
+                    $files[$rule['rule']][] = basename($path, '.json');
+                }
+            }
+        }
+
+        return $files;
+    }
+
+    /**
+     * A reference must name a full rule in another ruleset, carry nothing of its own
+     * beyond its controls, and list only controls its file's catalogue defines.
+     *
+     * @param array<string, string[]> $fullRuleFiles
+     */
+    private function validateReference(string $name, int|string $index, array $ref, array $catalogue, array $fullRuleFiles): void
+    {
+        $id = $ref['ref'];
+        $where = "{$name}.json ref " . (is_string($id) ? "'{$id}'" : "#{$index}");
+
+        $others = array_diff($fullRuleFiles[$id] ?? [], [$name]);
+        if (!is_string($id) || $others === []) {
+            $this->errors[] = "{$where} names a rule id that no other ruleset defines as a full rule.";
+        }
+
+        foreach (['rule', 'condition', 'service', 'method'] as $own) {
+            if (array_key_exists($own, $ref)) {
+                $this->errors[] = "{$where} carries its own '{$own}'. A reference may only add controls; the check lives in the ruleset it points at.";
+            }
+        }
+
+        foreach ($ref['controls'] ?? [] as $cid) {
+            if (!isset($catalogue[(string) $cid])) {
+                $this->errors[] = "{$where} lists control CID {$cid}, which is not in this file's controls catalogue.";
+            }
+        }
+    }
+
+    /**
+     * Every catalogue entry needs a paragraph shaped N.N.N.C.NN and a level the manual uses.
+     */
+    private function validateControlCatalogue(string $name, array $catalogue): void
+    {
+        foreach ($catalogue as $cid => $control) {
+            $paragraph = $control['paragraph'] ?? null;
+            $level = $control['level'] ?? null;
+
+            if (!is_string($paragraph) || !preg_match('/^\d+\.\d+\.\d+\.C\.\d{2}$/', $paragraph)) {
+                $this->errors[] = "{$name}.json control CID {$cid} has a bad paragraph; expected N.N.N.C.NN.";
+            }
+
+            if (!in_array($level, ['MUST', 'MUST NOT', 'SHOULD', 'SHOULD NOT'], true)) {
+                $this->errors[] = "{$name}.json control CID {$cid} has a bad level; expected MUST, MUST NOT, SHOULD or SHOULD NOT.";
+            }
+        }
     }
 
     /**

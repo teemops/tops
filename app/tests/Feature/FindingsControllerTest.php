@@ -410,6 +410,59 @@ class FindingsControllerTest extends TestCase
         $this->assertSame(['basic'], array_column($facets, 'ruleset'));
     }
 
+    public function test_the_nzism_filter_returns_only_this_organizations_nzism_findings(): void
+    {
+        $this->finding($this->completedScan(), ['rulesets' => ['basic']]);
+        $this->finding($this->completedScan(), ['rulesets' => ['basic', 'nzism']]);
+        ScanResult::factory()->create([
+            'scan_id' => Scan::factory()->create(['status' => 'completed'])->id,
+            'rulesets' => ['nzism'],
+        ]);
+
+        $response = $this->actingAs($this->user)->getJson($this->findingsUrl(['ruleset' => 'nzism']));
+
+        $this->assertEquals(1, $response->json('total'));
+        $this->assertSame(['basic', 'nzism'], $response->json('findings.0.rulesets'));
+        $this->assertSame(1, collect($response->json('benchmarkFacets'))->firstWhere('ruleset', 'nzism')['count']);
+    }
+
+    public function test_it_returns_nzism_controls_by_rule_id_must_first(): void
+    {
+        $response = $this->actingAs($this->user)->getJson($this->findingsUrl());
+
+        $controls = $response->json('controlsMap.tops-iam-001');
+
+        $this->assertNotEmpty($controls);
+        $this->assertSame(['cid', 'paragraph', 'level', 'section'], array_keys($controls[0]));
+
+        $levels = array_column($controls, 'level');
+        $firstShould = collect($levels)->search(fn ($l) => str_starts_with($l, 'SHOULD'));
+        if ($firstShould !== false) {
+            foreach (array_slice($levels, $firstShould) as $level) {
+                $this->assertStringStartsWith('SHOULD', $level, 'no MUST after a SHOULD');
+            }
+        }
+
+        // 6843 is a MUST in the manual (16.4.37.C.02) and 7437 a SHOULD.
+        $byCid = array_column($controls, null, 'cid');
+        $this->assertSame('MUST', $byCid['6843']['level']);
+        $this->assertSame('16.4.37.C.02', $byCid['6843']['paragraph']);
+        $this->assertSame('SHOULD', $byCid['7437']['level']);
+        $this->assertLessThan(
+            array_search('7437', array_keys($byCid)),
+            array_search('6843', array_keys($byCid))
+        );
+    }
+
+    public function test_findings_carry_the_rulesets_that_attribute_them(): void
+    {
+        $this->finding($this->completedScan(), ['rulesets' => ['basic', 'nzism']]);
+
+        $response = $this->actingAs($this->user)->getJson($this->findingsUrl());
+
+        $this->assertSame(['basic', 'nzism'], $response->json('findings.0.rulesets'));
+    }
+
     public function test_findings_are_paginated(): void
     {
         $scan = $this->completedScan();

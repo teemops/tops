@@ -19,24 +19,11 @@ class FindingsEngine
     }
 
     /**
-     * Load rules.json file
+     * Load a ruleset's rules, with any references to other rulesets resolved.
      */
     public function loadRules(string $ruleset = 'basic'): array
     {
-        $rulesPath = base_path("rules/rulesets/{$ruleset}.json");
-        
-        if (!File::exists($rulesPath)) {
-            throw new \Exception("Rules file not found: {$rulesPath}");
-        }
-        
-        $rulesJson = File::get($rulesPath);
-        $rules = json_decode($rulesJson, true);
-        
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            throw new \Exception("Invalid JSON in rules file: " . json_last_error_msg());
-        }
-        
-        return $rules['rules'] ?? [];
+        return app(RulesetLoader::class)->load($ruleset);
     }
 
     /**
