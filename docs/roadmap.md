@@ -849,9 +849,9 @@ already scans, **53** need a service TOPS does not scan yet.
 - [x] Every CID checked against the manual (v3.9 Nov 2025, full export) — AWS's mapping lags
       it on 18 of 46 controls: 13 renumbered, **3 changed level** (two are now MUST), 2 CIDs
       gone. Reports use the manual's levels. Two successor CIDs to confirm by hand
-- [ ] **G-1d — beyond AWS's mapping**, in Discovery: the MUST MFA control AWS missed (7436),
-      and a **data-location inventory** for 23.4.11 (7469/7470, MUST) — where data and
-      replicas sit, by region. For an NZ agency that is the sovereignty question
+- [ ] **G-1d — beyond AWS's mapping**, in Discovery: a **data-location inventory** for
+      23.4.11 (7469/7470, MUST) — where data and replicas sit, by region; for an NZ agency
+      that is the sovereignty question. Also offboarding (7440, MUST)
 - [ ] Never described as "NZISM compliant" — on the site, in the app, or in a proposal
 
 ### G-2 · NZISM report by control

@@ -51,22 +51,21 @@ gap to exactly the reader who will notice.
 
 ### Beyond AWS's mapping
 
-Chapter 23 (public cloud) has 36 controls; AWS maps 4. Candidates TOPS can evidence that AWS
-does not map, to confirm in G-1's Discovery:
+Chapter 23 (public cloud) has 36 controls; AWS maps 4 (7436, 7437, 7466, 7496). Candidates
+TOPS can evidence that AWS does not map, to confirm in G-1's Discovery:
 
-- **7436 — 23.3.19.C.01, MUST.** Privileged accounts on internet-reachable admin interfaces
-  use multiple factors. AWS mapped the neighbouring SHOULD (7437) instead; TOPS's root and
-  IAM-user MFA checks are evidence for this MUST.
 - **7469, 7470 — 23.4.11.C.01/02, MUST. Data location** — agencies must know where data in a
   public cloud service is stored or processed, replicas included, and assess the risk. TOPS
   already scans every enabled region; an inventory of *where resources and replicas are*
   (S3 bucket regions and replication, cross-region snapshot copies, RDS read replicas, by
   region) is evidence no config rule produces. **For an NZ agency this is the sovereignty
   question — possibly the strongest thing TOPS can show.**
-- **7496 — 23.5.11.C.01, MUST.** Cloud logs collected, protected, integrity verifiable —
-  TOPS's CloudTrail validation, encryption and multi-region checks.
 - **7440 — 23.3.20.C.01, MUST.** Offboarding removes cloud access — unused-credential checks
   (G-1b) are partial evidence.
+
+*Corrected 2026-10-15: an earlier version of this list said AWS had missed 7436 (privileged
+MFA) and listed 7496 here. Both are in AWS's mapping; the check behind that claim used a
+hand-typed list instead of the matrix.*
 
 **Section 1.1 is the spec for G-3.** It is NZISM's own rule for non-compliance:
 
