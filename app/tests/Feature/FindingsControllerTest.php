@@ -319,6 +319,23 @@ class FindingsControllerTest extends TestCase
     }
 
     /**
+     * The "All" benchmark pill counts findings, not facet entries: one finding in two
+     * benchmarks is one finding, and one with no benchmark is under none.
+     */
+    public function test_the_benchmark_total_counts_each_finding_once(): void
+    {
+        $scan = $this->completedScan();
+        $this->finding($scan, ['rulesets' => ['basic', 'nzism']]);
+        $this->finding($scan, ['rulesets' => ['basic']]);
+        $this->finding($scan, ['rulesets' => null]);
+
+        $response = $this->actingAs($this->user)->getJson($this->findingsUrl());
+
+        $this->assertEquals(2, $response->json('benchmarkTotal'));
+        $this->assertEquals(3, $response->json('total'));
+    }
+
+    /**
      * Findings raised before F-4 have no benchmark. They must not be guessed into one —
      * a finding wrongly labelled CIS is worse than one honestly labelled nothing.
      */

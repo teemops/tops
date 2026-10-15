@@ -121,6 +121,11 @@ class FindingsController extends Controller
             'findings' => $findings,
             'serviceFacets' => $this->serviceFacets($request, $organization->id),
             'benchmarkFacets' => $this->benchmarkFacets($request, $organization->id),
+            // Counted once per finding: summing the facets would double-count a finding
+            // attributed to more than one benchmark.
+            'benchmarkTotal' => (clone $this->filteredFindings($request, $organization->id, except: 'ruleset'))
+                ->whereNotNull('scan_results.rulesets')
+                ->count(),
             'recommendationsMap' => $recommendationsMap,
             'controlsMap' => $controlsMap,
             'total' => $total,

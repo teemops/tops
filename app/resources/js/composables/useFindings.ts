@@ -72,6 +72,7 @@ export interface FindingsIndexResponse {
     findings: Finding[];
     serviceFacets: ServiceFacet[];
     benchmarkFacets: BenchmarkFacet[];
+    benchmarkTotal: number;
     recommendationsMap: Record<string, Recommendation>;
     controlsMap: Record<string, NzismControl[]>;
     total: number;
@@ -105,6 +106,7 @@ const findings = ref<Finding[]>([]);
 const summary = ref<FindingSummary | null>(null);
 const serviceFacets = ref<ServiceFacet[]>([]);
 const benchmarkFacets = ref<BenchmarkFacet[]>([]);
+const benchmarkTotal = ref(0);
 const recommendationsMap = ref<Record<string, Recommendation>>({});
 const controlsMap = ref<Record<string, NzismControl[]>>({});
 const loading = ref(false);
@@ -149,6 +151,7 @@ export function useFindings() {
             findings.value = data.findings;
             serviceFacets.value = data.serviceFacets ?? [];
             benchmarkFacets.value = data.benchmarkFacets ?? [];
+            benchmarkTotal.value = data.benchmarkTotal ?? 0;
             recommendationsMap.value = data.recommendationsMap ?? {};
             controlsMap.value = data.controlsMap ?? {};
             pagination.value = {
@@ -162,6 +165,7 @@ export function useFindings() {
             summary.value = null;
             serviceFacets.value = [];
             benchmarkFacets.value = [];
+            benchmarkTotal.value = 0;
         } finally {
             loading.value = false;
         }
@@ -224,6 +228,7 @@ export function useFindings() {
         summary,
         serviceFacets,
         benchmarkFacets,
+        benchmarkTotal,
         recommendationsMap,
         controlsMap,
         loading,
