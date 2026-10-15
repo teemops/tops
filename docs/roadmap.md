@@ -583,7 +583,7 @@ fixes are what made that run succeed, which is the sequencing argument justifyin
 | --- | --- | --- | :---: |
 | **G-1** | **NZISM scan profile** — in three slices: (a) from what TOPS already collects, (b) new API calls in services it already scans, (c) new services by control weight | The thing to show an agency. 30 of AWS's 46 mapped NZISM controls already have a TOPS check behind them; (a) makes that visible as a profile with control ids on every finding. [Coverage and plan](features/nzism.md). | a: S–M · b: M · c: L |
 | **G-2** | **NZISM report by control** — each control, MUST/SHOULD, pass / fail / not assessed, with accepted risks | The C&A evidence an assessor can use. Fires the *Report export* Later item. | M |
-| **G-3** | **Accept a risk with a reason** — who, why, when, on an ignored finding | SHOULD gaps are routinely risk-accepted; recording why is what turns "ignored" into evidence. | S |
+| **G-3** | **Accept a risk the way NZISM 1.1 says** — reason, effect, mitigations, residual risk, who accepted it, review within a year | NZISM 1.1.65–1.1.69 specifies what a non-compliance record must hold; this turns "ignored" into that record. | S–M |
 | **G-4** | **Prove the Auckland path** — install and scan in ap-southeast-6 on a real account | Agencies are expected to keep RESTRICTED-and-below data onshore where they can, and AWS's own NZISM pack does not deploy to Auckland. Verify before claiming it. | S |
 | **G-5** | **Agency security pack** — architecture and data flow, what the IAM role can read, data residency, the NZISM coverage matrix, vulnerability reporting | Most of it exists (the CISO architecture diagram, `user-docs/`); this assembles it for the first meeting. | S |
 | ~~**N-12**~~ | ~~`teemops.com` — the design-partner recruitment page~~ | ✅ **Done** 2026-10-13 — deployed and live on `teemops.com` and `www.teemops.com`. Built 2026-08-06 but sat undeployed for two months, partly because the root `.gitignore`'s `*.sql` rule silently kept `www/schema.sql` out of the repo, so the documented `npm run db:init` could not have run. Restored from the copy in the tests; the custom domains moved from a dashboard step into `wrangler.jsonc`. See **D-14**. | S |
@@ -846,6 +846,8 @@ already scans, **53** need a service TOPS does not scan yet.
 - [ ] **G-1b** — the 11 new collections in existing services; upgrade the 9 partials
 - [ ] **G-1c** — GuardDuty and Security Hub first, then CloudWatch Logs, AWS Backup and ACM;
       further services only when an agency's workload uses them
+- [ ] Every CID's level and text checked against the manual's own section exports, not only
+      AWS's mapping — 22 sections; 1.1 is in hand, the rest are an owner export
 - [ ] Never described as "NZISM compliant" — on the site, in the app, or in a proposal
 
 ### G-2 · NZISM report by control
@@ -857,8 +859,13 @@ the accepted-risk findings with their reasons. "Not assessed" must never render 
 
 ### G-3 · Accept a risk with a reason
 
-*Feature, S. Added 2026-10-15.* Extends ignoring a finding (which already survives rescans,
-D-11) with who accepted it, why, and when — and shows that in G-2.
+*Feature, S–M. Added 2026-10-15; specified the same day by NZISM 1.1 itself.* Extends
+ignoring a finding (which already survives rescans, D-11) into a recorded risk acceptance
+with the fields NZISM 1.1.65.C.01 (CID 131) requires — reason, effect, alternative
+mitigations and their strength, residual risk — plus **who accepted it** (CIDs 127, 152: the
+Accreditation Authority) and a **review date at most a year out** (CID 146), after which the
+acceptance lapses and the finding reopens. Shown in G-2, retained (CID 151). Detail in
+[`features/nzism.md`](features/nzism.md#from-the-manual-itself).
 
 ### G-4 · Prove the Auckland path
 
