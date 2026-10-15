@@ -23,6 +23,7 @@ finding next week, with the same history, whether you have scanned once or fifty
 | **Remediation** | What to do about it. Every rule has one |
 | **Recommendation** | Sometimes: a grouped piece of guidance covering several related rules, with steps and links to AWS documentation |
 | **Status** | `open`, `resolved` or `ignored` — see [Resolving a finding](resolving-a-finding.md) |
+| **NZISM controls** | On findings from an NZISM scan: each NZISM control the check relates to, as its control id (CID), paragraph and level — **MUST** before **SHOULD** — for example *CID 6843 · 16.4.37.C.02 · MUST* |
 
 ## What the severities mean
 
@@ -46,8 +47,10 @@ The findings list opens on everything currently open, which for a first scan of 
 account is usually a lot. Four filters cut it down, and they combine:
 
 1. **Service** — pills across the top, each with a count. Clicking the active one clears it.
-2. **Benchmark** — `basic`, `cis` or `pci`. Findings that belong to no benchmark are not
-   counted under any of them, so the benchmark counts will not add up to the total.
+2. **Benchmark** — `basic`, `cis` or `nzism`. One finding can belong to more than one —
+   a check in both Basic and NZISM, from a scan that ran both, is one finding listed under
+   each. **All** counts each finding once; findings that belong to no benchmark are not
+   counted under any.
 3. **AWS account** — when you have more than one connected.
 4. **Status** — `open` by default. Resolved findings are hidden unless you ask for them.
 
@@ -70,8 +73,18 @@ Findings update when a scan looks again. Run a new scan for that account; if the
 passes, TOPS resolves the finding itself. See [Resolving a finding](resolving-a-finding.md).
 
 **The benchmark counts do not add up to the total.**
-Expected. A finding only counts under a benchmark it belongs to, and many rules belong to
-none.
+Expected. A finding can belong to more than one benchmark, and findings from before
+benchmarks were recorded belong to none.
+
+**An NZISM finding lost its NZISM controls.**
+A finding belongs to the benchmarks of the scan that last looked at it. Scan that account
+with the NZISM profile again and they return.
+
+**Is my account NZISM compliant?**
+TOPS cannot say, and does not. The NZISM profile checks the part of the NZISM that a
+configuration scan can evidence — most of the manual covers governance, people and process
+no scanner can see. Use the findings as evidence for the controls they name, not as an
+assessment.
 
 **A service I use has no findings at all.**
 Either nothing failed, or TOPS does not cover that service yet — it currently has rules for
