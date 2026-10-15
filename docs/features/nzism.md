@@ -107,11 +107,15 @@ Every (control, check) pair, with TOPS's status, is in
 
 | Status | Checks | Meaning |
 | --- | ---: | --- |
-| **covered** | 25 | An existing TOPS rule checks the same thing |
+| **covered** | 24 | An existing TOPS rule checks the same thing |
 | **partial** | 9 | An existing rule checks part of it (e.g. ALB/NLB but not classic ELB) |
-| **data** | 5 | A new rule on data TOPS already collects — JSON only |
+| **data** | 6 | A new rule on data TOPS already collects — JSON only |
 | **collect** | 11 | A new API call in a service TOPS already scans, then a rule |
 | **new** | 53 | A service TOPS does not scan yet |
+
+*Revised 2026-10-15 during G-1a: `tops-s3-002` was counted as covering S3 server-side
+encryption, but its condition checks S3 Bucket Keys, not encryption — it moved from covered to
+data, and NZISM evidences control 2082 through the new `tops-s3-006` instead.*
 
 **By control: 30 of the 46 have at least one TOPS check behind them today**, 24 of those
 through a fully covered check. The 53 "new" checks are concentrated: GuardDuty 6,
@@ -131,7 +135,7 @@ From the rule-engine inventory:
 1. **One rule, several frameworks.** F-4 already records a finding against a *list* of
    rulesets, but `scan:validate-rules` rejects a rule id that appears in more than one
    ruleset file — so CIS today restates basic checks under new ids and one problem raises two
-   findings. Relaxing that check lets `nzism.json` **reuse** the 25 covered rules by id, with
+   findings. Relaxing that check lets `nzism.json` **reuse** the covered rules by id, with
    no duplicate findings and no engine change.
 2. **Control references.** A rule maps to a benchmark only by naming convention (`cis-1.4`);
    nothing parses it. NZISM needs a real field — `controls: [{framework, cid, paragraph,
@@ -153,7 +157,7 @@ From the rule-engine inventory:
 In order, each shippable on its own:
 
 - **G-1a — NZISM profile from what TOPS has.** Relax the cross-ruleset uniqueness check,
-  `nzism.json` reusing the 25 covered rules, the 5 data-only rules, and a `controls` field
+  `nzism.json` reusing the covered rules, the data-only rules, and a `controls` field
   shown on findings. JSON plus a small validator and UI change.
 - **G-1b — fill the existing services.** The 11 *collect* checks: EBS default encryption,
   volumes and snapshots; RDS snapshots; S3 account-level block-public-access and bucket

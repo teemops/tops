@@ -5,7 +5,7 @@ namespace App\Services;
 use App\Models\Scan;
 use App\Models\ScanResult;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\File;
+use App\Services\RulesEngine\RulesetLoader;
 
 /**
  * Per-framework compliance scores for the Insights page.
@@ -115,6 +115,12 @@ class ComplianceScoreService
         $frameworks = [];
 
         foreach (ScanProfilesService::rulesetLabels() as $ruleset => $meta) {
+            // NZISM has no score: a percentage of checks passing reads as a compliance
+            // level, which a configuration scan cannot establish (G-1a design decision 1).
+            if ($ruleset === 'nzism') {
+                continue;
+            }
+
             $ruleIds = $this->ruleIds($ruleset);
 
             if (empty($ruleIds)) {
@@ -138,16 +144,14 @@ class ComplianceScoreService
      */
     private function ruleIds(string $ruleset): array
     {
-        $path = base_path("rules/rulesets/{$ruleset}.json");
-
-        if (!File::exists($path)) {
+        try {
+            $rules = app(RulesetLoader::class)->load($ruleset);
+        } catch (\Exception) {
             return [];
         }
 
-        $decoded = json_decode(File::get($path), true);
-
         return array_values(array_filter(
-            array_column($decoded['rules'] ?? [], 'rule')
+            array_column($rules, 'rule')
         ));
     }
 }

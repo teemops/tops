@@ -16,14 +16,15 @@ scan of one account takes a few minutes; you don't have to wait on the page for 
 2. **Choose the AWS account.** Only accounts showing **Active** appear in the list; if
    none do, the modal tells you to add one first.
 
-3. **Choose what to scan.** Each row is a scan profile — the general "basic" baseline and
-   the CIS AWS Foundations Benchmark — shown with its service and rule counts. Ticking a
+3. **Choose what to scan.** Each row is a scan profile — the general "basic" baseline, the
+   CIS AWS Foundations Benchmark, and NZISM (checks mapped to New Zealand Information
+   Security Manual 3.9 controls) — shown with its service and rule counts. Ticking a
    profile scans everything it covers. Expand one to tick individual services instead; as
    you narrow it down, a summary line updates to say exactly what will run, for example
    *"Scanning 2 of 11 services against Basic — 12 rules."*
 
-   You don't have to choose one or the other. Both profiles combine, and a service common
-   to both is only scanned once.
+   You don't have to choose one. Profiles combine, and a service common to several is only
+   scanned once.
 
 4. **Choose Start Scan.** The scan begins immediately as **Pending**, then **Running**
    once a worker picks it up — the list updates on its own every few seconds, so you don't

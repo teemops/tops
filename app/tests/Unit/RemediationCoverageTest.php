@@ -27,6 +27,11 @@ class RemediationCoverageTest extends TestCase
             $decoded = json_decode(File::get($path), true);
 
             foreach ($decoded['rules'] ?? [] as $rule) {
+                // A reference (nzism.json) points at a rule counted in its own ruleset.
+                if (isset($rule['ref'])) {
+                    continue;
+                }
+
                 $rules[] = [
                     'rule' => $rule['rule'] ?? '(no id)',
                     'severity' => $rule['severity'] ?? '(none)',

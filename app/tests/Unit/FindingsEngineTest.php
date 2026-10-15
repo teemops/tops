@@ -881,4 +881,50 @@ class FindingsEngineTest extends TestCase
         $this->assertCount(1, $findings, 'one problem on one resource is one finding');
         $this->assertSame(['basic', 'cis'], $findings->first()->rulesets);
     }
+
+    /**
+     * G-1a: NZISM references a check rather than restating it, so a Basic + NZISM scan
+     * must still give one finding, attributed to both.
+     */
+    public function test_a_referenced_rule_raises_one_finding_attributed_to_both_rulesets(): void
+    {
+        $scan = Scan::factory()->create();
+
+        ScanDetail::create([
+            'scan_id' => $scan->id,
+            'service' => 'iam',
+            'resource_type' => 'user',
+            'resource_id' => 'alice',
+            'api_method' => 'listMFADevices',
+            'raw_data' => ['MFADevices' => []],
+        ]);
+
+        (new FindingsEngine(new ConditionEvaluator()))->evaluateScan($scan, ['basic', 'nzism']);
+
+        $findings = ScanResult::where('scan_id', $scan->id)->where('finding_type', 'tops-iam-001')->get();
+
+        $this->assertCount(1, $findings);
+        $this->assertSame(['basic', 'nzism'], $findings->first()->rulesets);
+    }
+
+    public function test_an_nzism_only_scan_raises_the_referenced_rule_attributed_to_nzism(): void
+    {
+        $scan = Scan::factory()->create();
+
+        ScanDetail::create([
+            'scan_id' => $scan->id,
+            'service' => 'iam',
+            'resource_type' => 'user',
+            'resource_id' => 'alice',
+            'api_method' => 'listMFADevices',
+            'raw_data' => ['MFADevices' => []],
+        ]);
+
+        (new FindingsEngine(new ConditionEvaluator()))->evaluateScan($scan, ['nzism']);
+
+        $finding = ScanResult::where('scan_id', $scan->id)->where('finding_type', 'tops-iam-001')->first();
+
+        $this->assertNotNull($finding);
+        $this->assertSame(['nzism'], $finding->rulesets);
+    }
 }

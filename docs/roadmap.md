@@ -835,11 +835,11 @@ Full coverage analysis, the per-control matrix and the slice plan:
 **[docs/features/nzism.md](features/nzism.md)** and
 [`features/nzism/aws-config-mapping.csv`](features/nzism/aws-config-mapping.csv).
 
-Of AWS's 103 NZISM checks: **25 covered** by an existing TOPS rule, **9 partial**, **5** need
+Of AWS's 103 NZISM checks: **24 covered** by an existing TOPS rule, **9 partial**, **6** need
 only a new rule on data already collected, **11** need a new API call in a service TOPS
 already scans, **53** need a service TOPS does not scan yet.
 
-- [ ] **G-1a** — `nzism` profile reusing the covered rules by id (relax
+- [x] **G-1a** — *built 2026-10-15, in review* ([story](features/nzism-scan-profile.md)) — `nzism` profile reusing the covered rules by id (relax
       `scan:validate-rules`' cross-ruleset uniqueness, which F-4 was designed for), the five
       data-only rules, and a `controls` field (framework, CID, paragraph, MUST/SHOULD) shown
       on each finding

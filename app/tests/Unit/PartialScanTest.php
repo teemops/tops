@@ -148,4 +148,28 @@ class PartialScanTest extends TestCase
         $this->assertTrue($basic['evaluated']);
         $this->assertSame(100, $basic['score']);
     }
+
+    /**
+     * A percentage of checks passing would read as an NZISM compliance level (G-1a).
+     */
+    public function test_compliance_scoring_excludes_nzism(): void
+    {
+        $organization = Organization::factory()->create();
+        $awsAccount = AwsAccount::factory()->create(['organization_id' => $organization->id]);
+
+        Scan::factory()->create([
+            'organization_id' => $organization->id,
+            'aws_account_id' => $awsAccount->id,
+            'status' => 'completed',
+            'is_partial' => false,
+            'rulesets' => ['basic', 'nzism'],
+        ]);
+
+        $service = new ComplianceScoreService();
+        $scores = $service->scoresFor($organization->id, now()->subDays(30));
+
+        $this->assertArrayNotHasKey('nzism', $service->frameworks());
+        $this->assertNull(collect($scores)->firstWhere('key', 'nzism'));
+        $this->assertNotNull(collect($scores)->firstWhere('key', 'basic'));
+    }
 }
