@@ -28,11 +28,45 @@ Sub-Section, Block, Paragraph, Classifications, Compliance, CID, ControlText`. C
 do not. **The CID is the same number AWS's mapping uses** (`nzism_control_id`), so the two
 join directly — that is where G-1a's `controls` field should come from.
 
-*Only section 1.1 has been exported so far (2026-10-15, owner-supplied). AWS's mapping draws
-on 22 sections: 7.1, 12.4, 14.1, 14.5, 16.1, 16.3, 16.4, 16.6, 16.7, 17.1, 17.4, 17.5, 17.9,
-18.1, 18.4, 19.1, 20.3, 20.4, 22.1, 23.3, 23.4, 23.5. With those, every CID in the matrix
-can be checked against the manual's own text and level rather than AWS's. Reproduction terms
-for the manual's text are not yet checked, so the exports are not committed to the repo.*
+*The whole manual was exported on 2026-10-15 (owner-supplied): 3,992 paragraphs, **1,422
+controls** — 681 MUST, 81 MUST NOT, 615 SHOULD, 45 SHOULD NOT — across 24 chapters. The export
+states no reproduction terms, so it is not committed and the repo carries CIDs, paragraph
+numbers and levels only, never the manual's control text.*
+
+### AWS's mapping checked against the manual
+
+Every CID in AWS's packs was looked up in the November 2025 manual. The matrix now carries
+the manual's paragraph, level and classification next to AWS's (`manual_*` columns).
+**AWS's mapping lags the manual on 18 of its 46 controls:**
+
+| | Controls | What |
+| --- | ---: | --- |
+| Matches | 28 | Same CID, paragraph and level |
+| Renumbered | 13 | Same CID, new paragraph — chapters 20–22 and parts of 16 were renumbered |
+| **Level changed** | **3** | **6843** (16.4.37.C.02) and **6953** (16.7.42.C.02) are now **MUST** — MFA for privileged accounts; **7437** (23.3.19.C.02) is a SHOULD that AWS labels MUST |
+| **Gone** | **2** | **1893** — its block is now **1892** (16.1.42.C.01, MUST); **1946** — now **1945** (16.3.5.C.01, MUST). Successors need confirming by a person: the wording changed |
+
+**Use the manual's levels, never AWS's.** A report that calls a MUST a SHOULD understates a
+gap to exactly the reader who will notice.
+
+### Beyond AWS's mapping
+
+Chapter 23 (public cloud) has 36 controls; AWS maps 4. Candidates TOPS can evidence that AWS
+does not map, to confirm in G-1's Discovery:
+
+- **7436 — 23.3.19.C.01, MUST.** Privileged accounts on internet-reachable admin interfaces
+  use multiple factors. AWS mapped the neighbouring SHOULD (7437) instead; TOPS's root and
+  IAM-user MFA checks are evidence for this MUST.
+- **7469, 7470 — 23.4.11.C.01/02, MUST. Data location** — agencies must know where data in a
+  public cloud service is stored or processed, replicas included, and assess the risk. TOPS
+  already scans every enabled region; an inventory of *where resources and replicas are*
+  (S3 bucket regions and replication, cross-region snapshot copies, RDS read replicas, by
+  region) is evidence no config rule produces. **For an NZ agency this is the sovereignty
+  question — possibly the strongest thing TOPS can show.**
+- **7496 — 23.5.11.C.01, MUST.** Cloud logs collected, protected, integrity verifiable —
+  TOPS's CloudTrail validation, encryption and multi-region checks.
+- **7440 — 23.3.20.C.01, MUST.** Offboarding removes cloud access — unused-credential checks
+  (G-1b) are partial evidence.
 
 **Section 1.1 is the spec for G-3.** It is NZISM's own rule for non-compliance:
 

@@ -846,8 +846,12 @@ already scans, **53** need a service TOPS does not scan yet.
 - [ ] **G-1b** — the 11 new collections in existing services; upgrade the 9 partials
 - [ ] **G-1c** — GuardDuty and Security Hub first, then CloudWatch Logs, AWS Backup and ACM;
       further services only when an agency's workload uses them
-- [ ] Every CID's level and text checked against the manual's own section exports, not only
-      AWS's mapping — 22 sections; 1.1 is in hand, the rest are an owner export
+- [x] Every CID checked against the manual (v3.9 Nov 2025, full export) — AWS's mapping lags
+      it on 18 of 46 controls: 13 renumbered, **3 changed level** (two are now MUST), 2 CIDs
+      gone. Reports use the manual's levels. Two successor CIDs to confirm by hand
+- [ ] **G-1d — beyond AWS's mapping**, in Discovery: the MUST MFA control AWS missed (7436),
+      and a **data-location inventory** for 23.4.11 (7469/7470, MUST) — where data and
+      replicas sit, by region. For an NZ agency that is the sovereignty question
 - [ ] Never described as "NZISM compliant" — on the site, in the app, or in a proposal
 
 ### G-2 · NZISM report by control
@@ -1840,7 +1844,9 @@ Blocking nothing today, but each one shapes the plan:
   services it already scans; 30 of the 46 mapped controls have a TOPS check behind them.
   Partnership model recorded: government co-funds development through professional services —
   install, POC, rollout to a subset of agencies — with everything built released under
-  Apache-2.0. New Now: **G-1** NZISM profile, **G-2** report by control, **G-3** accepted risk
+  Apache-2.0. Checked against the full NZISM 3.9 (Nov 2025) export the same day: AWS's
+  mapping lags the manual on 18 of 46 controls, including three level changes. New Now:
+  **G-1** NZISM profile, **G-2** report by control, **G-3** accepted risk
   with a reason, **G-4** prove Auckland, **G-5** agency security pack. The hosted version
   (N-13, built on `claude/saas-deployment`, not deployed; N-14) moved to Next. Added X-13
   (whole-Organization onboarding) and X-14 (SSO) with triggers.
