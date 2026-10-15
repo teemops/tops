@@ -355,6 +355,30 @@ class NewServiceRulesTest extends TestCase
         $this->assertEqualsCanonicalizing(['missing', 'empty'], $ids);
     }
 
+    /**
+     * Aurora, DocumentDB and Neptune keep these settings on the cluster; their member
+     * instances report them false/empty, so the instance rules must skip cluster members.
+     */
+    public function test_instance_rules_skip_cluster_members_but_flag_standalone_instances(): void
+    {
+        $scan = Scan::factory()->create();
+        $this->detail($scan, 'rds', 'describeDBInstances', [
+            'DBInstanceIdentifier' => 'member', 'DBClusterIdentifier' => 'aurora-1',
+            'MultiAZ' => false, 'DeletionProtection' => false, 'EnabledCloudwatchLogsExports' => [],
+        ], 'member');
+        $this->detail($scan, 'rds', 'describeDBInstances', [
+            'DBInstanceIdentifier' => 'standalone',
+            'MultiAZ' => false, 'DeletionProtection' => false, 'EnabledCloudwatchLogsExports' => [],
+        ], 'standalone');
+
+        $this->evaluate($scan);
+
+        foreach (['tops-rds-003', 'tops-rds-007', 'tops-rds-012'] as $rule) {
+            $ids = ScanResult::where('scan_id', $scan->id)->where('finding_type', $rule)->pluck('resource_id')->all();
+            $this->assertSame(['standalone'], $ids, $rule);
+        }
+    }
+
     public function test_s3_bucket_default_encryption_not_kms(): void
     {
         $enc = fn (string $alg) => ['ServerSideEncryptionConfiguration' => ['Rules' => [[

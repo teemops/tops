@@ -52,6 +52,13 @@ class RulesetLoaderTest extends TestCase
         $this->assertSame('tops-iam-001', $rules[0]['rule']);
         $this->assertNotEmpty($rules[0]['condition']);
         $this->assertNotEmpty($rules[0]['remediation']);
+
+        // Same check, same remediation: identical to the rule as defined in basic.json.
+        $source = collect(json_decode(File::get(base_path('rules/rulesets/basic.json')), true)['rules'])
+            ->firstWhere('rule', 'tops-iam-001');
+        $resolved = $rules[0];
+        unset($resolved['controls']);
+        $this->assertSame($source, $resolved);
         // MUST first, then SHOULD / SHOULD NOT by CID.
         $this->assertSame(['200', '50', '100'], array_column($rules[0]['controls'], 'cid'));
         $this->assertSame(
@@ -83,6 +90,20 @@ class RulesetLoaderTest extends TestCase
         Log::shouldHaveReceived('warning')->withArgs(
             fn ($message, $context = []) => ($context['ref'] ?? null) === 'no-such-rule-999'
         );
+    }
+
+    public function test_a_non_string_reference_is_skipped_not_fatal(): void
+    {
+        Log::spy();
+        $this->writeRuleset('fixturemap', $this->mapping([
+            ['ref' => ['tops-iam-001'], 'controls' => ['100']],
+            ['ref' => 'tops-iam-001', 'controls' => ['100']],
+        ]));
+
+        $rules = (new RulesetLoader())->load('fixturemap');
+
+        $this->assertSame(['tops-iam-001'], array_column($rules, 'rule'));
+        Log::shouldHaveReceived('warning')->once();
     }
 
     public function test_a_control_missing_from_the_catalogue_is_not_attached(): void

@@ -27,6 +27,9 @@ class ValidateScanRules extends Command
     /** @var string[] */
     private array $warnings = [];
 
+    /** @var array<string, string[]> Service => the profiles whose scans collect it. */
+    private array $profiles = [];
+
     public function handle(): int
     {
         ServiceRegistry::flush();
@@ -100,6 +103,7 @@ class ValidateScanRules extends Command
                 continue;
             }
 
+            $this->profiles[$service] = (array) ($config['profiles'] ?? []);
             $clientKey = ServiceRegistry::get($service)['client'];
             $methods = $this->methodsIn($decoded);
 
@@ -201,7 +205,7 @@ class ValidateScanRules extends Command
     private function validateRulesets(array $collected): array
     {
         $seenIds = [];
-        $fullRuleFiles = $this->fullRuleFiles();
+        $fullRuleFiles = $this->fullRules();
 
         foreach (File::glob(base_path('rules/rulesets/*.json')) as $path) {
             $name = basename($path, '.json');
@@ -215,17 +219,18 @@ class ValidateScanRules extends Command
             }
 
             $this->validateControlCatalogue($name, $decoded['controls'] ?? []);
+            $seenRefs = [];
 
             foreach ($decoded['rules'] ?? [] as $index => $rule) {
                 $this->ruleCount++;
 
-                if (array_key_exists('ref', $rule)) {
-                    $this->validateReference($name, $index, $rule, $decoded['controls'] ?? [], $fullRuleFiles);
+                if (is_array($rule) && array_key_exists('ref', $rule)) {
+                    $this->validateReference($name, $index, $rule, $decoded['controls'] ?? [], $fullRuleFiles, $seenRefs);
 
                     continue;
                 }
 
-                $id = $rule['rule'] ?? null;
+                $id = is_array($rule) ? ($rule['rule'] ?? null) : null;
                 $where = $id ? "{$name}.json:{$id}" : "{$name}.json rule #{$index}";
 
                 if (!$id) {
@@ -272,11 +277,11 @@ class ValidateScanRules extends Command
     }
 
     /**
-     * Rule id => the ruleset files holding it as a full rule (not a reference).
+     * Rule id => the full rule (not a reference) with the ruleset files holding it.
      *
-     * @return array<string, string[]>
+     * @return array<string, array{files: string[], service: mixed}>
      */
-    private function fullRuleFiles(): array
+    private function fullRules(): array
     {
         $files = [];
 
@@ -284,8 +289,9 @@ class ValidateScanRules extends Command
             $decoded = json_decode(File::get($path), true);
 
             foreach ($decoded['rules'] ?? [] as $rule) {
-                if (is_array($rule) && isset($rule['rule'])) {
-                    $files[$rule['rule']][] = basename($path, '.json');
+                if (is_array($rule) && isset($rule['rule']) && is_string($rule['rule'])) {
+                    $files[$rule['rule']]['files'][] = basename($path, '.json');
+                    $files[$rule['rule']]['service'] ??= $rule['service'] ?? null;
                 }
             }
         }
@@ -297,16 +303,32 @@ class ValidateScanRules extends Command
      * A reference must name a full rule in another ruleset, carry nothing of its own
      * beyond its controls, and list only controls its file's catalogue defines.
      *
-     * @param array<string, string[]> $fullRuleFiles
+     * @param array<string, array{files: string[], service: mixed}> $fullRules
+     * @param string[] $seenRefs Refs already seen in this file.
      */
-    private function validateReference(string $name, int|string $index, array $ref, array $catalogue, array $fullRuleFiles): void
+    private function validateReference(string $name, int|string $index, array $ref, array $catalogue, array $fullRules, array &$seenRefs): void
     {
         $id = $ref['ref'];
         $where = "{$name}.json ref " . (is_string($id) ? "'{$id}'" : "#{$index}");
 
-        $others = array_diff($fullRuleFiles[$id] ?? [], [$name]);
-        if (!is_string($id) || $others === []) {
+        if (!is_string($id)) {
             $this->errors[] = "{$where} names a rule id that no other ruleset defines as a full rule.";
+        } else {
+            if (isset($seenRefs[$id])) {
+                $this->errors[] = "{$where} appears more than once in this ruleset.";
+            }
+            $seenRefs[$id] = true;
+
+            if (array_diff($fullRules[$id]['files'] ?? [], [$name]) === []) {
+                $this->errors[] = "{$where} names a rule id that no other ruleset defines as a full rule.";
+            } else {
+                // A scan only collects a service for the profiles listed in its tasks.json;
+                // otherwise the referenced rule never has data and silently never fires.
+                $service = $fullRules[$id]['service'];
+                if (is_string($service) && isset($this->profiles[$service]) && !in_array($name, $this->profiles[$service], true)) {
+                    $this->errors[] = "{$where} targets service '{$service}', whose tasks.json config.profiles does not list '{$name}'. A {$name} scan never collects it, so the rule can never fire.";
+                }
+            }
         }
 
         foreach (['rule', 'condition', 'service', 'method'] as $own) {
@@ -315,7 +337,11 @@ class ValidateScanRules extends Command
             }
         }
 
-        foreach ($ref['controls'] ?? [] as $cid) {
+        if (!is_array($ref['controls'] ?? null) || $ref['controls'] === []) {
+            $this->errors[] = "{$where} has no controls; a reference must list at least one control CID.";
+        }
+
+        foreach (is_array($ref['controls'] ?? null) ? $ref['controls'] : [] as $cid) {
             if (!isset($catalogue[(string) $cid])) {
                 $this->errors[] = "{$where} lists control CID {$cid}, which is not in this file's controls catalogue.";
             }

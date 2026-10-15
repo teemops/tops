@@ -40,13 +40,13 @@ class RulesetLoader
             }
 
             $index ??= $this->fullRulesExcept($ruleset);
-            $target = $index[$entry['ref']] ?? null;
+            $target = is_string($entry['ref']) ? ($index[$entry['ref']] ?? null) : null;
 
             if ($target === null) {
                 // A scan must not crash on a bad reference; the validator is what fails.
                 Log::warning('Skipping an unresolvable ruleset reference', [
                     'ruleset' => $ruleset,
-                    'ref' => $entry['ref'],
+                    'ref' => is_scalar($entry['ref']) ? $entry['ref'] : gettype($entry['ref']),
                 ]);
 
                 continue;

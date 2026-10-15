@@ -293,6 +293,20 @@ class ValidateScanRulesTest extends TestCase
         $path = base_path('rules/rulesets/fixturemapping.json');
         $this->created[] = $path;
         File::put($path, json_encode(['controls' => $controls, 'rules' => $rules], JSON_PRETTY_PRINT));
+
+        // Refs to iam rules are only collectable if iam's scans include this profile.
+        $this->addProfile('iam', 'fixturemapping');
+    }
+
+    private function addProfile(string $service, string $profile): void
+    {
+        $path = base_path("rules/tasks/{$service}/tasks.json");
+        $this->restore[$path] ??= File::get($path);
+
+        $decoded = json_decode(File::get($path), true);
+        $decoded['config']['profiles'][] = $profile;
+        File::put($path, json_encode($decoded, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        ServiceRegistry::flush();
     }
 
     private function validControls(): array
@@ -356,14 +370,66 @@ class ValidateScanRulesTest extends TestCase
             ->assertFailed();
     }
 
-    public function test_a_reference_may_repeat_an_id_without_tripping_the_uniqueness_check(): void
+    public function test_it_rejects_a_reference_with_missing_empty_or_non_array_controls(): void
     {
         $this->writeMapping($this->validControls(), [
+            ['ref' => 'tops-iam-001'],
+            ['ref' => 'tops-iam-002', 'controls' => []],
+            ['ref' => 'tops-iam-003', 'controls' => '100'],
+        ]);
+
+        $this->artisan('scan:validate-rules')
+            ->expectsOutputToContain("ref 'tops-iam-001' has no controls")
+            ->expectsOutputToContain("ref 'tops-iam-002' has no controls")
+            ->expectsOutputToContain("ref 'tops-iam-003' has no controls")
+            ->assertFailed();
+    }
+
+    public function test_it_rejects_the_same_ref_twice_in_one_ruleset(): void
+    {
+        $this->writeMapping($this->validControls(), [
+            ['ref' => 'tops-iam-001', 'controls' => ['100']],
             ['ref' => 'tops-iam-001', 'controls' => ['100']],
         ]);
 
         $this->artisan('scan:validate-rules')
-            ->doesntExpectOutputToContain('reuses the rule id')
-            ->assertSuccessful();
+            ->expectsOutputToContain("ref 'tops-iam-001' appears more than once")
+            ->assertFailed();
+    }
+
+    public function test_it_reports_malformed_entries_instead_of_crashing(): void
+    {
+        $this->writeMapping($this->validControls(), [
+            'not-an-array',
+            ['ref' => ['tops-iam-001'], 'controls' => ['100']],
+        ]);
+
+        $this->artisan('scan:validate-rules')
+            ->expectsOutputToContain("has no 'rule' id")
+            ->expectsOutputToContain('names a rule id that no other ruleset defines')
+            ->assertFailed();
+    }
+
+    /**
+     * Without the profile listed, a scan of it never collects the service, so the
+     * referenced rule has no data and silently never fires.
+     */
+    public function test_it_rejects_a_reference_to_a_service_the_profile_does_not_collect(): void
+    {
+        $this->writeService('fixturesqs', $this->validService('fixturesqs', 'sqs'));
+        $this->writeRuleset('fixturebasic', [[
+            'rule' => 'fixture-profile-001',
+            'name' => 'Profile gap',
+            'service' => 'fixturesqs',
+            'method' => 'listQueues',
+            'severity' => 'low',
+            'remediation' => 'n/a',
+            'condition' => 'true',
+        ]]);
+        $this->writeMapping($this->validControls(), [['ref' => 'fixture-profile-001', 'controls' => ['100']]]);
+
+        $this->artisan('scan:validate-rules')
+            ->expectsOutputToContain("ref 'fixture-profile-001' targets service 'fixturesqs'")
+            ->assertFailed();
     }
 }

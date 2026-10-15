@@ -50,9 +50,10 @@ A problem found by both a Basic and an NZISM scan is one finding, attributed to 
       NZISM 3.9 (November 2025) manual, not AWS's mapping — e.g. CID 6843 and CID 6953 show
       **MUST**, CID 7437 shows **SHOULD**
 - [ ] Given a CID that is not in the November 2025 manual, then it is not shown on any finding
-- [ ] Given a malformed control reference in a ruleset (unknown framework, missing CID or
-      paragraph, a level other than MUST / MUST NOT / SHOULD / SHOULD NOT), when
-      `php artisan scan:validate-rules` runs, then it fails and names the rule
+- [ ] Given a malformed control reference in a ruleset (missing or empty controls, a CID not
+      in the catalogue, a malformed paragraph, or a level other than MUST / MUST NOT /
+      SHOULD / SHOULD NOT), when `php artisan scan:validate-rules` runs, then it fails and
+      names the rule or the CID
 
 **Errors and authorization**
 - [ ] Given a member of one organization, when they request NZISM findings, then they see only
@@ -195,6 +196,8 @@ full rules — references are how a rule legitimately appears twice.
 - Control-level status, coverage or any percentage (G-2).
 - The finding detail page (`Findings/Show.vue`) — the list line covers the demo; added if
   the first customer reads findings there.
+- Aurora, DocumentDB and Neptune log exports are cluster settings; no cluster-level
+  log-export check yet (G-1b).
 
 ## Related Practices
 - [Product Practices](../practices/product.md) — honest claims; the smallest version that
