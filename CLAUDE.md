@@ -59,6 +59,25 @@ Run the `practices-review` skill, or walk `docs/processes/practices-checklist.md
 manually against your diff. The PR template repeats the Quality Gate — fill it in
 honestly; unticked boxes are a signal to the reviewer, not a formality.
 
+## Model routing
+
+The main session plans, decides and talks to the user; it hands self-contained work to
+the subagents in `.claude/agents/`, each pinned to the cheapest model that does that job
+well. Delegate by default when a task matches — the summary comes back, the file dumps
+and test logs do not.
+
+| Agent | Model | Use it for |
+| --- | --- | --- |
+| `explorer` | Haiku | Finding things: "where is X", "what calls Y" — read-only |
+| `test-runner` | Haiku | Running tests or `scan:validate-rules` and reporting only failures |
+| `implementer` | Sonnet | Writing a change whose design is already agreed, with its tests |
+| `rule-author` | Sonnet | `tasks.json` collection and ruleset rules (basic, CIS, NZISM) |
+| `reviewer` | Opus | Pre-PR review: correctness, tenancy, security, practices — read-only |
+
+Keep in the main session: deciding what to build, the `feature-development` phases
+before Development, anything needing the user's judgement, and work too small to be
+worth a hand-off. Run independent agents in parallel.
+
 ## Commands
 
 Run from `app/` unless noted.
