@@ -18,12 +18,13 @@ from PIL import Image, ImageDraw, ImageFont
 HERE = Path(__file__).parent
 OUT = HERE / "public" / "og.png"
 FAVICON = HERE / "public" / "favicon.ico"
-LOGO = HERE / "public" / "logo.png"
+LOGO = HERE / "public" / "logo.png"  # the Teem mark alone, for the favicon
+WORDMARK = HERE / "public" / "teem-logo-dark.png"  # the Teem logo, white wordmark
 
 W, H = 1200, 630
-BG = (10, 14, 23)
-TEXT = (233, 237, 245)
-MUTED = (152, 163, 184)
+BG = (15, 19, 27)
+TEXT = (232, 235, 241)
+MUTED = (154, 163, 178)
 BRAND = (245, 130, 31)
 
 FONT_CANDIDATES = {
@@ -70,30 +71,32 @@ def main() -> None:
     margin = 84
     y = 96
 
-    if LOGO.exists():
-        logo = Image.open(LOGO).convert("RGBA")
-        logo.thumbnail((78, 78), Image.LANCZOS)
+    if WORDMARK.exists():
+        logo = Image.open(WORDMARK).convert("RGBA")
+        logo.thumbnail((200, 75), Image.LANCZOS)
         img.alpha_composite(logo, (margin, y - 8))
-        draw.text((margin + 96, y + 12), "Teemops", font=font("bold", 42), fill=TEXT)
+        x = margin + logo.width + 22
+        draw.line((x, y, x, y + 56), fill=(255, 255, 255, 60), width=2)
+        draw.text((x + 22, y + 6), "teemops", font=font("bold", 40), fill=MUTED)
 
     y += 132
-    for line in ("Open source AWS security", "scanning you run yourself"):
+    for line in ("Find the AWS security risks", "that matter, every day"):
         draw.text((margin, y), line, font=font("bold", 62), fill=TEXT)
         y += 76
 
     y += 26
     for line in (
-        "Overly permissive IAM roles, public S3 buckets, open",
-        "security groups. 74 checks, each with the fix.",
+        "77 checks across 11 AWS services, a fix for every",
+        "finding, and read-only access. Scanned daily.",
     ):
         draw.text((margin, y), line, font=font("regular", 30), fill=MUTED)
         y += 42
 
-    # Footer rule and badge row.
+    # Footer rule and offer row.
     draw.line((margin, H - 106, W - margin, H - 106), fill=(255, 255, 255, 28), width=1)
     draw.text(
         (margin, H - 76),
-        "Apache 2.0   ·   Self-hosted   ·   No paid tier",
+        "$1 for your first 30 days",
         font=font("mono", 25),
         fill=BRAND,
     )
