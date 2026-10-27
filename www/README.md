@@ -69,6 +69,19 @@ the page agree:
 python3 build-assets.py
 ```
 
+## Legal pages
+
+Terms, privacy and cookies are Teem's company-wide policies, published on teem.cloud and
+linked from the footer and the pricing section. They are not copied here, so there is one
+version to keep up to date:
+
+- https://teem.cloud/legal/terms/ (section 7 covers teemops, as "Teem Ops")
+- https://teem.cloud/legal/privacy/
+- https://teem.cloud/legal/cookies/
+
+This page sets no cookies and runs no analytics. If that changes, check the privacy and
+cookie policies still describe it.
+
 ## Claims made on this page
 
 The page states specific numbers and behaviour. They were true of `teemops/teemops` on
