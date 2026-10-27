@@ -7,10 +7,15 @@
 - favicon.ico browsers request /favicon.ico whether or not a <link rel="icon">
               points elsewhere, so without this every visit logs a 404.
 
-Run after changing the headline or the logo:
+Both start from Teem's own logo files on teem.cloud, which the page also loads
+directly, so the brand has one source. Needs network access and rsvg-convert
+(librsvg) for the favicon. Run after changing the headline or the logo:
 
     python3 www/build-assets.py
 """
+import io
+import subprocess
+import urllib.request
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
@@ -18,8 +23,8 @@ from PIL import Image, ImageDraw, ImageFont
 HERE = Path(__file__).parent
 OUT = HERE / "public" / "og.png"
 FAVICON = HERE / "public" / "favicon.ico"
-LOGO = HERE / "public" / "logo.png"  # the Teem mark alone, for the favicon
-WORDMARK = HERE / "public" / "teem-logo-dark.png"  # the Teem logo, white wordmark
+WORDMARK_URL = "https://teem.cloud/logo-dark.png"  # the Teem logo, white wordmark
+MARK_URL = "https://teem.cloud/favicon.svg"  # the Teem mark alone, teem.cloud's favicon
 
 W, H = 1200, 630
 BG = (15, 19, 27)
@@ -63,6 +68,13 @@ def glow(img: Image.Image) -> None:
     img.alpha_composite(overlay)
 
 
+def fetch(url: str) -> bytes:
+    # teem.cloud's Cloudflare answers 403 to urllib's default user agent.
+    req = urllib.request.Request(url, headers={"User-Agent": "teemops-www-build-assets"})
+    with urllib.request.urlopen(req, timeout=20) as res:
+        return res.read()
+
+
 def main() -> None:
     img = Image.new("RGBA", (W, H), (*BG, 255))
     glow(img)
@@ -71,13 +83,12 @@ def main() -> None:
     margin = 84
     y = 96
 
-    if WORDMARK.exists():
-        logo = Image.open(WORDMARK).convert("RGBA")
-        logo.thumbnail((200, 75), Image.LANCZOS)
-        img.alpha_composite(logo, (margin, y - 8))
-        x = margin + logo.width + 22
-        draw.line((x, y, x, y + 56), fill=(255, 255, 255, 60), width=2)
-        draw.text((x + 22, y + 6), "teemops", font=font("bold", 40), fill=MUTED)
+    logo = Image.open(io.BytesIO(fetch(WORDMARK_URL))).convert("RGBA")
+    logo.thumbnail((200, 75), Image.LANCZOS)
+    img.alpha_composite(logo, (margin, y - 8))
+    x = margin + logo.width + 22
+    draw.line((x, y, x, y + 56), fill=(255, 255, 255, 60), width=2)
+    draw.text((x + 22, y + 6), "teemops", font=font("bold", 40), fill=MUTED)
 
     y += 132
     for line in ("Find the AWS security risks", "that matter, every day"):
@@ -109,12 +120,13 @@ def main() -> None:
 
 
 def favicon() -> None:
-    """Multi-size .ico from the logo. Keeps the transparent background so the
-    mark sits on whatever colour the browser's tab strip happens to be."""
-    if not LOGO.exists():
-        print(f"skipped {FAVICON} — {LOGO} is missing")
-        return
-    src = Image.open(LOGO).convert("RGBA")
+    """Multi-size .ico rasterised from teem.cloud's favicon.svg, so /favicon.ico
+    shows the same mark as the <link rel="icon"> that points at the SVG."""
+    png = subprocess.run(
+        ["rsvg-convert", "-w", "48", "-h", "48"],
+        input=fetch(MARK_URL), capture_output=True, check=True,
+    ).stdout
+    src = Image.open(io.BytesIO(png)).convert("RGBA")
     src.save(FAVICON, format="ICO", sizes=[(16, 16), (32, 32), (48, 48)])
     print(f"wrote {FAVICON} ({FAVICON.stat().st_size // 1024} KB)")
 

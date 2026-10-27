@@ -15,13 +15,11 @@ one.
 ```
 www/
 ├── wrangler.jsonc        # Worker config: static assets, custom domains, observability
-├── build-assets.py       # regenerates public/og.png and public/favicon.ico
+├── build-assets.py       # regenerates public/og.png and public/favicon.ico from teem.cloud's logo
 └── public/               # everything is static
     ├── index.html        # the page, with its CSS and JS inline
     ├── 404.html
     ├── fonts/            # IBM Plex, copied from the app's UI kit (OFL)
-    ├── teem-logo-dark.png  # the Teem logo, white wordmark, for the dark page
-    ├── logo.png          # the Teem mark alone, the source of the favicon
     ├── og.png            # generated, do not edit by hand
     ├── favicon.ico       # generated, do not edit by hand
     ├── robots.txt
@@ -29,9 +27,18 @@ www/
 ```
 
 The Teem logo is the only logo used for teemops. "teemops" appears as plain text beside
-it. `teem-logo-dark.png` is a copy of `apps/web/public/brand/teem-logo-dark.png` in
-`teemops/teemops`, and the colours in `index.html` are the dark theme of the app's UI kit
-(`packages/ui/src/css/tokens.css`), so the site and the app look like one product.
+it. The page loads the logo straight from teem.cloud rather than keeping a copy, so a
+change there shows up here with no deploy:
+
+- `https://teem.cloud/logo-dark.png`, the white wordmark teem.cloud uses on dark
+  backgrounds (`logo.png` there, also `design/brand/TeemLogo1ps-small.png` here, is the
+  black one for light backgrounds and would vanish on this page)
+- `https://teem.cloud/favicon.svg`, the mark alone
+
+`/favicon.ico` and `og.png` can't point elsewhere, so `build-assets.py` downloads those two
+files and rebuilds them. Run it again if the Teem logo changes. The colours in
+`index.html` are the dark theme of the app's UI kit (`packages/ui/src/css/tokens.css` in
+`teemops/teemops`), so the site and the app look like one product.
 
 ## Deploy
 
@@ -59,11 +66,12 @@ Then open the printed URL.
 ## Changing the page
 
 The CSS and JS are inline in `public/index.html` on purpose: the page is one file, has no
-build step, and loads no third-party assets at all. Keep it that way unless there is a
+build step, and loads nothing from anywhere but this site and teem.cloud (the logo). Keep it that way unless there is a
 reason not to.
 
-After changing the headline, regenerate the derived assets so the link-preview card and
-the page agree:
+After changing the headline or the Teem logo, regenerate the derived assets so the
+link-preview card and the page agree. It needs network access and `rsvg-convert`
+(librsvg):
 
 ```bash
 python3 build-assets.py
