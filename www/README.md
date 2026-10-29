@@ -52,7 +52,8 @@ domains under `routes` in `wrangler.jsonc`, so Wrangler creates the DNS records 
 certificates itself. Declaring routes turns the `workers.dev` URL off, so there is no
 preview address. Test locally with `npm run dev`.
 
-Deploy only while `app.teemops.com` is live, since every call to action points there.
+Deploy only while `app.teemops.com` is live, since every call to action points there,
+and only once production runs X-11 (the free first scan) and the COV checks (#104 to #107), which this page describes.
 
 ## Local development
 
@@ -93,12 +94,14 @@ cookie policies still describe it.
 ## Claims made on this page
 
 The page states specific numbers and behaviour. They were true of `teemops/teemops` on
-2026-10-27 and they are checkable. If the product changes, check them again:
+2026-10-29 (master at `9a232e9`, after #107) and they are checkable. If the product changes, check them again:
 
 | Claim | Source in `teemops/teemops` |
 | --- | --- |
-| 77 checks: 55 baseline + 22 CIS | `packages/scan-core/rules/aws/basic.json`, `cis.json` |
-| 11 AWS services | `packages/scan-core/collectors/aws/` |
+| 149 checks (143 in `basic.json`, 6 in `cis.json`), one per distinct problem | `packages/scan-core/rules/aws/`; `npm run validate:rules` prints the count |
+| 17 AWS services, as `validate:rules` counts them (S3 Control and Account are separate from S3) | `packages/scan-core/collectors/aws/` |
+| 22 CIS AWS Foundations v5.0 controls | the `cis-aws-5.0:` tags across both rule files; `frameworks.test`. The CIS monitoring alarms are checked but not yet tagged (#107), so don't claim more than 22 |
+| GuardDuty, Security Hub, Config, Access Analyzer, alarms on root user use and IAM policy changes | wave 3, #106 |
 | Remediation on every check | the `remediation` field on every rule |
 | Daily scans | N-8 in `docs/roadmap.md`, `docs/features/n8-scheduled-scans.md` |
 | Health score 0–100 | `docs/features/insights-health-score.md` |
@@ -107,6 +110,7 @@ The page states specific numbers and behaviour. They were true of `teemops/teemo
 | `--fail-on` exits non-zero | `apps/cli/src/cli.ts` |
 | Read-only role with a per-account ExternalId, no stored keys | N-4 in `docs/roadmap.md`, `docs/features/n4-connect-aws.md` |
 | Sign up with Google, Microsoft, GitHub or email | `apps/web/src/welcome.ts` |
+| First scan free with no card: score, severity counts and issue titles; resources, regions and fixes unlock with a plan; deleted after 14 days; one per AWS account | X-11, `docs/features/free-first-scan.md` |
 | Plans, prices, $1 for 30 days, limits, downgrade behaviour | "Pricing" in `docs/roadmap.md`, `docs/features/billing.md` |
 | AWS only today; GCP, Azure, Cloudflare next | X-1 to X-3 in `docs/roadmap.md` |
 

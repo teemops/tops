@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>teemops — find and fix AWS security risks, every day</title>
-<meta name="description" content="teemops scans your AWS accounts every day with 77 checks across 11 services, including the CIS AWS Foundations Benchmark. Read-only access, a fix for every finding, alerts by email or Slack. $1 for your first 30 days.">
+<meta name="description" content="teemops scans your AWS accounts every day with 149 checks across 17 services, including the CIS AWS Foundations Benchmark. Read-only access, a fix for every finding, alerts by email or Slack. Your first scan is free.">
 <link rel="canonical" href="https://teemops.com/">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" href="https://teem.cloud/favicon.svg" type="image/svg+xml">
@@ -14,7 +14,7 @@
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://teemops.com/">
 <meta property="og:title" content="teemops — find and fix AWS security risks, every day">
-<meta property="og:description" content="Daily AWS security scans with a fix for every finding. Read-only access, connected in under five minutes. $1 for your first 30 days.">
+<meta property="og:description" content="Daily AWS security scans with a fix for every finding. Read-only access, connected in under five minutes. Your first scan is free.">
 <meta property="og:image" content="https://teemops.com/og.png">
 <meta name="twitter:card" content="summary_large_image">
 
@@ -378,7 +378,7 @@ a:focus-visible, button:focus-visible, summary:focus-visible {
       <a class="nav__section" href="#pricing">Pricing</a>
       <a class="nav__section" href="#faq">FAQ</a>
       <a href="https://app.teemops.com/">Sign in</a>
-      <a class="btn btn--primary btn--sm" href="https://app.teemops.com/">Start for $1</a>
+      <a class="btn btn--primary btn--sm" href="https://app.teemops.com/">Scan free</a>
     </div>
   </div>
 </nav>
@@ -393,14 +393,14 @@ a:focus-visible, button:focus-visible, summary:focus-visible {
         <h1>Find the AWS security risks that matter, <em>every day</em></h1>
         <p class="hero__sub">
           Connect an AWS account with a read-only role in under five minutes. teemops runs
-          77 checks across 11 services every day, ranks what it finds, and tells you how to
-          fix each one.
+          149 checks across 17 AWS services every day, ranks what it finds, and tells you how
+          to fix each one.
         </p>
         <div class="hero__cta">
-          <a class="btn btn--primary" href="https://app.teemops.com/">Start for $1</a>
+          <a class="btn btn--primary" href="https://app.teemops.com/">Scan your account free</a>
           <a class="btn btn--ghost" href="#pricing">See pricing</a>
         </div>
-        <p class="hero__note">$1 for your first 30 days, then from $20 a month. Cancel any time.</p>
+        <p class="hero__note">Your first scan is free, with no card needed. Then $1 for your first 30 days, and from $20 a month after that.</p>
       </div>
 
       <!-- An illustration of the Overview screen, built in HTML so it stays sharp
@@ -486,7 +486,7 @@ a:focus-visible, button:focus-visible, summary:focus-visible {
         <article class="card">
           <div class="card__icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z"/></svg></div>
           <h3>A fix with every finding</h3>
-          <p>All 77 checks include remediation steps. Each finding also has a ready-made prompt
+          <p>All 149 checks include remediation steps. Each finding also has a ready-made prompt
              you can paste into Claude or your coding agent.</p>
         </article>
         <article class="card">
@@ -497,9 +497,11 @@ a:focus-visible, button:focus-visible, summary:focus-visible {
         </article>
         <article class="card">
           <div class="card__icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3l8 3v6c0 4.5-3.4 8.2-8 9-4.6-.8-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg></div>
-          <h3>CIS AWS Foundations Benchmark</h3>
-          <p>22 CIS checks run alongside 55 baseline checks across IAM, S3, EC2, RDS,
-             CloudTrail, KMS, Lambda, DynamoDB, load balancers, SNS and SQS.</p>
+          <h3>149 checks, CIS included</h3>
+          <p>IAM, S3, EC2, RDS, CloudTrail, KMS, Lambda, DynamoDB, load balancers, SNS, SQS,
+             GuardDuty, Security Hub, Config and IAM Access Analyzer, covering 22 controls of
+             the CIS AWS Foundations Benchmark v5.0. teemops also checks that you'd be alerted
+             to use of the root user and to IAM policy changes.</p>
         </article>
         <article class="card">
           <div class="card__icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></div>
@@ -522,20 +524,22 @@ a:focus-visible, button:focus-visible, summary:focus-visible {
         <article class="card">
           <span class="card__num">01</span>
           <h3>Sign up</h3>
-          <p>Use Google, Microsoft, GitHub or your email. Pick a plan and start your first
-             30 days for $1.</p>
+          <p>Use Google, Microsoft, GitHub or your email. There's no card to enter before
+             your first scan.</p>
         </article>
         <article class="card">
           <span class="card__num">02</span>
           <h3>Connect AWS</h3>
           <p>One CloudFormation stack creates a read-only role in your account. You can read
-             the template before you launch it, and delete the stack to revoke access.</p>
+             the template before you launch it, and delete the stack to revoke access. Your
+             first scan starts as soon as it's connected.</p>
         </article>
         <article class="card">
           <span class="card__num">03</span>
-          <h3>Fix what matters</h3>
-          <p>Your first scan shows findings grouped by severity, each with its fix. After
-             that, teemops scans every day and tells you when something new turns up.</p>
+          <h3>See it free, unlock for $1</h3>
+          <p>The free scan shows your health score and every issue it found, by severity.
+             Choose a plan for $1 to see the affected resources and how to fix each one, and
+             teemops scans every day from then on.</p>
         </article>
       </div>
     </div>
@@ -583,8 +587,8 @@ a:focus-visible, button:focus-visible, summary:focus-visible {
       <div class="section__lead section__lead--center">
         <p class="eyebrow">Pricing</p>
         <h2>Simple plans. $1 for your first 30 days.</h2>
-        <p>Every plan includes every feature. Pick the one that fits your team and number of
-           accounts, and change it whenever you need to.</p>
+        <p>Your first scan is free. Every plan includes every feature: pick the one that fits
+           your team and number of accounts, and change it whenever you need to.</p>
         <div class="currency" role="group" aria-label="Currency">
           <button type="button" data-currency="usd" aria-pressed="true">USD</button>
           <button type="button" data-currency="nzd" aria-pressed="false">NZD</button>
@@ -633,7 +637,7 @@ a:focus-visible, button:focus-visible, summary:focus-visible {
       <div class="included">
         <h3>Included in every plan</h3>
         <ul>
-          <li>All 77 checks, including CIS AWS Foundations</li>
+          <li>All 149 checks, including CIS AWS Foundations</li>
           <li>Daily scans of every connected account</li>
           <li>Remediation steps on every finding</li>
           <li>Health score and insights</li>
@@ -660,6 +664,14 @@ a:focus-visible, button:focus-visible, summary:focus-visible {
         <h2>Questions, answered</h2>
       </div>
       <div class="faq">
+        <details>
+          <summary>What's free?</summary>
+          <p>The first scan of each AWS account. You see your health score, how many issues of
+             each severity it found, and what each issue is. The affected resources, regions
+             and fixes unlock when you choose a plan, straight away and without scanning again,
+             and daily scans start. If you don't choose a plan within 14 days, the free results
+             are deleted. Each AWS account gets one free scan.</p>
+        </details>
         <details>
           <summary>What does the $1 get me?</summary>
           <p>Thirty days of the plan you choose, with everything included. We charge $1 up
@@ -710,8 +722,8 @@ a:focus-visible, button:focus-visible, summary:focus-visible {
   <section class="closing">
     <div class="wrap">
       <h2>See what's in your AWS account today</h2>
-      <p>Connect an account in under five minutes. Your first 30 days are $1.</p>
-      <a class="btn btn--primary" href="https://app.teemops.com/">Start for $1</a>
+      <p>Connect an account in under five minutes. Your first scan is free.</p>
+      <a class="btn btn--primary" href="https://app.teemops.com/">Scan your account free</a>
     </div>
   </section>
 </main>

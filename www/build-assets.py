@@ -97,7 +97,7 @@ def main() -> None:
 
     y += 26
     for line in (
-        "77 checks across 11 AWS services, a fix for every",
+        "149 checks across 17 AWS services, a fix for every",
         "finding, and read-only access. Scanned daily.",
     ):
         draw.text((margin, y), line, font=font("regular", 30), fill=MUTED)
@@ -107,7 +107,7 @@ def main() -> None:
     draw.line((margin, H - 106, W - margin, H - 106), fill=(255, 255, 255, 28), width=1)
     draw.text(
         (margin, H - 76),
-        "$1 for your first 30 days",
+        "Your first scan is free",
         font=font("mono", 25),
         fill=BRAND,
     )
