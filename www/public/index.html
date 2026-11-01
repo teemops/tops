@@ -592,6 +592,7 @@ a:focus-visible, button:focus-visible, summary:focus-visible {
         <div class="currency" role="group" aria-label="Currency">
           <button type="button" data-currency="usd" aria-pressed="true">USD</button>
           <button type="button" data-currency="nzd" aria-pressed="false">NZD</button>
+          <button type="button" data-currency="aud" aria-pressed="false">AUD</button>
         </div>
       </div>
 
@@ -599,38 +600,38 @@ a:focus-visible, button:focus-visible, summary:focus-visible {
         <article class="plan">
           <h3>Solo</h3>
           <p class="plan__for">For one person looking after one account.</p>
-          <div class="plan__price"><b data-usd="$20" data-nzd="NZ$30">$20</b><span>/ month</span></div>
-          <p class="plan__intro" data-usd="$1 for the first 30 days" data-nzd="NZ$1 for the first 30 days">$1 for the first 30 days</p>
+          <div class="plan__price"><b data-usd="$20" data-nzd="NZ$30" data-aud="A$30">$20</b><span>/ month</span></div>
+          <p class="plan__intro" data-usd="$1 for the first 30 days" data-nzd="NZ$1 for the first 30 days" data-aud="A$1 for the first 30 days">$1 for the first 30 days</p>
           <ul class="plan__limits">
             <li>Users <b>1</b></li>
             <li>Cloud accounts <b>1</b></li>
           </ul>
-          <a class="btn btn--ghost btn--block" href="https://app.teemops.com/" data-usd="Start for $1" data-nzd="Start for NZ$1">Start for $1</a>
+          <a class="btn btn--ghost btn--block" href="https://app.teemops.com/" data-usd="Start for $1" data-nzd="Start for NZ$1" data-aud="Start for A$1">Start for $1</a>
         </article>
 
         <article class="plan plan--pick">
           <span class="plan__tag">Recommended</span>
           <h3>Team</h3>
           <p class="plan__for">For a small team with a few environments.</p>
-          <div class="plan__price"><b data-usd="$50" data-nzd="NZ$60">$50</b><span>/ month</span></div>
-          <p class="plan__intro" data-usd="$1 for the first 30 days" data-nzd="NZ$1 for the first 30 days">$1 for the first 30 days</p>
+          <div class="plan__price"><b data-usd="$50" data-nzd="NZ$60" data-aud="A$60">$50</b><span>/ month</span></div>
+          <p class="plan__intro" data-usd="$1 for the first 30 days" data-nzd="NZ$1 for the first 30 days" data-aud="A$1 for the first 30 days">$1 for the first 30 days</p>
           <ul class="plan__limits">
             <li>Users <b>5</b></li>
             <li>Cloud accounts <b>5</b></li>
           </ul>
-          <a class="btn btn--primary btn--block" href="https://app.teemops.com/" data-usd="Start for $1" data-nzd="Start for NZ$1">Start for $1</a>
+          <a class="btn btn--primary btn--block" href="https://app.teemops.com/" data-usd="Start for $1" data-nzd="Start for NZ$1" data-aud="Start for A$1">Start for $1</a>
         </article>
 
         <article class="plan">
           <h3>Business</h3>
           <p class="plan__for">For growing teams running many accounts.</p>
-          <div class="plan__price"><b data-usd="$100" data-nzd="NZ$120">$100</b><span>/ month</span></div>
-          <p class="plan__intro" data-usd="$1 for the first 30 days" data-nzd="NZ$1 for the first 30 days">$1 for the first 30 days</p>
+          <div class="plan__price"><b data-usd="$100" data-nzd="NZ$120" data-aud="A$120">$100</b><span>/ month</span></div>
+          <p class="plan__intro" data-usd="$1 for the first 30 days" data-nzd="NZ$1 for the first 30 days" data-aud="A$1 for the first 30 days">$1 for the first 30 days</p>
           <ul class="plan__limits">
             <li>Users <b>10</b></li>
             <li>Cloud accounts <b>10</b></li>
           </ul>
-          <a class="btn btn--ghost btn--block" href="https://app.teemops.com/" data-usd="Start for $1" data-nzd="Start for NZ$1">Start for $1</a>
+          <a class="btn btn--ghost btn--block" href="https://app.teemops.com/" data-usd="Start for $1" data-nzd="Start for NZ$1" data-aud="Start for A$1">Start for $1</a>
         </article>
       </div>
 
@@ -646,7 +647,7 @@ a:focus-visible, button:focus-visible, summary:focus-visible {
         </ul>
       </div>
 
-      <p class="fine" id="price-note" data-usd="Prices in US dollars. Billed monthly through Stripe. Cancel any time." data-nzd="Prices in New Zealand dollars, GST included. Billed monthly through Stripe. Cancel any time.">
+      <p class="fine" id="price-note" data-usd="Prices in US dollars. Billed monthly through Stripe. Cancel any time." data-nzd="NZD prices are for customers in New Zealand, and include GST. Billed monthly through Stripe. Cancel any time." data-aud="AUD prices are for customers in Australia. Billed monthly through Stripe. Cancel any time.">
         Prices in US dollars. Billed monthly through Stripe. Cancel any time.
       </p>
       <p class="fine" style="margin-top:6px;">
@@ -749,9 +750,10 @@ a:focus-visible, button:focus-visible, summary:focus-visible {
 (function () {
   "use strict";
 
-  // Currency switch on the pricing table. USD is the list price; NZ visitors see
-  // NZD by default. The currency actually charged is chosen in the app's billing
-  // page, so this only changes what is shown here.
+  // Currency switch on the pricing table. USD is the list price; NZ and Australian
+  // visitors see their own currency by default. The app's billing page decides the
+  // currency from the customer's country (NZD for New Zealand only, AUD for
+  // Australia only), so this only changes what is shown here.
   var buttons = document.querySelectorAll("[data-currency]");
   var priced = document.querySelectorAll("[data-usd]");
 
@@ -769,6 +771,7 @@ a:focus-visible, button:focus-visible, summary:focus-visible {
   var zone = "";
   try { zone = Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch (e) {}
   if (/^(Pacific\/Auckland|Pacific\/Chatham|NZ)/.test(zone)) show("nzd");
+  else if (/^Australia\//.test(zone)) show("aud");
 })();
 </script>
 </body>
