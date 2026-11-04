@@ -1,7 +1,9 @@
 # teemops.com
 
-The marketing site and its demo-request form. One page, deployed to Cloudflare
-Workers as static assets plus a single API route.
+The marketing site for the teemops SaaS. One static page, deployed to Cloudflare Workers
+as static assets. Every sign-up button links to `https://app.teemops.com/`, where the
+app's welcome page handles sign-up and sign-in through auth.teem.cloud. This site has no
+server-side code.
 
 **This is a separate Workers project from the docs site.** The repo root's
 `wrangler.jsonc` is `docs.teemops.com` (built by `mkdocs.yml`); this directory's is
@@ -12,160 +14,115 @@ one.
 
 ```
 www/
-├── wrangler.jsonc        # Worker config — assets, D1 binding, observability
-├── schema.sql            # the design_partner_leads table
-├── vitest.config.ts      # runs the tests inside workerd, against a real local D1
-├── build-assets.py       # regenerates public/og.png and public/favicon.ico
-├── src/
-│   └── index.ts          # POST /api/design-partner — demo requests, the only server-side code
-├── test/
-│   └── signup.test.ts    # 19 tests over that endpoint
-└── public/               # everything else is static
+├── wrangler.jsonc        # Worker config: static assets, custom domains, observability
+├── build-assets.py       # regenerates public/og.png and public/favicon.ico from teem.cloud's logo
+└── public/               # everything is static
     ├── index.html        # the page, with its CSS and JS inline
     ├── 404.html
-    ├── og.png            # generated — do not edit by hand
-    ├── favicon.ico       # generated — do not edit by hand
-    ├── logo.png          # the source both are derived from
+    ├── fonts/            # IBM Plex, copied from the app's UI kit (OFL)
+    ├── og.png            # generated, do not edit by hand
+    ├── favicon.ico       # generated, do not edit by hand
     ├── robots.txt
     └── sitemap.xml
 ```
 
-## First-time setup
+The Teem logo is the only logo used for teemops. "teemops" appears as plain text beside
+it. The page loads the logo straight from teem.cloud rather than keeping a copy, so a
+change there shows up here with no deploy:
 
-Two CLI commands. There are no secrets to set. (Email Sending on `notify.teemops.com`
-was enabled once with `npx wrangler email sending enable notify.teemops.com`.)
+- `https://teem.cloud/logo-dark.png`, the white wordmark teem.cloud uses on dark
+  backgrounds (`logo.png` there, also `design/brand/TeemLogo1ps-small.png` here, is the
+  black one for light backgrounds and would vanish on this page)
+- `https://teem.cloud/favicon.svg`, the mark alone
 
-### 1. Create the leads table
+`/favicon.ico` and `og.png` can't point elsewhere, so `build-assets.py` downloads those two
+files and rebuilds them. Run it again if the Teem logo changes. The colours in
+`index.html` are the dark theme of the app's UI kit (`packages/ui/src/css/tokens.css` in
+`teemops/teemops`), so the site and the app look like one product.
 
-The D1 database `tops-www-leads` already exists. Create its schema in the remote copy:
+## Deploy
 
 ```bash
-npm run db:init
-```
-
-### 2. Deploy
-
-```bash
+npm install
 npm run deploy
 ```
 
 That also attaches `teemops.com` and `www.teemops.com`: they are declared as custom
 domains under `routes` in `wrangler.jsonc`, so Wrangler creates the DNS records and
 certificates itself. Declaring routes turns the `workers.dev` URL off, so there is no
-preview address — test locally with `npm run dev`.
+preview address. Test locally with `npm run dev`.
 
-## Reading the leads
-
-```bash
-npm run leads
-```
-
-That prints every signup, newest first. For the message someone left as well:
-
-```bash
-npx wrangler d1 execute tops-www-leads --remote \
-  --command="SELECT created_at, name, email, company, aws_scale, notes FROM design_partner_leads ORDER BY created_at DESC LIMIT 20"
-```
-
-**Each new lead is also emailed to `help@teemops.com`**, from `leads@notify.teemops.com`
-with Reply-To set to the lead, so you can answer from your inbox. The database is still the
-record: the email is sent after the row is stored, and a failed send is logged as
-`lead_notify_failed` without affecting the visitor. Check the Worker's logs if the emails
-stop arriving.
-
-`notify.teemops.com`, not the apex, is onboarded to Cloudflare Email Sending, because
-`teemops.com`'s mail and DMARC record belong to Proton and a second DMARC record would
-break both. The recipient is pinned by `destination_address` on the `EMAIL` binding in
-`wrangler.jsonc`, and `NOTIFY_TO` in `src/index.ts` must match it.
-
-## Spam protection, and what to do if it stops working
-
-The form is protected by a **honeypot**: a hidden `website` field that people never see and
-bots tend to fill. If it arrives non-empty the submission is dropped and the endpoint
-answers `201` anyway, so a bot gets no signal about which field gave it away. The name is
-defined once in `src/index.ts` as `HONEYPOT_FIELD` and must match the input in
-`public/index.html`.
-
-**There is deliberately no CAPTCHA.** Turnstile was built and then removed before launch,
-for three reasons: at current lead volume a handful of junk rows is easier to skim
-past than a widget is to maintain; the endpoint emails only our own pinned inbox and publishes nothing, so
-spam has no amplification path; and a third-party challenge script that fails to load —
-corporate network, privacy extension — makes the form unsubmittable and loses a real lead
-with no signal that it happened.
-
-**If you start getting spam**, in increasing order of effort:
-
-1. Turn on **Bot Fight Mode** for the zone. No code, no deploy.
-2. Add a **rate-limiting rule** on `/api/design-partner`. Still no code.
-3. Add [Turnstile](https://developers.cloudflare.com/turnstile/) — a widget in the
-   dashboard, its site key in the page, `wrangler secret put TURNSTILE_SECRET_KEY`, and a
-   `siteverify` call in `handleSignup`. Note the stored OAuth token lacks
-   `challenge-widgets.write`, so creating the widget from the CLI needs `wrangler login`
-   first. If you do this, never ship Cloudflare's test key (`1x00000000000000000000AA`) —
-   it always passes, so the form would look protected and be wide open.
-
-Reach for 3 only if 1 and 2 have not held.
-
-## Tests
-
-```bash
-npm test
-```
-
-19 tests covering `POST /api/design-partner`, run inside `workerd` against a real local D1
-via `@cloudflare/vitest-pool-workers` — so the SQL is genuinely executed rather than
-mocked. They cover the happy path, field trimming and length caps, every validation
-rejection, the honeypot (including that a trapped request is byte-for-byte
-indistinguishable from a genuine one), the lead notification (with the `EMAIL` binding
-replaced by a recorder, so tests never send mail), and the method and path guards.
-
-Each assertion checks the database as well as the status code, because the failure that
-matters is a submission that answers `201` and stores nothing.
-
-Note `@cloudflare/vitest-pool-workers` 0.20 removed the `/config` subpath and the
-`defineWorkersConfig` helper that most examples online still use. On vitest 4 the pool
-options go to a `cloudflareTest()` **plugin** — see the comment in `vitest.config.ts`.
+Deploy only while `app.teemops.com` is live, since every call to action points there,
+and only once production runs X-11 (the free first scan) and the COV checks (#104 to #107), which this page describes.
 
 ## Local development
 
 ```bash
 npm install
-npm run db:init:local
 npm run dev
 ```
 
-Then open the printed URL. There are no secrets and no `.dev.vars` to set up.
-
-Inspect what local submissions wrote:
-
-```bash
-npx wrangler d1 execute tops-www-leads --local --command="SELECT * FROM design_partner_leads"
-```
+Then open the printed URL.
 
 ## Changing the page
 
-The CSS and JS are inline in `public/index.html` on purpose — the page is one file, has no
-build step, and loads no third-party assets at all. Keep it that way
-unless there is a reason not to.
+The CSS and JS are inline in `public/index.html` on purpose: the page is one file, has no
+build step, and loads nothing from anywhere but this site and teem.cloud (the logo). Keep it that way unless there is a
+reason not to.
 
-After changing the headline, regenerate the derived assets so the link-preview card and
-the page agree:
+After changing the headline or the Teem logo, regenerate the derived assets so the
+link-preview card and the page agree. It needs network access and `rsvg-convert`
+(librsvg):
 
 ```bash
 python3 build-assets.py
 ```
 
+## Legal pages
+
+Terms, privacy and cookies are Teem's company-wide policies, published on teem.cloud and
+linked from the footer and the pricing section. They are not copied here, so there is one
+version to keep up to date:
+
+- https://teem.cloud/legal/terms/ (section 7 covers teemops, as "Teem Ops")
+- https://teem.cloud/legal/privacy/
+- https://teem.cloud/legal/cookies/
+
+This page sets no cookies and runs no analytics. If that changes, check the privacy and
+cookie policies still describe it.
+
 ## Claims made on this page
 
-The page states specific numbers. They were true at v0.5.0 and they are checkable — if you
-change the rules, check them again:
+The page states specific numbers and behaviour. They were true of `teemops/teemops` on
+2026-10-29 (master at `9a232e9`, after #107), re-checked on 2026-11-04 against prod (`bd18c7b`), and they are checkable. If the product changes, check them again:
 
-| Claim | Source |
+| Claim | Source in `teemops/teemops` |
 | --- | --- |
-| 74 checks | `app/rules/rulesets/basic.json` (52) + `cis.json` (22) |
-| 11 AWS services | directories under `app/rules/tasks/` |
-| 28 with step-by-step guidance | `app/rules/recommendations/tips.json` |
-| Install needs only Docker | `install.sh`, and D-8 in `docs/roadmap.md` |
+| 149 checks (143 in `basic.json`, 6 in `cis.json`), one per distinct problem | `packages/scan-core/rules/aws/`; `npm run validate:rules` prints the count |
+| 17 AWS services, as `validate:rules` counts them (S3 Control and Account are separate from S3) | `packages/scan-core/collectors/aws/` |
+| 31 CIS AWS Foundations v5.0 controls | the distinct `cis-aws-5.0:` tags across both rule files (`0444ce3` tagged the newer rules); `frameworks.test` |
+| GuardDuty, Security Hub, Config, Access Analyzer, alarms on root user use and IAM policy changes | wave 3, #106 |
+| Remediation on every check | the `remediation` field on every rule |
+| Daily scans | N-8 in `docs/roadmap.md`, `docs/features/n8-scheduled-scans.md` |
+| Health score 0–100 | `docs/features/insights-health-score.md` |
+| Email and Slack on new critical or high | `docs/features/x4-notifications.md` |
+| Agent prompt on each finding | `apps/web/src/pages/FindingPage.vue` |
+| `--fail-on` exits non-zero | `apps/cli/src/cli.ts` |
+| Read-only role with a per-account ExternalId, no stored keys | N-4 in `docs/roadmap.md`, `docs/features/n4-connect-aws.md` |
+| Sign up with Google, Microsoft, GitHub or email | `apps/web/src/welcome.ts` |
+| First scan free with no card: score, severity counts and issue titles; resources, regions and fixes unlock with a plan; deleted after 14 days; one per AWS account | X-11, `docs/features/free-first-scan.md` |
+| Plans, prices, $1 for 30 days, limits, downgrade behaviour | "Pricing" in `docs/roadmap.md`, `docs/features/billing.md` |
+| AWS only today; GCP, Azure, Cloudflare next | X-1 to X-3 in `docs/roadmap.md` |
 
-Overstating any of these to a lead costs more than it buys — they will install it
-and find out.
+Team and Business sell 5 and 10 users, so team invites (X-9) must ship before those
+plans are sold to anyone who needs a second user.
+
+Overstating any of these costs more than it buys: a customer will sign up and find out.
+
+## The old demo-request form
+
+Until October 2026 this site was the page for the self-hosted scanner, with a
+demo-request form at `POST /api/design-partner`. The form and its Worker were removed when
+the site moved to sign-up. The leads it collected are still in the D1 database
+`tops-www-leads` (id `88cc0eec-9c77-4714-8b1a-62c7db52e0e5`). Nothing writes to it now,
+and it has not been deleted.

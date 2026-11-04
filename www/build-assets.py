@@ -7,10 +7,15 @@
 - favicon.ico browsers request /favicon.ico whether or not a <link rel="icon">
               points elsewhere, so without this every visit logs a 404.
 
-Run after changing the headline or the logo:
+Both start from Teem's own logo files on teem.cloud, which the page also loads
+directly, so the brand has one source. Needs network access and rsvg-convert
+(librsvg) for the favicon. Run after changing the headline or the logo:
 
     python3 www/build-assets.py
 """
+import io
+import subprocess
+import urllib.request
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
@@ -18,12 +23,13 @@ from PIL import Image, ImageDraw, ImageFont
 HERE = Path(__file__).parent
 OUT = HERE / "public" / "og.png"
 FAVICON = HERE / "public" / "favicon.ico"
-LOGO = HERE / "public" / "logo.png"
+WORDMARK_URL = "https://teem.cloud/logo-dark.png"  # the Teem logo, white wordmark
+MARK_URL = "https://teem.cloud/favicon.svg"  # the Teem mark alone, teem.cloud's favicon
 
 W, H = 1200, 630
-BG = (10, 14, 23)
-TEXT = (233, 237, 245)
-MUTED = (152, 163, 184)
+BG = (15, 19, 27)
+TEXT = (232, 235, 241)
+MUTED = (154, 163, 178)
 BRAND = (245, 130, 31)
 
 FONT_CANDIDATES = {
@@ -62,6 +68,13 @@ def glow(img: Image.Image) -> None:
     img.alpha_composite(overlay)
 
 
+def fetch(url: str) -> bytes:
+    # teem.cloud's Cloudflare answers 403 to urllib's default user agent.
+    req = urllib.request.Request(url, headers={"User-Agent": "teemops-www-build-assets"})
+    with urllib.request.urlopen(req, timeout=20) as res:
+        return res.read()
+
+
 def main() -> None:
     img = Image.new("RGBA", (W, H), (*BG, 255))
     glow(img)
@@ -70,30 +83,31 @@ def main() -> None:
     margin = 84
     y = 96
 
-    if LOGO.exists():
-        logo = Image.open(LOGO).convert("RGBA")
-        logo.thumbnail((78, 78), Image.LANCZOS)
-        img.alpha_composite(logo, (margin, y - 8))
-        draw.text((margin + 96, y + 12), "Teemops", font=font("bold", 42), fill=TEXT)
+    logo = Image.open(io.BytesIO(fetch(WORDMARK_URL))).convert("RGBA")
+    logo.thumbnail((200, 75), Image.LANCZOS)
+    img.alpha_composite(logo, (margin, y - 8))
+    x = margin + logo.width + 22
+    draw.line((x, y, x, y + 56), fill=(255, 255, 255, 60), width=2)
+    draw.text((x + 22, y + 6), "teemops", font=font("bold", 40), fill=MUTED)
 
     y += 132
-    for line in ("Open source AWS security", "scanning you run yourself"):
+    for line in ("Find the AWS security risks", "that matter, every day"):
         draw.text((margin, y), line, font=font("bold", 62), fill=TEXT)
         y += 76
 
     y += 26
     for line in (
-        "Overly permissive IAM roles, public S3 buckets, open",
-        "security groups. 74 checks, each with the fix.",
+        "149 checks across 17 AWS services, a fix for every",
+        "finding, and read-only access. Scanned daily.",
     ):
         draw.text((margin, y), line, font=font("regular", 30), fill=MUTED)
         y += 42
 
-    # Footer rule and badge row.
+    # Footer rule and offer row.
     draw.line((margin, H - 106, W - margin, H - 106), fill=(255, 255, 255, 28), width=1)
     draw.text(
         (margin, H - 76),
-        "Apache 2.0   ·   Self-hosted   ·   No paid tier",
+        "Your first scan is free",
         font=font("mono", 25),
         fill=BRAND,
     )
@@ -106,12 +120,13 @@ def main() -> None:
 
 
 def favicon() -> None:
-    """Multi-size .ico from the logo. Keeps the transparent background so the
-    mark sits on whatever colour the browser's tab strip happens to be."""
-    if not LOGO.exists():
-        print(f"skipped {FAVICON} — {LOGO} is missing")
-        return
-    src = Image.open(LOGO).convert("RGBA")
+    """Multi-size .ico rasterised from teem.cloud's favicon.svg, so /favicon.ico
+    shows the same mark as the <link rel="icon"> that points at the SVG."""
+    png = subprocess.run(
+        ["rsvg-convert", "-w", "48", "-h", "48"],
+        input=fetch(MARK_URL), capture_output=True, check=True,
+    ).stdout
+    src = Image.open(io.BytesIO(png)).convert("RGBA")
     src.save(FAVICON, format="ICO", sizes=[(16, 16), (32, 32), (48, 48)])
     print(f"wrote {FAVICON} ({FAVICON.stat().st_size // 1024} KB)")
 
