@@ -53,7 +53,7 @@ certificates itself. Declaring routes turns the `workers.dev` URL off, so there 
 preview address. Test locally with `npm run dev`.
 
 Deploy only while `app.teemops.com` is live, since every call to action points there,
-and only once production runs X-11 (the free first scan) and the COV checks (#104 to #107), which this page describes.
+and only once production runs the COV checks (#104 to #107), which this page describes.
 
 ## Local development
 
@@ -110,7 +110,7 @@ The page states specific numbers and behaviour. They were true of `teemops/teemo
 | `--fail-on` exits non-zero | `apps/cli/src/cli.ts` |
 | Read-only role with a per-account ExternalId, no stored keys | N-4 in `docs/roadmap.md`, `docs/features/n4-connect-aws.md` |
 | Sign up with Google, Microsoft, GitHub or email | `apps/web/src/welcome.ts` |
-| First scan free with no card: score, severity counts and issue titles; resources, regions and fixes unlock with a plan; deleted after 14 days; one per AWS account | X-11, `docs/features/free-first-scan.md` |
+| The scan shows the health score and issues by severity; resources and fixes unlock with a plan. The page doesn't mention a free scan: the offer is $1 for 30 days | X-11, `docs/features/free-first-scan.md` |
 | Plans, prices, $1 for 30 days, limits, downgrade behaviour | "Pricing" in `docs/roadmap.md`, `docs/features/billing.md` |
 | AWS only today; GCP, Azure, Cloudflare next | X-1 to X-3 in `docs/roadmap.md` |
 
