@@ -94,13 +94,13 @@ cookie policies still describe it.
 ## Claims made on this page
 
 The page states specific numbers and behaviour. They were true of `teemops/teemops` on
-2026-10-29 (master at `9a232e9`, after #107) and they are checkable. If the product changes, check them again:
+2026-10-29 (master at `9a232e9`, after #107), re-checked on 2026-11-04 against prod (`bd18c7b`), and they are checkable. If the product changes, check them again:
 
 | Claim | Source in `teemops/teemops` |
 | --- | --- |
 | 149 checks (143 in `basic.json`, 6 in `cis.json`), one per distinct problem | `packages/scan-core/rules/aws/`; `npm run validate:rules` prints the count |
 | 17 AWS services, as `validate:rules` counts them (S3 Control and Account are separate from S3) | `packages/scan-core/collectors/aws/` |
-| 22 CIS AWS Foundations v5.0 controls | the `cis-aws-5.0:` tags across both rule files; `frameworks.test`. The CIS monitoring alarms are checked but not yet tagged (#107), so don't claim more than 22 |
+| 31 CIS AWS Foundations v5.0 controls | the distinct `cis-aws-5.0:` tags across both rule files (`0444ce3` tagged the newer rules); `frameworks.test` |
 | GuardDuty, Security Hub, Config, Access Analyzer, alarms on root user use and IAM policy changes | wave 3, #106 |
 | Remediation on every check | the `remediation` field on every rule |
 | Daily scans | N-8 in `docs/roadmap.md`, `docs/features/n8-scheduled-scans.md` |
