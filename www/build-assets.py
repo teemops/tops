@@ -107,7 +107,7 @@ def main() -> None:
     draw.line((margin, H - 106, W - margin, H - 106), fill=(255, 255, 255, 28), width=1)
     draw.text(
         (margin, H - 76),
-        "Your first scan is free",
+        "$1 for your first 30 days",
         font=font("mono", 25),
         fill=BRAND,
     )
